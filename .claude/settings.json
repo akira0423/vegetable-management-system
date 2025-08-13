@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run test:*)",
+      "Bash(npm run lint)"
+    ],
+    "deny": [
+      "Bash(curl:*)"
+    ],
+    "defaultMode": "plan"
+  }
+}

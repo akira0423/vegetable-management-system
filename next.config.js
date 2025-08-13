@@ -1,0 +1,49 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Jest workerエラーを回避するための設定
+  experimental: {
+    // workerThreads: false,
+    // esmExternals: false
+  },
+  // 開発時のワーカープロセス設定
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // 開発時のJestワーカーを無効化
+      config.optimization = {
+        ...config.optimization,
+        minimize: false,
+      }
+    }
+    return config
+  },
+  // 画像最適化設定
+  images: {
+    domains: [
+      'rsofuafiacwygmfkcrrk.supabase.co',
+      'images.unsplash.com',
+      'via.placeholder.com'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
+}
+
+module.exports = nextConfig

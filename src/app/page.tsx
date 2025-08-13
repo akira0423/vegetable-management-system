@@ -1,103 +1,202 @@
-import Image from "next/image";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Sprout, Users, BarChart3, Shield, Calendar, Camera } from "lucide-react"
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
+      {/* Header */}
+      <header className="border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Sprout className="h-8 w-8 text-green-600" />
+            <span className="text-xl font-bold text-gray-900">野菜栽培管理システム</span>
+          </div>
+          
+          <nav className="hidden md:flex items-center space-x-6">
+            <a href="#features" className="text-gray-600 hover:text-green-600 transition-colors">
+              機能
+            </a>
+            <a href="#about" className="text-gray-600 hover:text-green-600 transition-colors">
+              会社情報
+            </a>
+            <a href="#contact" className="text-gray-600 hover:text-green-600 transition-colors">
+              お問い合わせ
+            </a>
+          </nav>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <Link href="/login">
+            <Button variant="default" className="bg-green-600 hover:bg-green-700">
+              会員ログイン
+            </Button>
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </header>
+
+      {/* Hero Section */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            栽培進捗を
+            <span className="text-green-600">簡単・安全</span>
+            に管理
+          </h1>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            契約企業様の野菜栽培進捗を一元管理。
+            簡単な記録・共有システムで、効率的な農業経営をサポートします。
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login">
+              <Button size="lg" className="bg-green-600 hover:bg-green-700">
+                システムにログイン
+              </Button>
+            </Link>
+            <Button variant="outline" size="lg">
+              サービス資料をダウンロード
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-20 px-4 bg-white">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              主要機能
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              企業様の栽培管理業務を効率化する機能を豊富に搭載
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card>
+              <CardHeader>
+                <Calendar className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>ガントチャート管理</CardTitle>
+                <CardDescription>
+                  作物ごとの進行状況をカレンダー・ガントチャート形式で視覚的に管理
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Camera className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>写真付き作業記録</CardTitle>
+                <CardDescription>
+                  日次作業と写真をかんたんアップロード。現場の状況を即座に共有
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <BarChart3 className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>データ自動集計</CardTitle>
+                <CardDescription>
+                  投入肥料量、土壌データ、収穫量を自動でガントチャートに反映
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Users className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>企業別管理</CardTitle>
+                <CardDescription>
+                  100社以上の契約企業データを安全に管理。権限設定も柔軟に対応
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Shield className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>セキュア認証</CardTitle>
+                <CardDescription>
+                  企業別ログインシステムで安全なデータアクセスを保証
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Sprout className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>AIアドバイス</CardTitle>
+                <CardDescription>
+                  栽培データに基づくAIチャットボットが最適な栽培アドバイスを提供
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section id="about" className="py-20 px-4 bg-green-50">
+        <div className="container mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                会社情報
+              </h2>
+              <p className="text-gray-600 mb-6">
+                私たちは、現代農業のDX化を支援する専門企業として、
+                契約企業様の栽培データ管理と効率的な農業経営をサポートしています。
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900">ビジネスゴール</h3>
+                  <p className="text-gray-600">
+                    契約企業が自社で栽培する野菜の進捗を、簡単・安全に記録・共有できるポータルを提供し、
+                    運営側は一元的なデータ管理とマーケティング用コンテンツ配信を実現する。
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">対象ユーザー</h3>
+                  <p className="text-gray-600">
+                    B2B企業様（初期100社、今後拡大予定）
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                お問い合わせ
+              </h3>
+              <div className="space-y-4 text-gray-600">
+                <p>システム導入に関するご相談は、お気軽にお問い合わせください。</p>
+                <div>
+                  <strong>メール:</strong> contact@example.com
+                </div>
+                <div>
+                  <strong>電話:</strong> 03-1234-5678
+                </div>
+                <div>
+                  <strong>営業時間:</strong> 平日 9:00-18:00
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-8 px-4">
+        <div className="container mx-auto text-center">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Sprout className="h-6 w-6" />
+            <span className="text-lg font-semibold">野菜栽培管理システム</span>
+          </div>
+          <p className="text-gray-400">
+            © 2024 野菜栽培管理システム. All rights reserved.
+          </p>
+        </div>
       </footer>
     </div>
-  );
+  )
 }

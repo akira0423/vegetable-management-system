@@ -1,0 +1,23 @@
+-- ====================================================================
+-- テスト・開発環境用RLS一時無効化
+-- ====================================================================
+--
+-- 注意: 本番環境では絶対に実行しないでください！
+-- この設定により、認証なしでのデータアクセスが可能になります。
+--
+
+-- 開発・テスト時のみ使用：operation_logsのRLSを一時的に無効化
+ALTER TABLE operation_logs DISABLE ROW LEVEL SECURITY;
+
+-- 代替案：テスト環境用の寛容なポリシーを追加
+-- ALTER TABLE operation_logs ENABLE ROW LEVEL SECURITY;
+-- 
+-- DROP POLICY IF EXISTS "operation_logs_insert_policy" ON operation_logs;
+-- CREATE POLICY "operation_logs_insert_policy_dev" ON operation_logs
+--     FOR INSERT
+--     WITH CHECK (true); -- 開発時は制限なし
+-- 
+-- DROP POLICY IF EXISTS "operation_logs_select_policy" ON operation_logs;
+-- CREATE POLICY "operation_logs_select_policy_dev" ON operation_logs
+--     FOR SELECT
+--     USING (true); -- 開発時は制限なし
