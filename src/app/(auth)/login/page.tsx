@@ -33,7 +33,7 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      router.push('/dashboard/gantt')
     } catch (err) {
       setError('システムエラーが発生しました。しばらく経ってから再試行してください。')
     } finally {

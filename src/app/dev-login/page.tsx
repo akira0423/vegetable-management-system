@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+
+// 本番環境では dev-login を無効化
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Dev login is not available in production')
+}
 
 // 開発環境専用のテストユーザー
 const TEST_USERS = [
@@ -66,8 +71,8 @@ export default function DevLoginPage() {
       // クッキーにも保存（サーバーサイドからアクセスできるように）
       document.cookie = `dev_user=${encodeURIComponent(userJson)}; path=/; max-age=86400`
       
-      // ダッシュボードにリダイレクト
-      router.push('/dashboard')
+      // 栽培野菜管理ページにリダイレクト
+      router.push('/dashboard/gantt')
       
     } catch (err) {
       setError('ログインに失敗しました')

@@ -29,43 +29,28 @@ export async function createClient() {
   )
 }
 
-// テスト・開発用のservice role client（RLS制限をバイパス）
+// Service role client（RLS制限をバイパス）
 export async function createServiceClient() {
-  // Verify environment variables are available
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Missing Supabase environment variables:', {
+    console.error('❌ Missing Supabase environment variables:', {
       hasUrl: !!supabaseUrl,
       hasServiceKey: !!serviceRoleKey
     })
     throw new Error('Missing Supabase configuration for service client')
   }
 
-  console.log('Creating service client with service role key')
+  console.log('🔧 Creating service client with service role key')
   
-  const cookieStore = await cookies()
-
-  const client = createServerClient<Database>(
+  // Simple service role client without cookies
+  const { createClient } = await import('@supabase/supabase-js')
+  
+  const client = createClient<Database>(
     supabaseUrl,
-    serviceRoleKey,  // service role keyを使用
+    serviceRoleKey,
     {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          } catch (error) {
-            // Ignore cookie setting errors in server components
-            console.warn('Cookie setting error in service client:', error)
-          }
-        },
-      },
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -73,6 +58,19 @@ export async function createServiceClient() {
     }
   )
 
-  console.log('Service client created successfully')
+  console.log('✅ Service client created successfully')
+  
+  // サービスクライアントの接続テスト
+  try {
+    const { data, error } = await client.from('companies').select('id').limit(1)
+    if (error) {
+      console.error('❌ Service client connection test failed:', error)
+    } else {
+      console.log('✅ Service client connection test passed')
+    }
+  } catch (testError) {
+    console.error('❌ Service client test error:', testError)
+  }
+  
   return client
 }

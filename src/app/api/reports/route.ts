@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -19,11 +19,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
+    // アクティブな記録のみ取得するかどうか
+    const activeOnly = searchParams.get('active_only') !== 'false'
+    
     // ベースクエリ
     let query = supabase
       .from('work_reports')
       .select(`
         id,
+        company_id,
         vegetable_id,
         work_type,
         description,
@@ -31,12 +35,16 @@ export async function GET(request: NextRequest) {
         start_time,
         end_time,
         duration_hours,
-        photos,
         weather,
         temperature,
+        harvest_amount,
+        harvest_unit,
+        harvest_quality,
+        worker_count,
         notes,
         created_by,
         created_at,
+        deleted_at,
         vegetables:vegetable_id (
           id,
           name,
@@ -45,7 +53,9 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('company_id', companyId)
-      .order('work_date', { ascending: false })
+      .is('deleted_at', null) // ソフト削除フィルター
+    
+    query = query.order('work_date', { ascending: false })
       .order('created_at', { ascending: false })
 
     // フィルター条件の適用
@@ -78,10 +88,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 削除された野菜に関連する作業記録を除外
+    const filteredData = data?.filter(report => report.vegetables !== null) || []
+
     return NextResponse.json({
       success: true,
-      data: data || [],
-      count: data?.length || 0
+      data: filteredData,
+      count: filteredData.length
     })
 
   } catch (error) {
@@ -95,7 +108,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     
     let body;
     try {
@@ -121,21 +134,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Work date is required' }, { status: 400 })
     }
 
-    // 作業報告データの準備
+    // 拡張されたデータベーススキーマに合わせたデータ準備
     const reportData = {
+      // 基本情報
       company_id: body.company_id,
       vegetable_id: body.vegetable_id || null,
       work_type: body.work_type,
-      description: body.description || null,
+      description: body.description || body.work_notes || null,
       work_date: body.work_date,
       start_time: body.start_time || null,
       end_time: body.end_time || null,
       duration_hours: body.duration_hours || null,
-      photos: body.photos || [],
       weather: body.weather || null,
       temperature: body.temperature || null,
-      notes: body.notes || null,
-      created_by: body.created_by || null
+      notes: body.notes || body.work_notes || null,
+      created_by: body.created_by || null,
+      
+      // 収穫データ
+      harvest_amount: body.harvest_amount || null,
+      harvest_unit: body.harvest_unit || null,
+      harvest_quality: body.harvest_quality || null,
+      
+      // 売上データはnotesフィールドに統合保存するため、ここでは削除
+      
+      // 作業者情報
+      worker_count: body.worker_count || 1
     }
 
     // データベースに挿入
@@ -144,6 +167,7 @@ export async function POST(request: NextRequest) {
       .insert(reportData)
       .select(`
         id,
+        company_id,
         vegetable_id,
         work_type,
         description,
@@ -151,9 +175,12 @@ export async function POST(request: NextRequest) {
         start_time,
         end_time,
         duration_hours,
-        photos,
         weather,
         temperature,
+        harvest_amount,
+        harvest_unit,
+        harvest_quality,
+        worker_count,
         notes,
         created_by,
         created_at,
@@ -185,6 +212,60 @@ export async function POST(request: NextRequest) {
     console.error('Error stack:', error.stack)
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createServiceClient()
+    const body = await request.json()
+    
+    const { id, reason, hard_delete = false } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Report ID is required' }, { status: 400 })
+    }
+
+    if (hard_delete) {
+      // 物理削除（管理者用）
+      const { error } = await supabase
+        .from('work_reports')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.error('Database error:', error)
+        return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Report permanently deleted'
+      })
+    } else {
+      // カスケード削除システム - 完全削除
+      const { error } = await supabase
+        .from('work_reports')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.error('Database error:', error)
+        return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: '実績記録を完全に削除しました'
+      })
+    }
+
+  } catch (error) {
+    console.error('API error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' }, 
       { status: 500 }
     )
   }

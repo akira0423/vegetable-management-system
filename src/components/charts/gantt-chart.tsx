@@ -57,6 +57,8 @@ export function GanttChart({
   className,
   onTaskClick
 }: GanttChartProps) {
+  // 固定列の幅を定数として定義 (w-48 + w-24 + w-24 + w-20 + w-16 + w-20)
+  const FIXED_COLUMNS_WIDTH = 192 + 96 + 96 + 80 + 64 + 80 // = 608px
   // 優先度別背景色設定
   const getPriorityRowColor = (priority: string) => {
     switch (priority) {
@@ -227,13 +229,21 @@ export function GanttChart({
     // 作業レポートデータの処理
     const processedReports = workReports
       .filter(report => {
-        const reportDate = parseISO(report.work_date)
-        return reportDate >= chartStart && reportDate <= chartEnd
+        // work_dateが存在し、有効な日付形式かをチェック
+        if (!report.work_date) return false
+        try {
+          const reportDate = parseISO(report.work_date)
+          return !isNaN(reportDate.getTime()) && reportDate >= chartStart && reportDate <= chartEnd
+        } catch (error) {
+          console.warn('無効な作業日付をスキップ:', report.work_date, error)
+          return false
+        }
       })
       .map(report => {
-        const reportDate = parseISO(report.work_date)
-        const dateOffset = differenceInDays(reportDate, chartStart)
-        const position = dateOffset * dayWidth
+        try {
+          const reportDate = parseISO(report.work_date)
+          const dateOffset = differenceInDays(reportDate, chartStart)
+          const position = dateOffset * dayWidth
         
         // 作業種類に応じた色とアイコン
         const workTypeConfig = {
@@ -249,19 +259,24 @@ export function GanttChart({
         
         const config = workTypeConfig[report.work_type] || workTypeConfig.other
         
-        return {
-          ...report,
-          position,
-          config,
-          // ツールチップ用の詳細データ
-          details: {
-            cost: report.estimated_cost,
-            harvest: report.harvest_amount,
-            revenue: report.expected_revenue,
-            notes: report.work_notes
+          return {
+            ...report,
+            position,
+            config,
+            // ツールチップ用の詳細データ
+            details: {
+              cost: report.estimated_cost,
+              harvest: report.harvest_amount,
+              revenue: report.expected_revenue,
+              notes: report.work_notes
+            }
           }
+        } catch (error) {
+          console.warn('作業レポート処理エラー:', report, error)
+          return null
         }
       })
+      .filter(report => report !== null) // nullになったレポートを除外
 
     return {
       chartStart,
@@ -414,8 +429,17 @@ export function GanttChart({
                         <div className="flex" style={{ height: viewUnit === 'day' ? '64px' : '56px' }}>
                           {/* タスク名 */}
                           <div 
-                            className="w-48 p-3 border-r border-gray-100 flex items-center cursor-pointer hover:bg-blue-50 transition-colors duration-200" 
-                            onClick={() => onTaskClick?.(task)}
+                            className="w-48 p-3 border-r border-gray-100 flex items-center cursor-pointer hover:bg-blue-50 transition-colors duration-200 select-none" 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onTaskClick?.(task)
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                            style={{ userSelect: 'none' }}
                           >
                             <div className="flex-1">
                               <div className="text-sm font-medium text-gray-900 truncate mb-1">
@@ -514,13 +538,22 @@ export function GanttChart({
 
                         {/* Task bar */}
                         <div
-                          className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30"
+                          className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30 select-none"
                           style={{
                             left: task.left,
                             width: Math.max(task.width, 40),
-                            backgroundColor: task.color
+                            backgroundColor: task.color,
+                            userSelect: 'none'
                           }}
-                          onClick={() => onTaskClick?.(task)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onTaskClick?.(task)
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
                           title={`${task.name}\n進捗率: ${task.progress}%\n期間: ${(task as any).formattedStart} ～ ${(task as any).formattedEnd}\n担当者: ${task.assignedUser?.name || '未割当'}\n優先度: ${task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}`}
                         >
                           {/* Progress indicator */}
@@ -528,7 +561,7 @@ export function GanttChart({
                             className="absolute top-0 left-0 h-full bg-white/25 rounded-l-lg"
                             style={{ width: `${task.progress}%` }}
                           />
-                          <span className="relative z-10 truncate font-semibold">
+                          <span className="relative z-10 truncate font-semibold select-none" style={{ userSelect: 'none' }}>
                             {task.progress}%
                           </span>
                         </div>
@@ -540,50 +573,65 @@ export function GanttChart({
 
             {/* Work Report Plots */}
             {processedReports && processedReports.map((report, index) => {
-              // レポートに対応するタスクを見つける
+              // レポートに対応するタスクを見つける（より柔軟なマッチング）
               const matchingTaskIndex = processedTasks.findIndex(task => {
-                // 野菜と作業種類でマッチング
+                // 同じ野菜であることを最優先でチェック
+                if (task.vegetable.id !== report.vegetable_id) return false
+                
+                // 作業種類とタスク名の大まかなマッチング
                 const workTypeMatch = {
-                  seeding: ['播種・育苗'],
-                  planting: ['定植'],
-                  fertilizing: ['施肥'],
-                  watering: ['灌水'],
-                  weeding: ['除草'],
-                  pruning: ['整枝・摘苽'],
+                  seeding: ['播種', '育苗', '種まき'],
+                  planting: ['定植', '植付', '移植'],
+                  fertilizing: ['施肥', '肥料', '追肥'],
+                  watering: ['灌水', '水やり', '散水'],
+                  weeding: ['除草', '草取り'],
+                  pruning: ['整枝', '摘苽', '剪定', '摘葉'],
                   harvesting: ['収穫'],
-                  other: ['その他']
+                  other: ['その他', '管理', '点検']
                 }
                 
-                const matchingTaskNames = workTypeMatch[report.work_type] || []
-                return task.vegetable.id === report.vegetable_id && 
-                       matchingTaskNames.some(name => task.name.includes(name))
+                const matchingKeywords = workTypeMatch[report.work_type] || []
+                return matchingKeywords.some(keyword => task.name.includes(keyword))
               })
               
-              if (matchingTaskIndex === -1) return null
+              // マッチするタスクがない場合は、同じ野菜の最初のタスクに表示
+              const taskIndex = matchingTaskIndex !== -1 ? matchingTaskIndex : 
+                               processedTasks.findIndex(task => task.vegetable.id === report.vegetable_id)
               
-              const taskRow = matchingTaskIndex
-              const verticalPosition = 48 + (taskRow * 48) + 24 // ヘッダーの後 + タスク高さ * インデックス + 中央寄せ
+              if (taskIndex === -1) return null
+              
+              const headerHeight = viewUnit === 'day' ? 84 : 68
+              const taskRowHeight = viewUnit === 'day' ? 64 : 56
+              const verticalPosition = headerHeight + (taskIndex * taskRowHeight) + (taskRowHeight / 2) - 8
               
               return (
                 <div
                   key={`report-${report.id}-${index}`}
-                  className="absolute z-20 pointer-events-none"
+                  className="absolute z-30 pointer-events-none"
                   style={{ 
-                    left: 192 + report.position,
+                    left: FIXED_COLUMNS_WIDTH + report.position,
                     top: verticalPosition
                   }}
                 >
                   <div className="relative">
-                    {/* Work report marker - タスク列に正確に配置 */}
+                    {/* Work report marker */}
                     <div
-                      className="w-4 h-4 rounded-full border-2 border-white shadow-lg cursor-pointer pointer-events-auto hover:scale-110 transition-transform duration-200"
-                      style={{ backgroundColor: report.config.color }}
+                      className="w-5 h-5 rounded-full border-2 border-white shadow-lg cursor-pointer pointer-events-auto hover:scale-125 transition-all duration-200 select-none"
+                      style={{ backgroundColor: report.config.color, userSelect: 'none' }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
                       title={`${report.config.label} - ${format(parseISO(report.work_date), 'MM/dd', { locale: ja })}${report.details.cost ? `\nコスト: ¥${report.details.cost.toLocaleString()}` : ''}${report.details.harvest ? `\n収穫: ${report.details.harvest}kg` : ''}${report.details.revenue ? `\n売上: ¥${report.details.revenue.toLocaleString()}` : ''}${report.details.notes ? `\n備考: ${report.details.notes}` : ''}`}
                     >
                     </div>
-                    {/* Work type icon - アイコンを中央に配置 */}
-                    <div className="absolute -top-0.5 -left-0.5 text-xs pointer-events-none flex items-center justify-center">
-                      {report.config.icon}
+                    {/* Work type icon */}
+                    <div className="absolute -top-1 -left-1 text-sm pointer-events-none flex items-center justify-center w-6 h-6">
+                      <span className="drop-shadow-sm">{report.config.icon}</span>
+                    </div>
+                    {/* Date label */}
+                    <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs bg-white border border-gray-200 rounded px-1 py-0.5 shadow-sm whitespace-nowrap pointer-events-none">
+                      {format(parseISO(report.work_date), 'MM/dd', { locale: ja })}
                     </div>
                   </div>
                 </div>
@@ -597,7 +645,7 @@ export function GanttChart({
                 
                 // 今日が表示範囲内にある場合のみ表示
                 if (todayOffset >= 0 && todayOffset <= chartData.totalDays) {
-                  const todayPosition = 352 + (todayOffset * dayWidth) // 352pxは固定列の幅
+                  const todayPosition = FIXED_COLUMNS_WIDTH + (todayOffset * dayWidth)
                   const headerHeight = viewUnit === 'day' ? 84 : 68 // ヘッダーの高さ調整（年月8px + 日7px + 曜日5px = 20px、曜日なし時15px）
                   
                   return (

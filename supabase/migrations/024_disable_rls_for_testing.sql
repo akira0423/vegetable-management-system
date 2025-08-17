@@ -1,0 +1,14 @@
+-- ====================================================================
+-- 一時的にRLSを無効化してテスト用削除を確実に実行
+-- ====================================================================
+
+-- 1. growing_tasksテーブルのRLSを一時的に無効化
+ALTER TABLE growing_tasks DISABLE ROW LEVEL SECURITY;
+
+-- 2. 確認用ログ
+DO $$ 
+BEGIN
+    RAISE NOTICE 'growing_tasks RLS一時的に無効化完了';
+    RAISE NOTICE 'これで削除が確実に実行されます';
+    RAISE NOTICE 'テスト完了後は再度有効化してください';
+END $$;

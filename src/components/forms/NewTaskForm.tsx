@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { DialogFooter } from '@/components/ui/dialog'
-import { Calendar, User, Sprout, AlertTriangle, Plus, Loader2 } from 'lucide-react'
+import { Calendar, User, Sprout, AlertTriangle, Plus, Loader2, X } from 'lucide-react'
 import { format, addDays } from 'date-fns'
 
 interface Vegetable {
@@ -98,8 +97,10 @@ export default function NewTaskForm({ vegetables, onSubmit, onCancel, isLoading 
     if (formData.workType === 'other' && !formData.description.trim()) {
       newErrors.description = 'その他の場合は作業内容・備考の入力が必須です'
     }
-    if (!formData.vegetableId) {
-      newErrors.vegetableId = '野菜を選択してください'
+    if (!formData.vegetableId || formData.vegetableId === 'no-vegetables') {
+      newErrors.vegetableId = vegetables.length === 0 
+        ? '野菜が登録されていません。まず野菜を登録してください。'
+        : '野菜を選択してください'
     }
     // 担当者は任意項目になりました
     if (new Date(formData.endDate) < new Date(formData.startDate)) {
@@ -174,183 +175,224 @@ export default function NewTaskForm({ vegetables, onSubmit, onCancel, isLoading 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 左列 */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="workType" className="text-sm font-medium flex items-center">
-              <Sprout className="w-4 h-4 mr-2 text-green-600" />
-              作業種類 <span className="text-red-500 ml-1">*</span>
-            </Label>
-            <Select
-              value={formData.workType}
-              onValueChange={(value) => handleInputChange('workType', value)}
-            >
-              <SelectTrigger className={`transition-colors ${errors.workType ? 'border-red-500' : 'border-gray-300 focus:border-green-500'}`}>
-                <SelectValue placeholder="🌱 作業種類を選択してください" />
-              </SelectTrigger>
-              <SelectContent>
-                {WORK_TYPES.map(workType => (
-                  <SelectItem key={workType.value} value={workType.value}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{workType.label}</span>
-                      <span className="text-xs text-gray-500">{workType.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.workType && <p className="text-xs text-red-500">{errors.workType}</p>}
+    <div className="p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ヘッダー情報 */}
+        <div className="text-center mb-4">
+          <div className="bg-blue-100 p-2 rounded-full w-fit mx-auto mb-2">
+            <Plus className="w-5 h-5 text-blue-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">新規栽培スケジュール・タスク作成</h2>
+          <p className="text-xs text-gray-600 mt-1">栽培作業のタスクを作成してスケジュール管理を効率化します</p>
+        </div>
+
+        {/* 2列レイアウト */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* 左列 - 基本情報セクション */}
+          <div className="space-y-4">
+            {/* 対象野菜選択 */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                <Sprout className="w-4 h-4 mr-2" />
+                対象野菜選択
+              </h4>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-gray-700">
+                  対象野菜 <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select value={formData.vegetableId} onValueChange={(value) => handleInputChange('vegetableId', value)}>
+                  <SelectTrigger className={`bg-white border-green-200 h-9 text-sm ${errors.vegetableId ? 'border-red-400' : ''}`}>
+                    <SelectValue placeholder="🥬 野菜を選択してください" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    {vegetables.length === 0 ? (
+                      <SelectItem value="no-vegetables" disabled>
+                        <span className="text-gray-500 text-sm">
+                          登録された野菜がありません。まず野菜を登録してから作業記録を作成してください。
+                        </span>
+                      </SelectItem>
+                    ) : (
+                      vegetables.map(vegetable => (
+                        <SelectItem key={vegetable.id} value={vegetable.id}>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{vegetable.name}</span>
+                            <span className="text-xs text-gray-500">{vegetable.variety}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.vegetableId && <p className="text-xs text-red-500">{errors.vegetableId}</p>}
+              </div>
+            </div>
+
+            {/* 作業種類選択 */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                作業種類選択
+              </h4>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-gray-700">
+                  作業種類 <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Select value={formData.workType} onValueChange={(value) => handleInputChange('workType', value)}>
+                  <SelectTrigger className={`bg-white border-blue-200 h-9 text-sm ${errors.workType ? 'border-red-400' : ''}`}>
+                    <SelectValue placeholder="🌱 作業種類を選択してください" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WORK_TYPES.map(workType => (
+                      <SelectItem key={workType.value} value={workType.value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{workType.label}</span>
+                          <span className="text-xs text-gray-500">{workType.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.workType && <p className="text-xs text-red-500">{errors.workType}</p>}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vegetable" className="text-sm font-medium">
-              対象野菜 <span className="text-red-500 ml-1">*</span>
-            </Label>
-            <Select
-              value={formData.vegetableId}
-              onValueChange={(value) => handleInputChange('vegetableId', value)}
-            >
-              <SelectTrigger className={`transition-colors ${errors.vegetableId ? 'border-red-500' : 'border-gray-300 focus:border-green-500'}`}>
-                <SelectValue placeholder="🥬 野菜を選択してください" />
-              </SelectTrigger>
-              <SelectContent>
-                {vegetables.map(vegetable => (
-                  <SelectItem key={vegetable.id} value={vegetable.id}>
-                    {vegetable.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.vegetableId && <p className="text-xs text-red-500">{errors.vegetableId}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="assignedUser" className="text-sm font-medium flex items-center">
-              <User className="w-4 h-4 mr-2 text-blue-600" />
-              担当者 <span className="text-gray-400 ml-1 text-xs">(任意)</span>
-            </Label>
-            <Select
-              value={formData.assignedUserId}
-              onValueChange={(value) => handleInputChange('assignedUserId', value)}
-            >
-              <SelectTrigger className={`transition-colors ${errors.assignedUserId ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'}`}>
-                <SelectValue placeholder="👤 担当者を選択してください" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignedUsers.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
-                    <div className={`flex items-center space-x-2 ${user.isNone ? 'text-gray-500' : 'text-gray-900'}`}>
-                      <span>{user.name}</span>
-                      {user.isNone && <span className="text-xs text-gray-400">(未割り当て)</span>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.assignedUserId && <p className="text-xs text-red-500">{errors.assignedUserId}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="priority" className="text-sm font-medium flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-2 text-orange-600" />
-              優先度
-            </Label>
-            <Select
-              value={formData.priority}
-              onValueChange={(value: 'low' | 'medium' | 'high') => handleInputChange('priority', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
-                    低
-                  </div>
-                </SelectItem>
-                <SelectItem value="medium">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
-                    中
-                  </div>
-                </SelectItem>
-                <SelectItem value="high">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
-                    高
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          {/* 右列 - 設定セクション */}
+          <div className="space-y-4">
+            {/* スケジュール設定 */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                スケジュール設定
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-700">開始日</Label>
+                  <Input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    className="bg-white border-purple-200 h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-700">終了日</Label>
+                  <Input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    className={`bg-white border-purple-200 h-9 text-sm ${errors.endDate ? 'border-red-400' : ''}`}
+                  />
+                  {errors.endDate && <p className="text-xs text-red-500">{errors.endDate}</p>}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 右列 */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="startDate" className="text-sm font-medium flex items-center">
-              <Calendar className="w-4 h-4 mr-2 text-blue-600" />
-              開始日
-            </Label>
-            <Input
-              id="startDate"
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => handleInputChange('startDate', e.target.value)}
-            />
+        {/* 担当・詳細セクション（全幅） */}
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-orange-800 mb-3 flex items-center">
+            <User className="w-4 h-4 mr-2" />
+            担当・詳細設定
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">
+                担当者 <span className="text-gray-400 text-xs">(任意)</span>
+              </Label>
+              <Select value={formData.assignedUserId} onValueChange={(value) => handleInputChange('assignedUserId', value)}>
+                <SelectTrigger className="bg-white border-orange-200 h-9 text-sm">
+                  <SelectValue placeholder="👤 担当者を選択してください" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignedUsers.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <span className={`text-sm ${user.isNone ? 'text-gray-500' : 'text-gray-900'}`}>
+                        {user.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">優先度</Label>
+              <Select value={formData.priority} onValueChange={(value: 'low' | 'medium' | 'high') => handleInputChange('priority', value)}>
+                <SelectTrigger className="bg-white border-orange-200 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                      <span className="text-sm">低優先度</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-yellow-400 mr-2"></div>
+                      <span className="text-sm">中優先度</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="high">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-red-400 mr-2"></div>
+                      <span className="text-sm">高優先度</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
+          
+          {/* 作業内容・備考 */}
           <div className="space-y-2">
-            <Label htmlFor="endDate" className="text-sm font-medium flex items-center">
-              <Calendar className="w-4 h-4 mr-2 text-blue-600" />
-              終了日
-            </Label>
-            <Input
-              id="endDate"
-              type="date"
-              value={formData.endDate}
-              onChange={(e) => handleInputChange('endDate', e.target.value)}
-              className={errors.endDate ? 'border-red-500' : ''}
-            />
-            {errors.endDate && <p className="text-xs text-red-500">{errors.endDate}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium">
+            <Label className="text-xs font-medium text-gray-700">
               作業内容・備考 {formData.workType === 'other' && <span className="text-red-500 ml-1">*</span>}
             </Label>
             <Textarea
-              id="description"
               placeholder={formData.workType === 'other' ? '具体的な作業内容を入力してください（必須）' : '作業の詳細、使用する資材、注意事項など...'}
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
-              className={`min-h-[120px] resize-none ${errors.description ? 'border-red-500' : ''}`}
+              className={`min-h-[60px] resize-none bg-white border-orange-200 focus:border-orange-400 text-sm ${errors.description ? 'border-red-400' : ''}`}
             />
             {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
           </div>
         </div>
-      </div>
 
-      <DialogFooter className="flex gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          キャンセル
-        </Button>
-        <Button 
-          type="submit" 
-          className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4 mr-2" />
-          )}
-          {isLoading ? '作成中...' : 'タスクを作成'}
-        </Button>
-      </DialogFooter>
-    </form>
+
+        {/* アクションボタン */}
+        <div className="flex gap-3 justify-center pt-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            className="px-6 py-2 text-sm"
+            disabled={isLoading}
+          >
+            <X className="w-4 h-4 mr-1" />
+            キャンセル
+          </Button>
+          <Button 
+            type="submit" 
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                作成中...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-1" />
+                栽培タスクを作成
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
   )
 }

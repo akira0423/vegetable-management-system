@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { 
   Dialog, 
   DialogContent, 
@@ -18,7 +19,10 @@ import {
 } from '@/components/ui/dialog'
 import { GanttChart } from '@/components/charts/gantt-chart'
 import NewTaskForm from '@/components/forms/NewTaskForm'
-import { unifiedTestData } from '@/lib/unified-test-data'
+// サンプルデータのインポートを削除
+// import { unifiedTestData } from '@/lib/unified-test-data'
+import WorkReportForm from '@/components/work-report-form'
+import FarmMapView from '@/components/farm-map-view'
 import { 
   Calendar, 
   Filter, 
@@ -33,7 +37,16 @@ import {
   MapPin,
   TrendingUp,
   Archive,
-  BarChart3
+  BarChart3,
+  Map,
+  FileText,
+  Trash2,
+  AlertTriangle,
+  MoreHorizontal,
+  Edit,
+  Package,
+  DollarSign,
+  Clock
 } from 'lucide-react'
 import { format, subMonths, addMonths, startOfMonth, endOfMonth, differenceInDays, parseISO, addDays } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -69,6 +82,7 @@ interface Vegetable {
   name: string
   variety: string
   status: string
+  area_size?: number
 }
 
 const STATUS_COLORS = {
@@ -84,6 +98,22 @@ const PRIORITY_COLORS = {
   high: '#ef4444',
 }
 
+// 作業種類のラベル変換関数
+const getWorkTypeLabel = (workType: string) => {
+  const workTypeLabels: Record<string, string> = {
+    'seeding': '🌱 播種・育苗',
+    'planting': '🌿 定植', 
+    'fertilizing': '🌾 施肥',
+    'watering': '💧 灌水',
+    'weeding': '🔧 除草',
+    'pruning': '✂️ 整枝・摘芽',
+    'harvesting': '🥕 収穫',
+    'inspection': '🔍 点検・観察',
+    'other': '⚙️ その他'
+  }
+  return workTypeLabels[workType] || workType
+}
+
 export default function GanttPage() {
   // プロフェッショナルUI機能
   const { toast } = useToast()
@@ -95,7 +125,6 @@ export default function GanttPage() {
   
   // フィルター状態
   const [selectedVegetable, setSelectedVegetable] = useState<string>('all')
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [selectedPriority, setSelectedPriority] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -103,6 +132,13 @@ export default function GanttPage() {
   const [viewPeriod, setViewPeriod] = useState<'6months' | '1year' | '3years' | '5years'>('1year')
   const [viewUnit, setViewUnit] = useState<'day' | 'week' | 'month'>('day')
   const [currentDate, setCurrentDate] = useState(new Date())
+  
+  // カスタム期間設定
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
+  const [dateRangeError, setDateRangeError] = useState<string>('')
+  const [isUsingCustomRange, setIsUsingCustomRange] = useState<boolean>(false)
+  const [customRange, setCustomRange] = useState<{start: Date, end: Date} | null>(null)
   
   // タスク詳細モーダル
   const [selectedTask, setSelectedTask] = useState<GanttTask | null>(null)
@@ -123,6 +159,30 @@ export default function GanttPage() {
   // 新規タスク作成モーダル
   const [showNewTaskModal, setShowNewTaskModal] = useState(false)
   
+  // 新しく追加するモーダル状態
+  const [showWorkReportForm, setShowWorkReportForm] = useState(false)
+  const [showMapView, setShowMapView] = useState(false)
+  
+  // 削除機能関連の状態（プロフェッショナル拡張版）
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
+    show: boolean
+    item: any
+    type: 'task' | 'report'
+    validation: {
+      can_delete: boolean
+      task_info?: any
+      related_reports_count?: number
+      warnings: string[]
+    } | null
+    isValidating: boolean
+  }>({
+    show: false,
+    item: null,
+    type: 'task',
+    validation: null,
+    isValidating: false
+  })
+  
   // プロフェッショナル機能用状態管理
   const [isCreatingTask, setIsCreatingTask] = useState(false)
   const [isUpdatingTask, setIsUpdatingTask] = useState(false)
@@ -132,6 +192,15 @@ export default function GanttPage() {
   
   // 期間計算
   const getDateRange = useCallback(() => {
+    // カスタム範囲が設定されている場合はそれを使用
+    if (isUsingCustomRange && customRange) {
+      return {
+        start: format(customRange.start, 'yyyy-MM-dd'),
+        end: format(customRange.end, 'yyyy-MM-dd')
+      }
+    }
+
+    // デフォルトの期間計算
     const now = currentDate
     let start: Date, end: Date
 
@@ -163,7 +232,7 @@ export default function GanttPage() {
       start: format(start, 'yyyy-MM-dd'),
       end: format(end, 'yyyy-MM-dd')
     }
-  }, [viewPeriod, currentDate])
+  }, [viewPeriod, currentDate, isUsingCustomRange, customRange])
 
   // 作業レポート状態
   const [workReports, setWorkReports] = useState([])
@@ -253,18 +322,185 @@ export default function GanttPage() {
     fetchData()
   }, [])
 
+  // グローバルなフォーカス管理 - モーダル関連の問題を解決
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      // 定期的にページ状態をリセット
+      if (document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = 'auto'
+      }
+      if (document.documentElement.style.pointerEvents === 'none') {
+        document.documentElement.style.pointerEvents = 'auto'
+      }
+    }
+
+    document.addEventListener('click', handleGlobalClick)
+    return () => document.removeEventListener('click', handleGlobalClick)
+  }, [])
+
   // フィルター変更時にデータを再取得
   useEffect(() => {
     if (tasks.length > 0) { // 初回読み込み後のフィルター変更のみ
       fetchData()
     }
-  }, [selectedVegetable, selectedStatus, viewPeriod, currentDate])
+  }, [selectedVegetable, viewPeriod, currentDate])
+
+  // viewPeriodが変更された際にカスタム範囲をリセット
+  useEffect(() => {
+    if (isUsingCustomRange) {
+      setIsUsingCustomRange(false)
+      setCustomRange(null)
+      setCustomStartDate('')
+      setCustomEndDate('')
+      setDateRangeError('')
+    }
+  }, [viewPeriod])
+
+  // タスク作成後の専用データ取得関数（作成されたタスクの日付範囲を考慮）
+  const fetchDataWithTaskDateRange = async (newTask?: any) => {
+    setLoading(true)
+    try {
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+          console.log('✅ fetchDataWithTaskDateRange - ユーザーのcompany_id:', companyId)
+        }
+      }
+      let { start, end } = getDateRange()
+      
+      // 新しく作成されたタスクの日付範囲を既存の表示範囲に含める
+      if (newTask) {
+        const taskStart = new Date(newTask.start_date || newTask.start)
+        const taskEnd = new Date(newTask.end_date || newTask.end)
+        const currentStart = new Date(start)
+        const currentEnd = new Date(end)
+        
+        // タスクの日付が現在の表示範囲外の場合、範囲を拡張
+        if (taskStart < currentStart) {
+          start = taskStart.toISOString().split('T')[0]
+        }
+        if (taskEnd > currentEnd) {
+          end = taskEnd.toISOString().split('T')[0]
+        }
+        
+        console.log('📅 タスク作成により表示期間を調整:', { 
+          元の期間: `${currentStart.toLocaleDateString()} - ${currentEnd.toLocaleDateString()}`,
+          新しい期間: `${new Date(start).toLocaleDateString()} - ${new Date(end).toLocaleDateString()}`,
+          作成されたタスク: `${taskStart.toLocaleDateString()} - ${taskEnd.toLocaleDateString()}`
+        })
+      }
+      
+      const params = new URLSearchParams({
+        company_id: companyId,
+        start_date: start,
+        end_date: end
+      })
+
+      if (selectedVegetable !== 'all') {
+        params.append('vegetable_id', selectedVegetable)
+      }
+
+      params.append('active_only', 'true')
+      
+      console.log('🔍 fetchDataWithTaskDateRange - APIリクエスト:', `/api/gantt?${params.toString()}`)
+
+      // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
+      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+        fetch(`/api/gantt?${params.toString()}`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`),
+        fetch(`/api/vegetables?company_id=${companyId}`) // 最新の野菜データを直接取得
+      ])
+
+      const ganttResult = await ganttResponse.json()
+      let reportsResult = { success: false, data: [] }
+      let vegetablesResult = { success: false, data: [] }
+      
+      if (reportsResponse.ok) {
+        reportsResult = await reportsResponse.json()
+      }
+      
+      if (vegetablesResponse.ok) {
+        vegetablesResult = await vegetablesResponse.json()
+      }
+
+      console.log('🔍 fetchDataWithTaskDateRange - APIレスポンス:', {
+        ganttSuccess: ganttResult.success,
+        ganttTasksCount: ganttResult.data?.tasks?.length || 0,
+        ganttError: ganttResult.error
+      })
+
+      // タスクデータの設定（実データのみ）
+      if (ganttResult.success) {
+        console.log('🔍 fetchDataWithTaskDateRange - 取得されたタスク詳細:', ganttResult.data.tasks?.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          start: t.start_date,
+          end: t.end_date,
+          vegetable_id: t.vegetable_id
+        })))
+        setTasks(ganttResult.data.tasks || [])
+      } else {
+        console.log('❌ fetchDataWithTaskDateRange - Gantt API エラー:', ganttResult.error)
+        setTasks([])
+      }
+
+      // 野菜データは専用APIから取得（実データのみ）
+      if (vegetablesResult.success && vegetablesResult.data) {
+        setVegetables(vegetablesResult.data.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          variety: v.variety_name,
+          status: v.status,
+          area_size: v.area_size || 0
+        })))
+      } else {
+        console.log('野菜API エラー:', vegetablesResult.error)
+        setVegetables([])
+      }
+
+      // 作業レポートデータの設定（実データのみ）
+      if (reportsResult.success) {
+        setWorkReports(reportsResult.data || [])
+      } else {
+        console.log('作業レポートAPI エラー:', reportsResult.error)
+        setWorkReports([])
+      }
+    } catch (error) {
+      console.error('データ取得エラー:', error)
+      // エラー時は空のデータを設定
+      setTasks([])
+      setVegetables([])
+      setWorkReports([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      // API から実際のデータを取得（会社IDは将来的に認証から取得）
-      const companyId = 'a1111111-1111-1111-1111-111111111111'
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      console.log('🔍 fetchData - ユーザー認証レスポンス:', userResponse.ok)
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        console.log('🔍 fetchData - ユーザーデータ:', userData)
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+          console.log('✅ fetchData - 決定されたcompany_id:', companyId)
+        } else {
+          console.log('⚠️ fetchData - company_id取得失敗、デフォルト使用:', companyId)
+        }
+      } else {
+        console.log('❌ fetchData - ユーザー認証API呼び出し失敗')
+      }
       const { start, end } = getDateRange()
       
       const params = new URLSearchParams({
@@ -276,228 +512,223 @@ export default function GanttPage() {
       if (selectedVegetable !== 'all') {
         params.append('vegetable_id', selectedVegetable)
       }
-      if (selectedStatus !== 'all') {
-        params.append('status', selectedStatus)
-      }
 
-      // ガントチャートデータと作業レポートデータを並行取得
-      const [ganttResponse, reportsResponse] = await Promise.all([
-        fetch(`/api/gantt?${params}`),
-        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}`)
+      params.append('active_only', 'true')
+      
+      // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
+      console.log('🔍 fetchData - 野菜API呼び出し準備 company_id:', companyId)
+      console.log('🔍 fetchData - 野菜API URL:', `/api/vegetables?company_id=${companyId}`)
+      
+      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+        fetch(`/api/gantt?${params.toString()}`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`),
+        fetch(`/api/vegetables?company_id=${companyId}`) // 最新の野菜データを直接取得
       ])
 
       const ganttResult = await ganttResponse.json()
       let reportsResult = { success: false, data: [] }
+      let vegetablesResult = { success: false, data: [] }
       
       if (reportsResponse.ok) {
         reportsResult = await reportsResponse.json()
       }
-
-      if (ganttResult.success) {
-        setTasks(ganttResult.data.tasks || [])
-        setVegetables(ganttResult.data.vegetables || [])
-      } else {
-        // APIエラーの場合はサンプルデータを使用
-        console.log('API エラー、サンプルデータを使用:', ganttResult.error)
-        setTasks(unifiedTestData.tasks || [])
-        setVegetables(unifiedTestData.vegetables || [])
+      
+      if (vegetablesResponse.ok) {
+        vegetablesResult = await vegetablesResponse.json()
       }
 
-      // 作業レポートデータの設定
+      // タスクデータの設定（実データのみ）
+      if (ganttResult.success) {
+        console.log('📊 fetchData - 取得されたタスク数:', ganttResult.data.tasks?.length || 0)
+        console.log('📊 fetchData - タスク詳細:', ganttResult.data.tasks?.map(t => ({ id: t.id, name: t.name })) || [])
+        setTasks(ganttResult.data.tasks || [])
+      } else {
+        console.log('Gantt API エラー:', ganttResult.error)
+        setTasks([])
+      }
+
+      // 野菜データは専用APIから取得（実データのみ）
+      console.log('🔍 fetchData - 野菜API結果:', vegetablesResult)
+      if (vegetablesResult.success && vegetablesResult.data) {
+        console.log('🔍 fetchData - 取得された野菜数:', vegetablesResult.data.length)
+        console.log('🔍 fetchData - 野菜詳細:', vegetablesResult.data.map((v: any) => ({ id: v.id, name: v.name, company_id: v.company_id })))
+        setVegetables(vegetablesResult.data.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          variety: v.variety_name,
+          status: v.status,
+          area_size: v.area_size || 0
+        })))
+      } else {
+        console.log('❌ fetchData - 野菜API エラー:', vegetablesResult.error)
+        setVegetables([])
+      }
+
+      // 作業レポートデータの設定（実データのみ）
       if (reportsResult.success) {
         setWorkReports(reportsResult.data || [])
       } else {
-        // サンプル作業レポートデータ
-        setWorkReports([
-          {
-            id: 'wr1',
-            work_date: '2025-08-05',
-            work_type: 'harvesting',
-            vegetable_id: 'v1',
-            harvest_amount: 15.5,
-            expected_revenue: 3100,
-            work_notes: 'トマト収穫、品質良好'
-          },
-          {
-            id: 'wr2',
-            work_date: '2025-07-15',
-            work_type: 'pruning',
-            vegetable_id: 'v1',
-            estimated_cost: 1200,
-            work_notes: 'トマトの整枝・摘芽作業'
-          },
-          {
-            id: 'wr3',
-            work_date: '2025-08-07',
-            work_type: 'pruning',
-            vegetable_id: 'v2',
-            estimated_cost: 900,
-            work_notes: 'キュウリの整枝・摘芽作業'
-          },
-          {
-            id: 'wr4',
-            work_date: '2025-06-20',
-            work_type: 'harvesting',
-            vegetable_id: 'v2',
-            harvest_amount: 25.2,
-            expected_revenue: 5040,
-            work_notes: 'キュウリの収穫作業'
-          },
-          {
-            id: 'wr5',
-            work_date: '2025-08-22',
-            work_type: 'fertilizing',
-            vegetable_id: 'v3',
-            estimated_cost: 1500,
-            work_notes: 'レタスの施肥作業'
-          }
-        ])
+        console.log('作業レポートAPI エラー:', reportsResult.error)
+        setWorkReports([])
       }
     } catch (error) {
       console.error('データ取得エラー:', error)
-      // ネットワークエラーの場合は統合テストデータを使用
-      await loadUnifiedData()
+      // エラー時は空のデータを設定
+      setTasks([])
+      setVegetables([])
       setWorkReports([])
     } finally {
       setLoading(false)
     }
   }
 
-  const loadUnifiedData = async () => {
-    // 統合テストデータ
-    const sampleVegetables: Vegetable[] = [
-      { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎', status: 'growing' },
-      { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉', status: 'growing' },
-      { id: 'v3', name: '露地レタス（春作）', variety: 'グリーンリーフ', status: 'planning' }
-    ]
+  // 期間検証関数
+  const validateDateRange = (startDate: string, endDate: string): boolean => {
+    if (!startDate || !endDate) {
+      setDateRangeError('開始日と終了日の両方を選択してください')
+      return false
+    }
 
-    const currentYear = new Date().getFullYear()
-    const sampleTasks: GanttTask[] = [
-      {
-        id: 't1',
-        name: '播種・育苗',
-        start: `${currentYear}-03-01`,
-        end: `${currentYear}-03-15`,
-        progress: 100,
-        status: 'completed',
-        priority: 'high',
-        vegetable: { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎' },
-        assignedUser: { id: 'u1', name: '田中太郎' },
-        color: STATUS_COLORS.completed
-      },
-      {
-        id: 't2',
-        name: '定植',
-        start: `${currentYear}-03-16`,
-        end: `${currentYear}-03-20`,
-        progress: 100,
-        status: 'completed',
-        priority: 'high',
-        vegetable: { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎' },
-        assignedUser: { id: 'u1', name: '田中太郎' },
-        color: STATUS_COLORS.completed
-      },
-      {
-        id: 't3',
-        name: '整枝・摘芽',
-        start: `${currentYear}-03-21`,
-        end: `${currentYear}-06-10`,
-        progress: 75,
-        status: 'in_progress',
-        priority: 'medium',
-        vegetable: { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎' },
-        assignedUser: { id: 'u2', name: '佐藤花子' },
-        color: STATUS_COLORS.in_progress
-      },
-      {
-        id: 't4',
-        name: '収穫',
-        start: `${currentYear}-06-11`,
-        end: `${currentYear}-08-31`,
-        progress: 20,
-        status: 'in_progress',
-        priority: 'high',
-        vegetable: { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎' },
-        assignedUser: { id: 'u1', name: '田中太郎' },
-        color: STATUS_COLORS.in_progress
-      },
-      {
-        id: 't5',
-        name: '播種・育苗',
-        start: `${currentYear}-03-15`,
-        end: `${currentYear}-03-25`,
-        progress: 100,
-        status: 'completed',
-        priority: 'high',
-        vegetable: { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉' },
-        assignedUser: { id: 'u2', name: '佐藤花子' },
-        color: STATUS_COLORS.completed
-      },
-      {
-        id: 't6',
-        name: '定植・支柱設置',
-        start: `${currentYear}-03-26`,
-        end: `${currentYear}-04-05`,
-        progress: 100,
-        status: 'completed',
-        priority: 'high',
-        vegetable: { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉' },
-        assignedUser: { id: 'u2', name: '佐藤花子' },
-        color: STATUS_COLORS.completed
-      },
-      {
-        id: 't7',
-        name: '整枝・摘芽',
-        start: `${currentYear}-04-06`,
-        end: `${currentYear}-05-20`,
-        progress: 90,
-        status: 'in_progress',
-        priority: 'medium',
-        vegetable: { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉' },
-        assignedUser: { id: 'u3', name: '山田次郎' },
-        color: STATUS_COLORS.in_progress
-      },
-      {
-        id: 't8',
-        name: '収穫',
-        start: `${currentYear}-05-21`,
-        end: `${currentYear}-07-15`,
-        progress: 30,
-        status: 'in_progress',
-        priority: 'high',
-        vegetable: { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉' },
-        assignedUser: { id: 'u2', name: '佐藤花子' },
-        color: STATUS_COLORS.in_progress
-      },
-      {
-        id: 't9',
-        name: '施肥',
-        start: `${currentYear}-08-20`,
-        end: `${currentYear}-08-25`,
-        progress: 60,
-        status: 'in_progress',
-        priority: 'medium',
-        vegetable: { id: 'v3', name: '露地レタス（秋作）', variety: 'グリーンリーフ' },
-        assignedUser: { id: 'u3', name: '山田次郎' },
-        color: STATUS_COLORS.in_progress
-      },
-      {
-        id: 't10',
-        name: '播種・育苗',
-        start: `${currentYear}-08-26`,
-        end: `${currentYear}-09-10`,
-        progress: 0,
-        status: 'pending',
-        priority: 'medium',
-        vegetable: { id: 'v3', name: '露地レタス（秋作）', variety: 'グリーンリーフ' },
-        assignedUser: { id: 'u1', name: '田中太郎' },
-        color: STATUS_COLORS.pending
-      }
-    ]
+    const start = new Date(startDate)
+    const end = new Date(endDate)
 
-    setVegetables(sampleVegetables)
-    setTasks(sampleTasks)
+    if (start >= end) {
+      setDateRangeError('終了日は開始日より後の日付を選択してください')
+      return false
+    }
+
+    // 最低1ヶ月の制約チェック
+    const oneMonthLater = new Date(start)
+    oneMonthLater.setMonth(oneMonthLater.getMonth() + 1)
+    
+    if (end < oneMonthLater) {
+      setDateRangeError('表示期間は最低1ヶ月以上で設定してください')
+      return false
+    }
+
+    setDateRangeError('')
+    return true
   }
+
+  // カスタム期間でのデータ取得関数
+  const fetchDataWithCustomRange = async (startDate: Date, endDate: Date) => {
+    setLoading(true)
+    try {
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+        }
+      }
+      
+      const startStr = format(startDate, 'yyyy-MM-dd')
+      const endStr = format(endDate, 'yyyy-MM-dd')
+      
+      const params = new URLSearchParams({
+        company_id: companyId,
+        start_date: startStr,
+        end_date: endStr
+      })
+
+      if (selectedVegetable !== 'all') {
+        params.append('vegetable_id', selectedVegetable)
+      }
+
+      params.append('active_only', 'true')
+      
+      // データを並行取得
+      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+        fetch(`/api/gantt?${params.toString()}`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${startStr}&end_date=${endStr}&active_only=true`),
+        fetch(`/api/vegetables?company_id=${companyId}`)
+      ])
+
+      const ganttResult = await ganttResponse.json()
+      let reportsResult = { success: false, data: [] }
+      let vegetablesResult = { success: false, data: [] }
+      
+      if (reportsResponse.ok) {
+        reportsResult = await reportsResponse.json()
+      }
+      
+      if (vegetablesResponse.ok) {
+        vegetablesResult = await vegetablesResponse.json()
+      }
+
+      // 取得したデータでUIを更新
+      if (ganttResult.success && ganttResult.data?.tasks) {
+        setTasks(ganttResult.data.tasks || [])
+      } else {
+        setTasks([])
+      }
+
+      if (vegetablesResult.success && vegetablesResult.data) {
+        setVegetables(vegetablesResult.data.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          variety: v.variety_name || '（未定）'
+        })))
+      } else {
+        setVegetables([])
+      }
+
+      if (reportsResult.success && reportsResult.data) {
+        setWorkReports(reportsResult.data.map((r: any) => ({
+          id: r.id,
+          vegetable_id: r.vegetable_id
+        })))
+      } else {
+        setWorkReports([])
+      }
+
+      console.log(`✅ カスタム期間データ取得完了: ${startStr} 〜 ${endStr}`)
+      
+    } catch (error) {
+      console.error('カスタム期間データ取得エラー:', error)
+      setTasks([])
+      setVegetables([])
+      setWorkReports([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 安全な日付フォーマット関数
+  const safeFormatDate = (dateValue: any, formatStr: string = 'MM/dd'): string => {
+    if (!dateValue) return '-'
+    
+    try {
+      const date = new Date(dateValue)
+      if (isNaN(date.getTime())) {
+        return '-'
+      }
+      return format(date, formatStr, { locale: ja })
+    } catch (error) {
+      console.warn('日付フォーマットエラー:', dateValue, error)
+      return '-'
+    }
+  }
+
+  // カスタム期間変更処理
+  const handleCustomDateChange = () => {
+    if (validateDateRange(customStartDate, customEndDate)) {
+      const startDate = new Date(customStartDate)
+      const endDate = new Date(customEndDate)
+      
+      // カスタム範囲を設定
+      setCustomRange({ start: startDate, end: endDate })
+      setIsUsingCustomRange(true)
+      
+      // データを再取得
+      fetchDataWithCustomRange(startDate, endDate)
+    }
+  }
+
+  // テストデータ生成を完全に削除 - 実データベースのみ使用
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -537,8 +768,56 @@ export default function GanttPage() {
     link.click()
   }
 
-  const handleNewTask = () => {
+  const handleNewTask = async () => {
+    // タスク作成前に最新の野菜データを取得
+    try {
+      // 動的にcompany_idを取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+          console.log('🎯 handleNewTask - 使用するcompany_id:', companyId)
+        }
+      }
+      
+      const response = await fetch(`/api/vegetables?company_id=${companyId}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('🎯 handleNewTask - 野菜API結果:', result)
+        if (result.success && result.data) {
+          console.log('🎯 handleNewTask - 取得した野菜数:', result.data.length)
+          // 最新の野菜データで更新
+          setVegetables(result.data.map((v: any) => ({
+            id: v.id,
+            name: v.name,
+            variety: v.variety_name,
+            status: v.status
+          })))
+        } else {
+          console.log('❌ handleNewTask - APIからのデータが空のため、空の野菜設定とします')
+          setVegetables([])
+        }
+      }
+    } catch (error) {
+      console.error('野菜データの更新に失敗:', error)
+    }
+    
     setShowNewTaskModal(true)
+  }
+
+  // 作業記録成功時のハンドラー
+  const handleWorkReportSuccess = () => {
+    // 作業記録成功時にデータを再取得
+    fetchData()
+    toast({
+      title: '成功',
+      description: '作業記録を保存しました',
+      type: 'success'
+    })
   }
 
   // タスク作成処理 - プロフェッショナル実装
@@ -577,44 +856,41 @@ export default function GanttPage() {
       return
     }
 
-    // 楽観的更新用の一時タスク作成
-    const tempTask: GanttTask = {
-      id: `temp-${Date.now()}`,
-      name: taskData.name,
-      start: taskData.start,
-      end: taskData.end,
-      progress: 0,
-      status: 'pending',
-      priority: taskData.priority || 'medium',
-      vegetable: taskData.vegetable,
-      assignedUser: taskData.assignedUser,
-      color: STATUS_COLORS.pending,
-      isTemporary: true // 一時タスクマーカー
-    }
-
     setIsCreatingTask(true)
     setError('')
     
-    // 楽観的更新: UIを即座に更新
-    setTasks(prev => [...prev, tempTask])
-    
     try {
-      // データベースに保存 - ネットワーク耐性あり
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      let createdBy = 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user) {
+          companyId = userData.user.company_id || companyId
+          createdBy = userData.user.id || createdBy
+          console.log('✅ handleCreateTask - ユーザー情報:', { companyId, createdBy })
+        }
+      }
+      
+      // 統一アーキテクチャでのデータベース保存（work_reportsと同じパターン）
       const payload = {
         vegetable_id: taskData.vegetable.id,
         name: taskData.name,
         start_date: taskData.start,
         end_date: taskData.end,
         priority: taskData.priority || 'medium',
-        task_type: taskData.workType || 'other', // デフォルト値を設定
+        task_type: taskData.workType || 'other',
         description: taskData.description,
         assigned_user_id: taskData.assignedUser?.id,
-        created_by: 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // テスト用ユーザーID
+        company_id: companyId,
+        created_by: createdBy
       }
       
-      console.log('🚀 タスク作成データ:', payload) // デバッグログ
+      console.log('🚀 統一アーキテクチャでタスク作成:', payload)
       
-      const response = await retryWithBackoff(() => fetch('/api/gantt', {
+      const response = await retryWithBackoff(() => fetch('/api/growing-tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -623,7 +899,8 @@ export default function GanttPage() {
       }))
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, ${errorText}`)
       }
 
       const result = await response.json()
@@ -632,16 +909,38 @@ export default function GanttPage() {
         throw new Error(result.error || 'タスクの作成に失敗しました')
       }
 
-      // 成功: 一時タスクを実際のデータで置き換え
-      const savedTask: GanttTask = {
-        ...result.data,
-        color: STATUS_COLORS[result.data.status] || STATUS_COLORS.pending
+      console.log('✅ タスク作成成功:', result.data)
+
+      // /api/growing-tasksのレスポンス形式をガンチャート用に変換
+      const getStatusColor = (status: string): string => {
+        const colors = {
+          pending: '#94a3b8',      // グレー
+          in_progress: '#3b82f6',  // ブルー
+          completed: '#10b981',    // グリーン
+          cancelled: '#ef4444',    // レッド
+        }
+        return colors[status as keyof typeof colors] || colors.pending
       }
       
-      setTasks(prev => prev.map(task => 
-        task.id === tempTask.id ? savedTask : task
-      ))
-      
+      const ganttFormattedTask = {
+        id: result.data.id,
+        name: result.data.name,
+        start: result.data.start_date,
+        end: result.data.end_date,
+        progress: result.data.progress || 0,
+        status: result.data.status,
+        priority: result.data.priority,
+        workType: result.data.task_type,
+        description: result.data.description,
+        vegetable: result.data.vegetable,
+        assignedUser: result.data.assigned_to ? {
+          id: result.data.assigned_to,
+          name: 'User' // 一時的
+        } : null,
+        color: getStatusColor(result.data.status)
+      }
+
+      // 成功: 作業記録と同じように即座にリフレッシュ
       toast({
         title: '成功',
         description: 'タスクを作成しました',
@@ -649,18 +948,22 @@ export default function GanttPage() {
       })
       setShowNewTaskModal(false)
       
-      // 分析データ同期
+      // タスク作成成功
+      console.log('✅ タスク作成成功:', result.data.name)
+      
+      // データを再取得して確実に最新状態を表示
+      // 新しく作成されたタスクの日付を含むように期間を調整
+      await fetchDataWithTaskDateRange(ganttFormattedTask)
+      
+      // 分析データ同期（非同期で実行）
       try {
-        await syncTaskToAnalytics(savedTask)
+        await syncTaskToAnalytics(result.data)
       } catch (syncError) {
         console.warn('分析データ同期エラー:', syncError)
       }
       
     } catch (error) {
       console.error('タスク作成エラー:', error)
-      
-      // ロールバック: 一時タスクを削除
-      setTasks(prev => prev.filter(task => task.id !== tempTask.id))
       
       // ネットワークエラーの特別処理
       if (isNetworkError(error)) {
@@ -807,27 +1110,124 @@ export default function GanttPage() {
     }
   }
 
-  // タスク削除処理
-  const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('本当にこのタスクを削除しますか？')) {
+  // プロフェッショナル削除処理：楽観的更新＋ロールバック対応
+  const handleDeleteTask = async (taskId: string, reason?: string) => {
+    console.log('🗑️ プロフェッショナル削除処理開始:', taskId)
+    
+    const taskToDelete = tasks.find(t => t.id === taskId)
+    if (!taskToDelete) {
+      console.log('❌ タスクが見つかりません:', taskId)
+      toast({
+        title: 'エラー',
+        description: 'タスクが見つかりません',
+        type: 'error'
+      })
       return
     }
 
-    const oldTasks = tasks
-    const taskToDelete = tasks.find(t => t.id === taskId)
+    // 1. 楽観的更新：即座にUIからタスクを削除
+    console.log('⚡ 楽観的更新実行中...')
+    const originalTasks = tasks
+    setTasks(prev => prev.filter(task => task.id !== taskId))
     setIsDeletingTask(taskId)
     setError('')
 
-    // 楽観的更新: 即座にリストから削除
-    setTasks(prev => prev.filter(task => task.id !== taskId))
+    // 2. 成功の仮定でトースト表示（後でロールバック可能）
+    const optimisticToastId = Date.now().toString()
+    toast({
+      id: optimisticToastId,
+      title: '削除中',
+      description: `"${taskToDelete.name}" を削除しています...`,
+      type: 'info',
+      duration: 3000
+    })
 
     try {
-      const response = await fetch('/api/gantt', {
+      // 3. サーバーAPIコール（統一エンドポイント使用）
+      console.log('🌐 統一削除API呼び出し:', `/api/growing-tasks/${taskId}`)
+      const response = await fetch(`/api/growing-tasks/${taskId}?reason=${encodeURIComponent(reason || '手動削除')}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      const result = await response.json()
+      console.log('📡 削除API レスポンス:', result)
+
+      if (!result.success) {
+        console.error('🗑️ 削除API詳細エラー:', result)
+        throw new Error(result.error || 'タスクの削除に失敗しました')
+      }
+
+      // 4. 削除成功：楽観的更新を確定
+      console.log('✅ 削除成功確定:', result.data?.deleted_name)
+      
+      toast({
+        title: '削除完了',
+        description: `"${result.data?.deleted_name || taskToDelete.name}" を削除しました`,
+        type: 'success'
+      })
+      
+      // 確実にタスクが消えるよう強制リロード
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
+      // 5. 分析システム通知
+      window.dispatchEvent(new CustomEvent('taskAnalyticsDelete', { 
+        detail: { 
+          taskId, 
+          vegetableId: taskToDelete.vegetable.id,
+          deletedName: taskToDelete.name
+        } 
+      }))
+
+      // 6. 関連データ更新通知
+      console.log('📊 関連データ更新イベント発行')
+      window.dispatchEvent(new CustomEvent('tasksDataChanged', {
+        detail: { action: 'delete', taskId, vegetableName: result.data?.vegetable_info?.name }
+      }))
+
+    } catch (error) {
+      // 7. エラー発生：楽観的更新をロールバック
+      console.error('❌ 削除エラー - ロールバック実行:', error)
+      
+      // タスクリストを元に戻す（ソート順も保持）
+      setTasks(originalTasks)
+      
+      // エラートースト表示
+      toast({
+        title: '削除エラー',
+        description: error instanceof Error ? error.message : 'タスクの削除に失敗しました',
+        type: 'error',
+        duration: 6000
+      })
+
+      // 詳細エラー情報をログ出力
+      console.error('削除エラー詳細:', {
+        taskId,
+        taskName: taskToDelete.name,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      })
+
+    } finally {
+      // 8. 後処理
+      setIsDeletingTask(null)
+      console.log('🏁 削除処理完了')
+    }
+  }
+
+  // 実績記録削除処理
+  const handleDeleteReport = async (reportId: string) => {
+    try {
+      const response = await fetch('/api/reports', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ id: taskId })
+        body: JSON.stringify({ id: reportId })
       })
 
       if (!response.ok) {
@@ -836,40 +1236,121 @@ export default function GanttPage() {
 
       const result = await response.json()
       if (!result.success) {
-        throw new Error(result.error || 'タスクの削除に失敗しました')
+        throw new Error(result.error || '実績記録の削除に失敗しました')
       }
 
       toast({
         title: '成功',
-        description: 'タスクを削除しました',
+        description: result.message || '実績記録を削除しました',
         type: 'success'
       })
       
-      // 分析データからも削除通知
-      if (taskToDelete) {
-        window.dispatchEvent(new CustomEvent('taskAnalyticsDelete', { 
-          detail: { taskId, vegetableId: taskToDelete.vegetable.id } 
-        }))
-      }
+      // データを再取得
+      fetchData()
       
     } catch (error) {
-      console.error('タスク削除エラー:', error)
-      // ロールバック: タスクを復元
-      setTasks(oldTasks)
+      console.error('実績記録削除エラー:', error)
       toast({
         title: 'エラー',
-        description: error instanceof Error ? error.message : 'タスクの削除に失敗しました',
+        description: error instanceof Error ? error.message : '実績記録の削除に失敗しました',
         type: 'error'
       })
-    } finally {
-      setIsDeletingTask(null)
+    }
+  }
+
+  // プロフェッショナル削除確認：事前検証付き
+  const showDeleteConfirmation = async (item: any, type: 'task' | 'report') => {
+    console.log('🗑️ 削除確認ダイアログ準備中:', { item: item.name, type, id: item.id })
+    
+    // 初期ダイアログ表示
+    setDeleteConfirmDialog({
+      show: true,
+      item,
+      type,
+      validation: null, // 検証中
+      isValidating: true
+    })
+
+    // タスクの場合は削除前検証を実行
+    if (type === 'task') {
+      try {
+        console.log('🔍 削除前検証実行中...')
+        const response = await fetch(`/api/growing-tasks/${item.id}`, {
+          method: 'GET'
+        })
+        
+        const validation = await response.json()
+        console.log('🔍 検証結果:', validation)
+        
+        setDeleteConfirmDialog(prev => ({
+          ...prev,
+          validation,
+          isValidating: false
+        }))
+      } catch (error) {
+        console.error('削除前検証エラー:', error)
+        setDeleteConfirmDialog(prev => ({
+          ...prev,
+          validation: {
+            can_delete: true,
+            warnings: ['検証に失敗しましたが、削除は可能です']
+          },
+          isValidating: false
+        }))
+      }
+    } else {
+      // レポートの場合は検証なし
+      setDeleteConfirmDialog(prev => ({
+        ...prev,
+        validation: { can_delete: true, warnings: [] },
+        isValidating: false
+      }))
+    }
+  }
+
+  // プロフェッショナル削除実行：理由付きでの削除
+  const handleConfirmDelete = async (reason?: string) => {
+    const { item, type, validation } = deleteConfirmDialog
+    
+    console.log('🗑️ 削除実行開始:', { 
+      item: item?.name, 
+      type, 
+      id: item?.id, 
+      reason: reason || '理由未指定',
+      can_delete: validation?.can_delete 
+    })
+    
+    // 削除不可能な場合の確認
+    if (validation && !validation.can_delete) {
+      toast({
+        title: '削除不可',
+        description: '削除条件を満たしていません',
+        type: 'error'
+      })
+      return
+    }
+
+    // ダイアログを閉じる
+    setDeleteConfirmDialog({ 
+      show: false, 
+      item: null, 
+      type: 'task',
+      validation: null,
+      isValidating: false
+    })
+    
+    if (type === 'task') {
+      console.log('🗑️ タスク削除処理を呼び出し:', item.id, '理由:', reason)
+      await handleDeleteTask(item.id, reason)
+    } else {
+      console.log('🗑️ レポート削除処理を呼び出し:', item.id)
+      await handleDeleteReport(item.id)
     }
   }
 
   // フィルタリング
   const filteredTasks = tasks.filter(task => {
     if (selectedVegetable !== 'all' && task.vegetable.id !== selectedVegetable) return false
-    if (selectedStatus !== 'all' && task.status !== selectedStatus) return false
     if (selectedPriority !== 'all' && task.priority !== selectedPriority) return false
     if (searchQuery && !task.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
@@ -899,24 +1380,66 @@ export default function GanttPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            更新
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            エクスポート
-          </Button>
-          <Button size="sm" onClick={handleNewTask}>
-            <Plus className="w-4 h-4 mr-2" />
-            新規タスク
-          </Button>
+        <div className="flex items-center gap-2">
+          {/* 栽培管理グループ */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowMapView(true)}
+              className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 shadow-sm transition-all duration-200"
+            >
+              <Map className="w-4 h-4 mr-1" />
+              <span className="hidden xl:inline">地図上で栽培野菜計画登録</span>
+              <span className="hidden md:inline xl:hidden">地図計画登録</span>
+              <span className="md:hidden">地図</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleNewTask}
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300 shadow-sm transition-all duration-200"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              <span className="hidden xl:inline">栽培スケジュール・タスク登録</span>
+              <span className="hidden md:inline xl:hidden">タスク登録</span>
+              <span className="md:hidden">新規</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowWorkReportForm(true)}
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300 shadow-sm transition-all duration-200"
+            >
+              <Calendar className="w-4 h-4 mr-1" />
+              <span className="hidden xl:inline">栽培作業記録・報告</span>
+              <span className="hidden md:inline xl:hidden">作業記録</span>
+              <span className="md:hidden">記録</span>
+            </Button>
+          </div>
+
+          {/* データ操作グループ */}
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleExport}
+              className="text-green-700 hover:text-green-800 hover:bg-green-100 transition-all duration-200"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              <span className="hidden md:inline">エクスポート</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-blue-700 hover:text-blue-800 hover:bg-blue-100 transition-all duration-200"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">更新</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -940,16 +1463,16 @@ export default function GanttPage() {
       )}
 
       {/* 📊 野菜管理統計カード */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-green-50 to-green-100 border-green-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-green-700 font-medium">管理中野菜</p>
                 <p className="text-2xl font-bold text-green-800">
-                  {vegetables.filter(v => v.status === 'growing').length}
+                  {vegetables.length}
                 </p>
-                <p className="text-xs text-green-600 mt-1">アクティブ栽培</p>
+                <p className="text-xs text-green-600 mt-1">登録済み野菜数</p>
               </div>
               <div className="bg-green-500 p-3 rounded-full">
                 <Sprout className="w-6 h-6 text-white" />
@@ -964,7 +1487,7 @@ export default function GanttPage() {
               <div>
                 <p className="text-sm text-blue-700 font-medium">総栽培面積</p>
                 <p className="text-2xl font-bold text-blue-800">
-                  {vegetables.reduce((sum, v) => sum + (parseFloat(v.variety) || 0), 0)}㎡
+                  {vegetables.reduce((sum, v) => sum + (v.area_size || 0), 0).toFixed(1)}㎡
                 </p>
                 <p className="text-xs text-blue-600 mt-1">全区画合計</p>
               </div>
@@ -996,14 +1519,62 @@ export default function GanttPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-700 font-medium">完了済みタスク</p>
+                <p className="text-sm text-purple-700 font-medium">総作業時間</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {tasks.filter(t => t.status === 'completed').length}
+                  {workReports.reduce((sum: number, report: any) => sum + ((report.duration_hours || 0) * 60), 0).toFixed(1)}h
                 </p>
-                <p className="text-xs text-purple-600 mt-1">完了した作業</p>
+                <p className="text-xs text-purple-600 mt-1">累計作業時間</p>
               </div>
               <div className="bg-purple-500 p-3 rounded-full">
-                <Archive className="w-6 h-6 text-white" />
+                <Clock className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-700 font-medium">過去収穫量</p>
+                <p className="text-2xl font-bold text-orange-800">
+                  {workReports.reduce((sum: number, report: any) => 
+                    sum + (report.work_type === 'harvesting' ? (report.harvest_amount || 0) : 0), 0
+                  ).toFixed(1)}kg
+                </p>
+                <p className="text-xs text-orange-600 mt-1">総収穫実績</p>
+              </div>
+              <div className="bg-orange-500 p-3 rounded-full">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-emerald-700 font-medium">売上高</p>
+                <p className="text-2xl font-bold text-emerald-800">
+                  ¥{workReports.reduce((sum: number, report: any) => {
+                    // notesから売上データを解析
+                    let revenue = 0
+                    if (report.notes) {
+                      try {
+                        const notesData = JSON.parse(report.notes)
+                        revenue = notesData.sales_amount || notesData.expected_revenue || 0
+                      } catch (e) {
+                        // JSON解析失敗時は0
+                      }
+                    }
+                    return sum + (report.sales_amount || report.expected_revenue || revenue)
+                  }, 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-emerald-600 mt-1">総売上実績</p>
+              </div>
+              <div className="bg-emerald-500 p-3 rounded-full">
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -1139,21 +1710,6 @@ export default function GanttPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>ステータス</Label>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="pending">未開始</SelectItem>
-                      <SelectItem value="in_progress">進行中</SelectItem>
-                      <SelectItem value="completed">完了</SelectItem>
-                      <SelectItem value="cancelled">中止</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="space-y-2">
                   <Label>優先度</Label>
@@ -1185,209 +1741,481 @@ export default function GanttPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="display" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>表示期間</Label>
-                  <Select value={viewPeriod} onValueChange={(value: '6months' | '1year' | '3years' | '5years') => setViewPeriod(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="6months">半年</SelectItem>
-                      <SelectItem value="1year">1年</SelectItem>
-                      <SelectItem value="3years">3年</SelectItem>
-                      <SelectItem value="5years">5年</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <TabsContent value="display" className="space-y-6">
+              {/* 日付選択エリア */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">開始日</Label>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full"
+                  />
+                  {/* 表示単位を開始日の下に配置 */}
+                  <div className="space-y-2">
+                    <Select value={viewUnit} onValueChange={(value: 'day' | 'week' | 'month') => setViewUnit(value)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">日単位</SelectItem>
+                        <SelectItem value="week">週単位</SelectItem>
+                        <SelectItem value="month">月単位</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label>表示単位</Label>
-                  <Select value={viewUnit} onValueChange={(value: 'day' | 'week' | 'month') => setViewUnit(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">日単位</SelectItem>
-                      <SelectItem value="week">週単位</SelectItem>
-                      <SelectItem value="month">月単位</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>基準月</Label>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-                    >
-                      ←
-                    </Button>
-                    <span className="text-sm font-medium min-w-[120px] text-center">
-                      {format(currentDate, 'yyyy年MM月', { locale: ja })}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">終了日</Label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full"
+                  />
+                  {/* 期間適用ボタンを終了日の下に配置 */}
+                  <Button 
+                    onClick={handleCustomDateChange}
+                    className="w-full bg-green-100 hover:bg-green-200 text-green-800 font-medium py-3 px-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border border-green-300"
+                    disabled={!customStartDate || !customEndDate}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      期間を適用する
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-                    >
-                      →
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>表示範囲</Label>
-                  <div className="text-sm text-gray-600">
-                    {format(new Date(start), 'yyyy/MM/dd', { locale: ja })} 〜{' '}
-                    {format(new Date(end), 'yyyy/MM/dd', { locale: ja })}
-                  </div>
+                  </Button>
                 </div>
               </div>
+
+              {/* 現在の表示範囲 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <Label className="text-sm font-medium text-blue-800">現在の表示範囲</Label>
+                <div className="text-sm text-blue-700 mt-1 font-medium">
+                  {format(new Date(start), 'yyyy/MM/dd', { locale: ja })} 〜{' '}
+                  {format(new Date(end), 'yyyy/MM/dd', { locale: ja })}
+                </div>
+              </div>
+
+              {/* エラーメッセージ */}
+              {dateRangeError && (
+                <div className="text-sm text-red-600 p-3 bg-red-50 rounded-lg border border-red-200 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{dateRangeError}</span>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      {/* 統計情報 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{filteredTasks.filter(t => t.status === 'in_progress').length}</div>
-            <div className="text-sm text-gray-600">進行中タスク</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{filteredTasks.filter(t => t.status === 'completed').length}</div>
-            <div className="text-sm text-gray-600">完了済み</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-600">{filteredTasks.filter(t => t.status === 'pending').length}</div>
-            <div className="text-sm text-gray-600">未開始</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">
-              {Math.round(filteredTasks.reduce((acc, task) => acc + task.progress, 0) / filteredTasks.length || 0)}%
-            </div>
-            <div className="text-sm text-gray-600">平均進捗</div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* 栽培野菜管理チャート */}
-      <GanttChart 
-        tasks={filteredTasks}
-        workReports={workReports}
-        startDate={start}
-        endDate={end}
-        viewUnit={viewUnit}
-        onTaskClick={handleTaskClick}
-        className="min-h-[500px]"
-      />
-
-      {/* タスク詳細リスト */}
-      <Card>
-        <CardHeader>
-          <CardTitle>タスク詳細リスト</CardTitle>
-          <CardDescription>
-            表示中のタスク: {filteredTasks.length}件
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* ヘッダー行 */}
-            <div className="grid grid-cols-12 gap-4 pb-2 border-b bg-gray-50 rounded-lg px-4 py-2 font-medium text-sm text-gray-700">
-              <div className="col-span-3">
-                登録されている野菜
-              </div>
-              <div className="col-span-6">
-                タスク名・詳細
-              </div>
-              <div className="col-span-3 text-right">
-                進捗
+      {filteredTasks.length > 0 || vegetables.length > 0 ? (
+        <GanttChart 
+          tasks={filteredTasks}
+          workReports={workReports}
+          startDate={start}
+          endDate={end}
+          viewUnit={viewUnit}
+          onTaskClick={handleTaskClick}
+          className="min-h-[500px]"
+        />
+      ) : (
+        <Card className="min-h-[500px]">
+          <CardContent className="flex items-center justify-center h-full">
+            <div className="text-center py-12">
+              <Sprout className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">登録情報がありません</h3>
+              <p className="text-gray-500 text-sm mb-6">野菜やタスクを登録すると、ガントチャートが表示されます</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowMapView(true)}
+                  className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                >
+                  <Map className="w-4 h-4 mr-2" />
+                  野菜を登録
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleNewTask}
+                  className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  タスクを登録
+                </Button>
               </div>
             </div>
-            
-            {filteredTasks.map(task => (
-              <div 
-                key={task.id} 
-                className="grid grid-cols-12 items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  console.log('List item clicked:', task.name) // デバッグ用
-                  handleTaskClick(task)
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    handleTaskClick(task)
-                  }
-                }}
-              >
-                {/* 野菜名列 */}
-                <div className="col-span-3">
-                  <div className="font-medium text-blue-600 text-sm">
-                    {task.vegetable.name}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {task.vegetable.variety}
-                  </div>
-                </div>
-                
-                {/* タスク名と詳細列 */}
-                <div className="col-span-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-medium">{task.name}</h4>
-                    <Badge 
-                      variant="secondary"
-                      style={{ backgroundColor: task.color, color: 'white' }}
-                    >
-                      {task.status === 'pending' && '未開始'}
-                      {task.status === 'in_progress' && '進行中'}
-                      {task.status === 'completed' && '完了'}
-                      {task.status === 'cancelled' && '中止'}
-                    </Badge>
-                    <Badge variant="outline">
-                      {task.priority === 'high' && '高優先度'}
-                      {task.priority === 'medium' && '中優先度'}
-                      {task.priority === 'low' && '低優先度'}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {task.assignedUser?.name || '未割当'} • 
-                    {format(new Date(task.start), 'yyyy/MM/dd', { locale: ja })} 〜 
-                    {format(new Date(task.end), 'yyyy/MM/dd', { locale: ja })}
-                  </div>
-                </div>
-                {/* 進捗列 */}
-                <div className="col-span-3 text-right">
-                  <div className="text-lg font-semibold">{task.progress}%</div>
-                  <div className="w-24 h-2 bg-gray-200 rounded-full mt-1 ml-auto">
-                    <div 
-                      className="h-2 rounded-full transition-all"
-                      style={{ 
-                        width: `${task.progress}%`,
-                        backgroundColor: task.color
-                      }}
-                    />
-                  </div>
-                </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 野菜別 計画タスク・実績記録 */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Sprout className="w-5 h-5 text-green-600" />
+          <h2 className="text-xl font-bold text-gray-900">野菜別 計画・実績管理</h2>
+          <Badge variant="outline" className="text-sm">
+            {vegetables.length}種類の野菜
+          </Badge>
+        </div>
+
+        {vegetables.length === 0 ? (
+          <Card className="py-16">
+            <CardContent className="flex items-center justify-center">
+              <div className="text-center">
+                <Sprout className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">登録情報がありません</h3>
+                <p className="text-gray-500 text-sm mb-6">野菜を登録すると、計画・実績管理が表示されます</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowMapView(true)}
+                  className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                >
+                  <Map className="w-4 h-4 mr-2" />
+                  野菜を登録する
+                </Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          vegetables.map(vegetable => {
+            const vegetableTasks = filteredTasks.filter(task => task.vegetable.id === vegetable.id)
+            const vegetableReports = workReports.filter((report: any) => report.vegetable_id === vegetable.id)
+            
+            // データがない野菜はスキップ
+            if (vegetableTasks.length === 0 && vegetableReports.length === 0) {
+              return null
+            }
+
+          return (
+            <Card key={vegetable.id} className="shadow-sm">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500 p-2 rounded-full">
+                      <Sprout className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-gray-800">{vegetable.name}</CardTitle>
+                      <CardDescription className="text-sm">
+                        品種: {vegetable.variety} • ステータス: {vegetable.status}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-blue-300 text-blue-700">
+                      計画 {vegetableTasks.length}件
+                    </Badge>
+                    <Badge variant="outline" className="border-green-300 text-green-700">
+                      実績 {vegetableReports.length}件
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 xl:grid-cols-2">
+                  {/* 左側: 計画タスク */}
+                  <div className="border-r border-gray-200 bg-blue-50/30">
+                    <div className="bg-blue-100/50 px-4 py-3 border-b">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <h3 className="font-medium text-blue-800">計画タスク</h3>
+                        <Badge variant="secondary" className="bg-blue-200 text-blue-800 text-xs">
+                          {vegetableTasks.length}件
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="p-4 min-h-[200px] max-h-96 overflow-y-auto">
+                      {vegetableTasks.length > 0 ? (
+                        <div className="space-y-3">
+                          {vegetableTasks.map(task => (
+                            <div 
+                              key={task.id}
+                              className="border rounded-lg p-3 bg-white hover:bg-blue-50/50 cursor-pointer transition-all duration-200 group relative select-none"
+                              onClick={(e) => {
+                                // ドロップダウンメニューがクリックされた場合はタスククリックを無効化
+                                if (e.target instanceof Element && e.target.closest('[data-radix-dropdown-menu-trigger]')) {
+                                  return
+                                }
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTaskClick(task)
+                              }}
+                              role="button"
+                              tabIndex={0}
+                              style={{ userSelect: 'none' }}
+                            >
+                              {/* アクションメニュー */}
+                              <div className="absolute top-2 right-2">
+                                <DropdownMenu onOpenChange={(open) => {
+                                  if (!open) {
+                                    // ドロップダウンが閉じられた時にフォーカスをリセット
+                                    setTimeout(() => {
+                                      if (document.activeElement instanceof HTMLElement) {
+                                        document.activeElement.blur()
+                                      }
+                                      document.body.focus()
+                                    }, 10)
+                                  }
+                                }}>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 p-1.5 text-slate-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      style={{ userSelect: 'none' }}
+                                    >
+                                      <Settings className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent 
+                                    align="end" 
+                                    className="w-48 bg-white border border-gray-200 rounded-lg shadow-lg p-1 backdrop-blur-sm"
+                                  >
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handleTaskClick(task)
+                                      }}
+                                      className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md cursor-pointer transition-colors duration-200"
+                                    >
+                                      <Edit className="w-4 h-4 mr-3 text-blue-500" />
+                                      詳細・編集
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        showDeleteConfirmation(task, 'task')
+                                      }}
+                                      className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md cursor-pointer transition-colors duration-200"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-3 text-red-500" />
+                                      削除
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div className="mb-2">
+                                <h4 className="font-medium text-sm mb-1">{task.name}</h4>
+                                <div className="flex items-center gap-2">
+                                  {task.workType && (
+                                    <span className="text-xs text-gray-500">
+                                      {getWorkTypeLabel(task.workType)}
+                                    </span>
+                                  )}
+                                  <Badge 
+                                    variant="secondary"
+                                    style={{ backgroundColor: task.color, color: 'white' }}
+                                    className="text-xs"
+                                  >
+                                    {task.status === 'pending' && '未開始'}
+                                    {task.status === 'in_progress' && '進行中'}
+                                    {task.status === 'completed' && '完了'}
+                                    {task.status === 'cancelled' && '中止'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-gray-600">
+                                  {safeFormatDate(task.start, 'MM/dd')} 〜 
+                                  {safeFormatDate(task.end, 'MM/dd')}
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  {task.priority === 'high' && '高'}
+                                  {task.priority === 'medium' && '中'}
+                                  {task.priority === 'low' && '低'}
+                                </Badge>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs text-gray-500">
+                                  {task.assignedUser?.name || '未割当'}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium">{task.progress}%</span>
+                                  <div className="w-16 h-1.5 bg-gray-200 rounded-full">
+                                    <div 
+                                      className="h-1.5 rounded-full transition-all"
+                                      style={{ 
+                                        width: `${task.progress}%`,
+                                        backgroundColor: task.color
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">計画タスクがありません</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 右側: 実績記録 */}
+                  <div className="bg-green-50/30">
+                    <div className="bg-green-100/50 px-4 py-3 border-b">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-green-600" />
+                        <h3 className="font-medium text-green-800">実績記録</h3>
+                        <Badge variant="secondary" className="bg-green-200 text-green-800 text-xs">
+                          {vegetableReports.length}件
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="p-4 min-h-[200px] max-h-96 overflow-y-auto">
+                      {vegetableReports.length > 0 ? (
+                        <div className="space-y-3">
+                          {vegetableReports.map((report: any) => (
+                            <div 
+                              key={report.id}
+                              className="border rounded-lg p-3 bg-white hover:bg-green-50/50 transition-all duration-200 group relative select-none"
+                              style={{ userSelect: 'none' }}
+                            >
+                              {/* アクションメニュー */}
+                              <div className="absolute top-2 right-2">
+                                <DropdownMenu onOpenChange={(open) => {
+                                  if (!open) {
+                                    // ドロップダウンが閉じられた時にフォーカスをリセット
+                                    setTimeout(() => {
+                                      if (document.activeElement instanceof HTMLElement) {
+                                        document.activeElement.blur()
+                                      }
+                                      document.body.focus()
+                                    }, 10)
+                                  }
+                                }}>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 p-1.5 text-slate-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                      style={{ userSelect: 'none' }}
+                                    >
+                                      <Settings className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent 
+                                    align="end" 
+                                    className="w-40 bg-white border border-gray-200 rounded-lg shadow-lg p-1 backdrop-blur-sm"
+                                  >
+                                    <DropdownMenuItem 
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        showDeleteConfirmation(report, 'report')
+                                      }}
+                                      className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md cursor-pointer transition-colors duration-200"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-3 text-red-500" />
+                                      削除
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div className="mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                  <span className="font-medium text-sm">
+                                    {getWorkTypeLabel(report.work_type)}
+                                  </span>
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                                    {safeFormatDate(report.work_date, 'MM/dd')}
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              {report.work_notes && (
+                                <div className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                  {report.work_notes}
+                                </div>
+                              )}
+                              
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {report.duration_hours && (
+                                  <div>
+                                    <span className="text-gray-500">時間: </span>
+                                    <span className="font-medium">{(report.duration_hours * 60).toFixed(0)}分</span>
+                                  </div>
+                                )}
+                                {report.estimated_cost && (
+                                  <div>
+                                    <span className="text-gray-500">コスト: </span>
+                                    <span className="font-medium">¥{report.estimated_cost.toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {report.harvest_amount && (
+                                  <div>
+                                    <span className="text-gray-500">収穫: </span>
+                                    <span className="font-medium">{report.harvest_amount}{report.harvest_unit}</span>
+                                  </div>
+                                )}
+                                {(() => {
+                                  let revenue = report.expected_revenue
+                                  if (!revenue && report.notes) {
+                                    try {
+                                      const notesData = JSON.parse(report.notes)
+                                      revenue = notesData.sales_amount || notesData.expected_revenue
+                                    } catch (e) {}
+                                  }
+                                  return revenue ? (
+                                    <div>
+                                      <span className="text-gray-500">売上: </span>
+                                      <span className="font-medium text-green-600">¥{revenue.toLocaleString()}</span>
+                                    </div>
+                                  ) : null
+                                })()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">実績記録がありません</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        }))}
+      </div>
 
       {/* タスク詳細モーダル */}
       <Dialog open={isTaskModalOpen} onOpenChange={(open) => {
@@ -1395,6 +2223,16 @@ export default function GanttPage() {
         if (!open) {
           setSelectedTask(null)
           setIsTaskModalOpen(false)
+          // ダイアログが閉じられた時にフォーカスをリセット
+          setTimeout(() => {
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur()
+            }
+            document.body.focus()
+            // ページ全体のポインターイベントを確実に有効化
+            document.body.style.pointerEvents = 'auto'
+            document.documentElement.style.pointerEvents = 'auto'
+          }, 100)
         }
       }}>
         <DialogContent className="max-w-4xl bg-white shadow-xl border-0 rounded-xl">
@@ -1424,8 +2262,8 @@ export default function GanttPage() {
                   <div>
                     <Label className="text-sm font-medium">期間</Label>
                     <p className="text-sm text-gray-600">
-                      {format(new Date(selectedTask.start), 'yyyy年MM月dd日', { locale: ja })} 〜{' '}
-                      {format(new Date(selectedTask.end), 'yyyy年MM月dd日', { locale: ja })}
+                      {safeFormatDate(selectedTask.start, 'yyyy年MM月dd日')} 〜{' '}
+                      {safeFormatDate(selectedTask.end, 'yyyy年MM月dd日')}
                     </p>
                   </div>
                   
@@ -1500,11 +2338,17 @@ export default function GanttPage() {
               </div>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedTask(null)}>
+                <Button variant="outline" onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setSelectedTask(null)
+                }}>
                   閉じる
                 </Button>
                 <Button 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     if (selectedTask.progress < 100) {
                       handleProgressUpdate(selectedTask.id, selectedTask.progress + 10)
                     }
@@ -1521,17 +2365,8 @@ export default function GanttPage() {
 
       {/* 新規タスク作成モーダル */}
       <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
-        <DialogContent className="max-w-4xl bg-white shadow-xl border-0 rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center text-xl">
-              <Plus className="w-5 h-5 mr-2 text-green-600" />
-              新規タスク作成
-            </DialogTitle>
-            <DialogDescription>
-              新しい作業タスクの詳細情報を入力してください
-            </DialogDescription>
-          </DialogHeader>
-          
+        <DialogContent className="max-w-[95vw] xl:max-w-[1000px] max-h-[95vh] p-0 bg-white overflow-hidden shadow-2xl border-0 rounded-xl">
+          <DialogTitle className="sr-only">新規栽培スケジュール・タスク作成</DialogTitle>
           <NewTaskForm 
             vegetables={vegetables} 
             onSubmit={handleCreateTask}
@@ -1540,6 +2375,193 @@ export default function GanttPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* 作業記録フォーム */}
+      <WorkReportForm
+        open={showWorkReportForm}
+        onOpenChange={setShowWorkReportForm}
+        onSuccess={handleWorkReportSuccess}
+      />
+
+      {/* 削除確認ダイアログ */}
+      <Dialog open={deleteConfirmDialog.show} onOpenChange={(open) => {
+        setDeleteConfirmDialog({ show: open, item: null, type: 'task' })
+        if (!open) {
+          // ダイアログが閉じられた時にフォーカスをリセット
+          setTimeout(() => {
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur()
+            }
+            document.body.focus()
+            // ページ全体のポインターイベントを確実に有効化
+            document.body.style.pointerEvents = 'auto'
+            document.documentElement.style.pointerEvents = 'auto'
+          }, 100)
+        }
+      }}>
+        <DialogContent className="max-w-lg bg-white border-0 shadow-2xl rounded-xl">
+          <DialogHeader className="text-center pb-2">
+            <DialogTitle className="flex items-center justify-center gap-3 text-lg font-semibold text-gray-800">
+              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              プロフェッショナル削除確認
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 px-2">
+            {/* 削除対象の表示 */}
+            {deleteConfirmDialog.item && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {deleteConfirmDialog.type === 'task' ? '📋' : '📝'}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {deleteConfirmDialog.type === 'task' 
+                        ? deleteConfirmDialog.item.name 
+                        : getWorkTypeLabel(deleteConfirmDialog.item.work_type)
+                      }
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {deleteConfirmDialog.type === 'task' 
+                        ? `${deleteConfirmDialog.item.vegetable?.name} - ${safeFormatDate(deleteConfirmDialog.item.start, 'yyyy/MM/dd')}〜${safeFormatDate(deleteConfirmDialog.item.end, 'yyyy/MM/dd')}`
+                        : `${safeFormatDate(deleteConfirmDialog.item.work_date, 'yyyy年MM月dd日')} - ${deleteConfirmDialog.item.work_notes || '詳細なし'}`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 削除前検証結果の表示 */}
+            {deleteConfirmDialog.isValidating && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <p className="text-blue-800 font-medium">削除前検証中...</p>
+                </div>
+              </div>
+            )}
+
+            {/* 検証完了時の結果表示 */}
+            {deleteConfirmDialog.validation && !deleteConfirmDialog.isValidating && (
+              <div>
+                {/* 警告がある場合 */}
+                {deleteConfirmDialog.validation.warnings.length > 0 && (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-4">
+                    <p className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                      ⚠️ 確認事項
+                    </p>
+                    <ul className="text-yellow-700 space-y-1 text-sm">
+                      {deleteConfirmDialog.validation.warnings.map((warning, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-yellow-500 font-bold">•</span>
+                          {warning}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* 関連情報の表示 */}
+                {deleteConfirmDialog.validation.related_reports_count !== undefined && (
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4">
+                    <p className="text-sm text-gray-600">
+                      関連作業レポート: <span className="font-bold">{deleteConfirmDialog.validation.related_reports_count}件</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 削除理由入力 */}
+            {deleteConfirmDialog.type === 'task' && !deleteConfirmDialog.isValidating && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">削除理由（オプション）</Label>
+                <Input
+                  id="deletion-reason"
+                  placeholder="例：不要になったため、重複作成、計画変更等"
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
+            )}
+
+            {/* プロフェッショナル削除情報 */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                🔐 プロフェッショナル削除システム
+              </p>
+              <ul className="text-blue-700 space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 font-bold">✓</span>
+                  削除前の関連データ自動検証
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 font-bold">✓</span>
+                  楽観的更新による即座のUI反映
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 font-bold">✓</span>
+                  エラー時の自動ロールバック機能
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 font-bold">✓</span>
+                  削除操作の完全な監査ログ記録
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* アクションボタン */}
+          <div className="flex gap-3 justify-center pt-4">
+            <Button 
+              variant="outline" 
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setDeleteConfirmDialog({ 
+                  show: false, 
+                  item: null, 
+                  type: 'task',
+                  validation: null,
+                  isValidating: false
+                })
+              }}
+              className="min-w-[100px] border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              キャンセル
+            </Button>
+            <Button 
+              variant="destructive" 
+              disabled={deleteConfirmDialog.isValidating || (deleteConfirmDialog.validation && !deleteConfirmDialog.validation.can_delete)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                
+                // 削除理由を取得
+                const reasonInput = document.getElementById('deletion-reason') as HTMLInputElement
+                const reason = reasonInput?.value || '理由未指定'
+                
+                handleConfirmDelete(reason)
+              }}
+              className="min-w-[100px] bg-red-600 hover:bg-red-700 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {deleteConfirmDialog.isValidating ? '検証中...' : 'プロフェッショナル削除'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 農地編集ビュー */}
+      {showMapView && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <FarmMapView onClose={() => setShowMapView(false)} />
+        </div>
+      )}
     </div>
   )
 }

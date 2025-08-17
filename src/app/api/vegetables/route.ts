@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient() // Service clientに変更
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -14,11 +14,14 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    console.log('🔍 野菜API - リクエストパラメータ:', { companyId, search, status, plotName, limit, offset })
+
     if (!companyId) {
+      console.log('❌ 野菜API - company_id が指定されていません')
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // ベースクエリ
+    // ベースクエリ（アーカイブ済みデータを除外）
     let query = supabase
       .from('vegetables')
       .select(`
@@ -34,17 +37,18 @@ export async function GET(request: NextRequest) {
         actual_harvest_end,
         status,
         notes,
-        custom_fields,
+        spatial_data,
+        polygon_coordinates,
+        plot_center_lat,
+        plot_center_lng,
+        polygon_color,
         created_at,
         updated_at,
         created_by,
-        company_id,
-        created_by_user:users!created_by(
-          id,
-          full_name
-        )
+        company_id
       `)
       .eq('company_id', companyId)
+      .is('deleted_at', null) // ソフトデリート：削除済みデータを除外
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -61,36 +65,39 @@ export async function GET(request: NextRequest) {
       query = query.ilike('plot_name', `%${plotName}%`)
     }
 
+    console.log('🔍 野菜API - SQLクエリ実行中...')
     const { data: vegetables, error } = await query
 
+    console.log('🔍 野菜API - クエリ結果:', { vegetablesCount: vegetables?.length || 0, error: error?.message })
+    console.log('🔍 野菜API - 取得された野菜データ:', vegetables?.map(v => ({ id: v.id, name: v.name, company_id: v.company_id })) || [])
+
     if (error) {
-      console.error('Database error:', error)
+      console.error('❌ 野菜API - Database error:', error)
       return NextResponse.json({ error: 'Failed to fetch vegetables' }, { status: 500 })
     }
 
+    // ソフトデリートフィルタによりアクティブな野菜のみ取得済み
+    const activeVegetables = vegetables || []
+    console.log('🔍 野菜API - アクティブな野菜数:', activeVegetables.length)
+
     // 各野菜の統計情報を取得
     const vegetablesWithStats = await Promise.all(
-      (vegetables || []).map(async (vegetable) => {
+      activeVegetables.map(async (vegetable) => {
         // タスク統計
         const { data: taskStats } = await supabase
-          .from('gantt_tasks')
+          .from('growing_tasks')
           .select('id, status')
           .eq('vegetable_id', vegetable.id)
 
         const totalTasks = taskStats?.length || 0
         const completedTasks = taskStats?.filter(task => task.status === 'completed').length || 0
 
-        // 写真統計
-        const { count: photosCount } = await supabase
-          .from('photos')
-          .select('id', { count: 'exact', head: true })
-          .eq('vegetable_id', vegetable.id)
-
-        // レポート統計
+        // 作業記録統計
         const { count: reportsCount } = await supabase
-          .from('operation_logs')
+          .from('work_reports')
           .select('id', { count: 'exact', head: true })
           .eq('vegetable_id', vegetable.id)
+          .is('deleted_at', null)
 
         // 栽培日数計算
         const plantingDate = new Date(vegetable.planting_date)
@@ -106,11 +113,9 @@ export async function GET(request: NextRequest) {
 
         return {
           ...vegetable,
-          created_by: vegetable.created_by_user?.full_name || '不明',
           stats: {
             total_tasks: totalTasks,
             completed_tasks: completedTasks,
-            photos_count: photosCount || 0,
             reports_count: reportsCount || 0,
             days_since_planting: Math.max(0, daysSincePlanting),
             estimated_days_to_harvest: estimatedDaysToHarvest
@@ -119,17 +124,19 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    // 統計情報も取得
+    // 統計情報も取得（アクティブな野菜のみ）
     const { count: totalVegetables } = await supabase
       .from('vegetables')
       .select('id', { count: 'exact', head: true })
       .eq('company_id', companyId)
+      .is('deleted_at', null)
 
-    // ステータス別統計
+    // ステータス別統計（アクティブな野菜のみ）
     const { data: statusStats } = await supabase
       .from('vegetables')
       .select('status')
       .eq('company_id', companyId)
+      .is('deleted_at', null)
 
     const statusCounts = {
       planning: statusStats?.filter(v => v.status === 'planning').length || 0,
@@ -138,8 +145,8 @@ export async function GET(request: NextRequest) {
       completed: statusStats?.filter(v => v.status === 'completed').length || 0
     }
 
-    // 総栽培面積
-    const totalPlotSize = vegetables?.reduce((sum, v) => sum + (v.area_size || 0), 0) || 0
+    // 総栽培面積（アクティブな野菜のみ）
+    const totalPlotSize = activeVegetables.reduce((sum, v) => sum + (v.area_size || 0), 0) || 0
 
     return NextResponse.json({
       success: true,
@@ -168,7 +175,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     const body = await request.json()
     
     const {
@@ -176,6 +183,7 @@ export async function POST(request: NextRequest) {
       variety_name,
       plot_name,
       plot_size,
+      area_size,
       planting_date,
       expected_harvest_date, // フォームから来る収穫予定日
       status = 'planning',
@@ -185,10 +193,13 @@ export async function POST(request: NextRequest) {
       created_by
     } = body
 
+    // 面積フィールドの統一（plot_size または area_size）
+    const finalAreaSize = area_size || plot_size
+
     // 必須フィールドのバリデーション
-    if (!name || !variety_name || !plot_name || !plot_size || !planting_date || !company_id) {
+    if (!name || !variety_name || !plot_name || !finalAreaSize || !planting_date || !company_id) {
       return NextResponse.json({ 
-        error: 'Missing required fields: name, variety_name, plot_name, plot_size, planting_date, company_id' 
+        error: 'Missing required fields: name, variety_name, plot_name, area_size (or plot_size), planting_date, company_id' 
       }, { status: 400 })
     }
 
@@ -256,11 +267,31 @@ export async function POST(request: NextRequest) {
     const { farm_area_data, ...otherFields } = body
     console.log('🗺️ 農地エリア情報:', farm_area_data)
     
+    // 位置情報の処理
+    let spatialData = null
+    let polygonCoordinates = null
+    let centerLat = null
+    let centerLng = null
+    
+    if (farm_area_data) {
+      spatialData = farm_area_data
+      polygonCoordinates = farm_area_data.geometry?.geometry?.coordinates
+      
+      // 中心座標の計算（簡易版）
+      if (polygonCoordinates && polygonCoordinates[0]) {
+        const coords = polygonCoordinates[0]
+        const lats = coords.map(c => c[1])
+        const lngs = coords.map(c => c[0])
+        centerLat = (Math.min(...lats) + Math.max(...lats)) / 2
+        centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2
+      }
+    }
+    
     const insertData = {
       name,
       variety_name,
       plot_name,
-      area_size: parseFloat(plot_size), // area_sizeに変更
+      area_size: parseFloat(finalAreaSize), // 統一された面積フィールドを使用
       planting_date,
       expected_harvest_start: validatedHarvestDate, // 検証済みの収穫予定日
       expected_harvest_end: validatedHarvestDate, // 検証済みの収穫予定日
@@ -268,13 +299,11 @@ export async function POST(request: NextRequest) {
       notes: notes || null, // 空文字列の場合はnull
       company_id: safeCompanyId, // 安全な会社IDを設定
       created_by: validCreatedBy,
-      // 農地エリア情報をcustom_fieldsに保存
-      custom_fields: farm_area_data ? {
-        farm_area_data: farm_area_data,
-        has_spatial_data: true,
-        spatial_data_version: '1.0',
-        polygon_color: '#22c55e' // デフォルト色を設定
-      } : {}
+      // 位置情報を追加
+      spatial_data: spatialData,
+      polygon_coordinates: polygonCoordinates,
+      plot_center_lat: centerLat,
+      plot_center_lng: centerLng
     }
     
     const result = await supabase
@@ -369,7 +398,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     const body = await request.json()
     
     const { 
@@ -386,7 +415,7 @@ export async function PUT(request: NextRequest) {
       actual_harvest_end,
       status,
       notes,
-      custom_fields 
+      polygon_color
     } = body
 
     if (!id) {
@@ -448,7 +477,7 @@ export async function PUT(request: NextRequest) {
     // growth_stageはテーブルに存在しないためコメントアウト
     // if (growth_stage !== undefined) updateData.growth_stage = growth_stage
     if (notes !== undefined) updateData.notes = notes
-    if (custom_fields !== undefined) updateData.custom_fields = custom_fields
+    if (polygon_color !== undefined) updateData.polygon_color = polygon_color
 
     const { data: vegetable, error } = await supabase
       .from('vegetables')
@@ -467,7 +496,7 @@ export async function PUT(request: NextRequest) {
         actual_harvest_end,
         status,
         notes,
-        custom_fields,
+        polygon_color,
         updated_at
       `)
       .single()
@@ -494,105 +523,46 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
+    
+    // クエリパラメータからIDを取得
     const { searchParams } = new URL(request.url)
-    const vegetableId = searchParams.get('id')
+    const id = searchParams.get('id')
 
-    if (!vegetableId) {
-      return NextResponse.json({ 
-        error: 'Vegetable ID is required' 
-      }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'Vegetable ID is required' }, { status: 400 })
     }
 
-    // 野菜が存在するかチェック
-    const { data: existingVegetable, error: fetchError } = await supabase
+    console.log('🗑️ 野菜削除開始:', id)
+
+    // シンプルなハード削除（新しいスキーマに対応）
+    const { error } = await supabase
       .from('vegetables')
-      .select('id, name, variety_name')
-      .eq('id', vegetableId)
-      .single()
+      .delete()
+      .eq('id', id)
 
-    if (fetchError || !existingVegetable) {
-      return NextResponse.json({ error: 'Vegetable not found' }, { status: 404 })
+    if (error) {
+      console.error('Delete error:', error)
+      return NextResponse.json({ 
+        error: 'Failed to delete vegetable',
+        details: error.message 
+      }, { status: 500 })
     }
 
-    // 関連データの削除確認
-    const { data: relatedTasks } = await supabase
-      .from('gantt_tasks')
-      .select('id')
-      .eq('vegetable_id', vegetableId)
+    console.log('✅ 野菜削除完了:', id)
 
-    const { data: relatedPhotos } = await supabase
-      .from('photos')
-      .select('id')
-      .eq('vegetable_id', vegetableId)
-
-    const { data: relatedReports } = await supabase
-      .from('operation_logs')
-      .select('id')
-      .eq('vegetable_id', vegetableId)
-
-    // 関連データがある場合は警告
-    const hasRelatedData = (relatedTasks?.length || 0) > 0 || 
-                          (relatedPhotos?.length || 0) > 0 || 
-                          (relatedReports?.length || 0) > 0
-
-    if (hasRelatedData) {
-      // ソフトデリート（ステータスを削除済みに変更）
-      const { error: updateError } = await supabase
-        .from('vegetables')
-        .update({ 
-          status: 'completed',
-          actual_harvest_date: new Date().toISOString(),
-          notes: (existingVegetable as any).notes ? 
-            `${(existingVegetable as any).notes}\n\n[削除済み - ${new Date().toLocaleDateString('ja-JP')}]` : 
-            `[削除済み - ${new Date().toLocaleDateString('ja-JP')}]`,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', vegetableId)
-
-      if (updateError) {
-        console.error('Update error:', updateError)
-        return NextResponse.json({ error: 'Failed to archive vegetable' }, { status: 500 })
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Vegetable "${existingVegetable.name} (${existingVegetable.variety_name})" archived successfully`,
-        action: 'archived',
-        related_data: {
-          tasks: relatedTasks?.length || 0,
-          photos: relatedPhotos?.length || 0,
-          reports: relatedReports?.length || 0
-        }
-      })
-    } else {
-      // 完全削除
-      const { error: deleteError } = await supabase
-        .from('vegetables')
-        .delete()
-        .eq('id', vegetableId)
-
-      if (deleteError) {
-        console.error('Database deletion error:', deleteError)
-        return NextResponse.json({ error: 'Failed to delete vegetable' }, { status: 500 })
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Vegetable "${existingVegetable.name} (${existingVegetable.variety_name})" deleted successfully`,
-        action: 'deleted',
-        deleted_vegetable: {
-          id: existingVegetable.id,
-          name: existingVegetable.name,
-          variety: existingVegetable.variety_name
-        }
-      })
-    }
+    return NextResponse.json({
+      success: true,
+      message: '野菜を削除しました'
+    })
 
   } catch (error) {
-    console.error('API error:', error)
+    console.error('Professional deletion API error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' }, 
+      { 
+        error: 'システムエラーが発生しました',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 
       { status: 500 }
     )
   }

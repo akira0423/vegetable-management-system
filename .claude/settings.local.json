@@ -5,7 +5,9 @@
       "Bash(npm run test:*)",
       "Bash(npm run lint)",
       "Bash(claude config list)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

@@ -53,7 +53,8 @@ export default function SignupPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Step 1: Supabase認証ユーザー作成
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -73,9 +74,33 @@ export default function SignupPage() {
         return
       }
 
+      // Step 2: アプリケーション側データ作成
+      if (data.user) {
+        const completeResponse = await fetch('/api/auth/complete-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: data.user.id,
+            email: formData.email,
+            full_name: formData.fullName,
+            company_name: formData.companyName
+          })
+        })
+
+        const completeResult = await completeResponse.json()
+
+        if (!completeResult.success) {
+          setError(`アカウント作成に失敗しました: ${completeResult.error}`)
+          return
+        }
+
+        console.log('✅ 完全なアカウント作成完了:', completeResult.data)
+      }
+
       setSuccess(true)
     } catch (err) {
       setError('システムエラーが発生しました。しばらく経ってから再試行してください。')
+      console.error('サインアップエラー:', err)
     } finally {
       setLoading(false)
     }

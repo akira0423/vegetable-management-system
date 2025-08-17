@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { MeshCell } from '@/types/database'
+import { useRealtimeSync } from '@/lib/realtime-sync'
 
 interface FarmMapViewProps {
   onClose: () => void
@@ -79,7 +80,15 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isPolygonEditMode, setIsPolygonEditMode] = useState(false)
   
+  // 🆕 複数ポリゴン表示管理システム
+  const [visiblePolygons, setVisiblePolygons] = useState<Set<string>>(new Set())
+  const [polygonColors, setPolygonColors] = useState<Map<string, string>>(new Map())
+  
+  // 🆕 モバイル対応（タッチデバイス検出）
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  
   const router = useRouter()
+  const { notifyVegetableChange, onDataChange } = useRealtimeSync()
   
   const mapEditorRef = useRef<{ 
     flyToLocation: (lng: number, lat: number, zoom?: number) => void; 
@@ -89,7 +98,25 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     showVegetablePolygon?: (vegetable: any) => void;
     clearVegetablePolygons?: () => void;
     updatePolygonColor?: (vegetableId: string, newColor: string) => void;
+    // 🆕 複数ポリゴン管理用の新しいメソッド
+    showMultiplePolygons?: (vegetables: any[]) => void;
+    hidePolygon?: (vegetableId: string) => void;
+    showPolygon?: (vegetable: any) => void;
+    clearAllPolygons?: () => void;
   }>(null)
+
+  // 🆕 タッチデバイス検出とモバイル対応の初期化
+  useEffect(() => {
+    // タッチデバイス検出
+    const checkTouchDevice = () => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0)
+    }
+    checkTouchDevice()
+    
+    // リサイズ時にも再チェック
+    window.addEventListener('resize', checkTouchDevice)
+    return () => window.removeEventListener('resize', checkTouchDevice)
+  }, [])
 
   // サイドバー表示状態をセッションストレージから復元＋レスポンシブ対応
   useEffect(() => {
@@ -118,20 +145,44 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     
     try {
       console.log('🔄 野菜データをリロード中...')
-      const response = await fetch('/api/vegetables?company_id=a1111111-1111-1111-1111-111111111111')
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+          console.log('✅ ユーザーのcompany_id:', companyId)
+        }
+      }
+      
+      const response = await fetch(`/api/vegetables?company_id=${companyId}`)
       
       if (response.ok) {
         const result = await response.json()
         
         if (result.success && result.data) {
-          // 野菜データに農地エリア情報を展開
+          // 新しいAPIレスポンス形式に対応
           const processedVegetables = result.data
-            .filter((vegetable: any) => vegetable.id) // 有効なIDを持つレコードのみ
+            .filter((vegetable: any) => {
+              // 有効なIDを持つレコードのみ
+              if (!vegetable.id) return false
+              
+              // deleted_atがあれば除外（ソフト削除済み）
+              if (vegetable.deleted_at) {
+                console.log('🗑️ 削除済みデータをスキップ:', vegetable.name)
+                return false
+              }
+              
+              return true
+            })
             .map((vegetable: any) => ({
               ...vegetable,
-              farm_area_data: vegetable.custom_fields?.farm_area_data || null,
-              has_spatial_data: vegetable.custom_fields?.has_spatial_data || false,
-              polygon_color: vegetable.custom_fields?.polygon_color || '#22c55e'
+              // 新しいスキーマから位置情報を復元
+              farm_area_data: vegetable.spatial_data,
+              has_spatial_data: vegetable.spatial_data !== null,
+              polygon_color: vegetable.polygon_color || '#22c55e' // データベースから取得
             }))
           
           console.log(`✅ ${processedVegetables.length}件の野菜データを取得`)
@@ -208,14 +259,33 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
       console.log('🌱 新規栽培情報を保存します:', vegetableData)
       console.log('🗺️ 紐づけるエリアデータ:', newAreaData)
       
+      // 現在のユーザー情報を取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      let createdBy = null
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user) {
+          companyId = userData.user.company_id || companyId
+          createdBy = userData.user.id
+          console.log('✅ 保存用ユーザー情報:', { companyId, createdBy })
+        }
+      }
+
       // 農地ポリゴンデータと栽培情報を確実に紐づけ
       const completeData = {
         ...vegetableData,
-        farm_area_data: newAreaData, // 農地エリアデータの紐づけ
-        area_size: newAreaData?.area_square_meters || 0, // 面積データの同期
-        company_id: 'a1111111-1111-1111-1111-111111111111',
-        created_by: 'd0efa1ac-7e7e-420b-b147-dabdf01454b7'
+        // 新しいスキーマに合わせてplot_sizeをarea_sizeに統一
+        area_size: vegetableData.plot_size || newAreaData?.area_square_meters || 0,
+        company_id: companyId,
+        created_by: createdBy,
+        // 農地エリアデータを明示的に追加
+        farm_area_data: newAreaData
       }
+      
+      // plot_sizeフィールドを削除（新しいスキーマにはない）
+      delete completeData.plot_size
       
       console.log('📤 完全なデータペイロード:', completeData)
       
@@ -233,6 +303,9 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
       if (result.success) {
         console.log('✅ 栽培情報保存成功:', result.data)
         
+        // リアルタイム同期通知を送信
+        notifyVegetableChange('created', result.data)
+        
         // リアルタイム更新：即座に一覧に反映
         setShowNewVegetableModal(false)
         setNewAreaData(null)
@@ -245,13 +318,21 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         console.log('💾 保存された野菜データ:', savedVegetable)
         
         // 新しく登録された野菜を地図上に表示（オプション）
-        if (savedVegetable && mapEditorRef.current?.showVegetablePolygon) {
+        if (savedVegetable) {
+          const vegetableToShow = {
+            ...savedVegetable,
+            farm_area_data: newAreaData,
+            has_spatial_data: true
+          }
+          
           setTimeout(() => {
-            mapEditorRef.current?.showVegetablePolygon({
-              ...savedVegetable,
-              farm_area_data: newAreaData,
-              has_spatial_data: true
-            })
+            if (mapEditorRef.current?.showPolygon) {
+              mapEditorRef.current.showPolygon(vegetableToShow)
+              console.log('🟢 新規野菜をポリゴン表示:', savedVegetable.name)
+            } else if (mapEditorRef.current?.showVegetablePolygon) {
+              mapEditorRef.current.showVegetablePolygon(vegetableToShow)
+              console.log('🟢 (レガシー) 新規野菜をポリゴン表示:', savedVegetable.name)
+            }
           }, 1000)
         }
         
@@ -293,6 +374,45 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     loadRegisteredVegetables()
   }, [loadRegisteredVegetables])
 
+  // リアルタイム同期：他のページからの更新イベントを受信
+  useEffect(() => {
+    // 野菜データ変更イベントの監視
+    const unsubscribeVegetableCreated = onDataChange('vegetable_created', () => {
+      console.log('🔔 野菜作成イベント受信 - データを再読み込み')
+      loadRegisteredVegetables(false)
+    })
+
+    const unsubscribeVegetableUpdated = onDataChange('vegetable_updated', () => {
+      console.log('🔔 野菜更新イベント受信 - データを再読み込み')
+      loadRegisteredVegetables(false)
+    })
+
+    const unsubscribeVegetableDeleted = onDataChange('vegetable_deleted', () => {
+      console.log('🔔 野菜削除イベント受信 - データを再読み込み')
+      loadRegisteredVegetables(false)
+    })
+
+    const unsubscribeVegetableArchived = onDataChange('vegetable_archived', () => {
+      console.log('🔔 野菜アーカイブイベント受信 - データを再読み込み')
+      loadRegisteredVegetables(false)
+    })
+
+    // 全体データ更新イベントの監視
+    const unsubscribeAnalyticsUpdated = onDataChange('analytics_updated', () => {
+      console.log('🔔 アナリティクス更新イベント受信 - データを再読み込み')
+      loadRegisteredVegetables(false)
+    })
+
+    // クリーンアップ
+    return () => {
+      unsubscribeVegetableCreated()
+      unsubscribeVegetableUpdated()
+      unsubscribeVegetableDeleted()
+      unsubscribeVegetableArchived()
+      unsubscribeAnalyticsUpdated()
+    }
+  }, [onDataChange, loadRegisteredVegetables])
+
   // イベント監視：他のページからの更新通知を受信（プロフェッショナル版）
   useEffect(() => {
     const handleVegetableRegistered = (event: CustomEvent) => {
@@ -330,43 +450,156 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     console.log('野菜登録画面へ移動:', selectedCells)
   }, [selectedCells])
 
+  // 🆕 複数ポリゴン表示対応の野菜エリアクリックハンドラー
   const handleVegetableAreaClick = useCallback((vegetable: any) => {
-    console.log('🥕 野菜エリアをクリック:', vegetable)
+    console.log('🥕 野菜エリアをクリック (複数表示モード):', vegetable)
     
-    if (vegetable.farm_area_data?.geometry && mapEditorRef.current) {
-      // 既存のポリゴンを削除してから新しいポリゴンを表示
-      if ((mapEditorRef.current as any).clearVegetablePolygons) {
-        (mapEditorRef.current as any).clearVegetablePolygons()
-      }
-      
-      // 野菜エリアのポリゴンを地図上に表示
-      if ((mapEditorRef.current as any).showVegetablePolygon) {
-        (mapEditorRef.current as any).showVegetablePolygon(vegetable)
-        console.log('🟢 緑色のポリゴンを表示しました')
-      } else {
-        // フォールバック：従来の中心点移動
-        const geometry = vegetable.farm_area_data.geometry
-        if (geometry.geometry && geometry.geometry.coordinates) {
-          const coordinates = geometry.geometry.coordinates[0]
-          let centerLng = 0
-          let centerLat = 0
-          
-          coordinates.forEach((coord: [number, number]) => {
-            centerLng += coord[0]
-            centerLat += coord[1]
-          })
-          
-          centerLng /= coordinates.length
-          centerLat /= coordinates.length
-          
-          mapEditorRef.current.flyToLocation(centerLng, centerLat, 18)
-        }
-      }
-    } else {
+    if (!vegetable.farm_area_data?.geometry || !mapEditorRef.current) {
       console.warn('⚠️ 野菜の位置情報が見つからません:', vegetable)
       alert('この野菜の位置情報が登録されていないため、地図に移動できません。')
+      return
+    }
+
+    const vegetableId = vegetable.id
+    
+    // 既に表示されている場合はトグル動作（非表示にする）
+    if (visiblePolygons.has(vegetableId)) {
+      console.log('🔄 既に表示中のポリゴンを非表示にします:', vegetableId)
+      
+      // 表示リストから削除
+      setVisiblePolygons(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(vegetableId)
+        return newSet
+      })
+      
+      // 地図上から非表示
+      if (mapEditorRef.current?.hidePolygon) {
+        mapEditorRef.current.hidePolygon(vegetableId)
+      } else {
+        console.warn('⚠️ ポリゴン非表示メソッドが利用できません')
+      }
+      
+      return
+    }
+
+    // 新しいポリゴンを表示リストに追加
+    console.log('➕ 新しいポリゴンを表示リストに追加:', vegetableId)
+    setVisiblePolygons(prev => new Set([...prev, vegetableId]))
+    
+    // ポリゴンの色を管理
+    if (!polygonColors.has(vegetableId)) {
+      const color = vegetable.polygon_color || '#22c55e'
+      setPolygonColors(prev => new Map(prev).set(vegetableId, color))
+    }
+
+    // 地図上にポリゴンを表示（新しいメソッドを優先）
+    if (mapEditorRef.current?.showPolygon) {
+      mapEditorRef.current.showPolygon(vegetable)
+      console.log('🟢 ポリゴンを表示しました:', vegetableId)
+    } else if (mapEditorRef.current?.showVegetablePolygon) {
+      // レガシーメソッドのフォールバック
+      mapEditorRef.current.showVegetablePolygon(vegetable)
+      console.log('🟢 (レガシー) ポリゴンを表示しました:', vegetableId)
+    } else {
+      console.warn('⚠️ ポリゴン表示メソッドが利用できません')
+    }
+    
+    // ポリゴン表示後、該当位置に地図を移動
+    moveMapToVegetable(vegetable)
+    
+    // 詳細情報を設定
+    setSelectedVegetable(vegetable)
+  }, [visiblePolygons, polygonColors, setSelectedVegetable])
+
+  // 🆕 地図移動ヘルパー関数
+  const moveMapToVegetable = useCallback((vegetable: any) => {
+    if (!vegetable.farm_area_data?.geometry || !mapEditorRef.current) return
+    
+    const geometry = vegetable.farm_area_data.geometry
+    if (geometry.geometry && geometry.geometry.coordinates) {
+      const coordinates = geometry.geometry.coordinates[0]
+      let centerLng = 0
+      let centerLat = 0
+      
+      coordinates.forEach((coord: [number, number]) => {
+        centerLng += coord[0]
+        centerLat += coord[1]
+      })
+      
+      centerLng /= coordinates.length
+      centerLat /= coordinates.length
+      
+      mapEditorRef.current.flyToLocation(centerLng, centerLat, 18)
+      console.log('📍 地図を野菜位置に移動しました:', centerLng, centerLat)
     }
   }, [])
+
+  // 🆕 右クリックで全ポリゴン削除ハンドラー
+  const handleMapRightClick = useCallback((event: any) => {
+    event.preventDefault() // コンテキストメニューを無効化
+    
+    console.log('🖱️ 地図右クリック: 全ポリゴンを削除します')
+    
+    // 全てのポリゴンを非表示
+    setVisiblePolygons(new Set())
+    
+    // 選択状態もリセット
+    setSelectedVegetable(null)
+    
+    // 地図上のポリゴンをクリア
+    if (mapEditorRef.current && (mapEditorRef.current as any).clearAllPolygons) {
+      (mapEditorRef.current as any).clearAllPolygons()
+    } else if (mapEditorRef.current && (mapEditorRef.current as any).clearVegetablePolygons) {
+      // レガシーメソッドのフォールバック
+      (mapEditorRef.current as any).clearVegetablePolygons()
+    }
+    
+    console.log('✨ 全ポリゴンを削除しました')
+  }, [])
+
+  // 🆕 個別ポリゴンダブルクリック削除ハンドラー
+  const handlePolygonDoubleClick = useCallback((vegetableId: string) => {
+    console.log('🖱️ ポリゴンダブルクリック: 個別削除します:', vegetableId)
+    
+    // 表示リストから削除
+    setVisiblePolygons(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(vegetableId)
+      return newSet
+    })
+    
+    // 地図上から非表示
+    if (mapEditorRef.current && (mapEditorRef.current as any).hidePolygon) {
+      (mapEditorRef.current as any).hidePolygon(vegetableId)
+    }
+    
+    console.log('✨ ポリゴンを個別削除しました:', vegetableId)
+  }, [])
+
+  // 🆕 全ポリゴン表示/非表示切り替えヘルパー
+  const toggleAllPolygons = useCallback(() => {
+    if (visiblePolygons.size > 0) {
+      // 全て非表示
+      setVisiblePolygons(new Set())
+      if (mapEditorRef.current && (mapEditorRef.current as any).clearAllPolygons) {
+        (mapEditorRef.current as any).clearAllPolygons()
+      }
+      console.log('👁️ 全ポリゴンを非表示にしました')
+    } else {
+      // 全て表示
+      const allVegetableIds = registeredVegetables
+        .filter(v => v.has_spatial_data)
+        .map(v => v.id)
+      
+      setVisiblePolygons(new Set(allVegetableIds))
+      
+      if (mapEditorRef.current && (mapEditorRef.current as any).showMultiplePolygons) {
+        (mapEditorRef.current as any).showMultiplePolygons(registeredVegetables.filter(v => v.has_spatial_data))
+      }
+      console.log('👁️ 全ポリゴンを表示しました')
+    }
+  }, [visiblePolygons.size, registeredVegetables])
 
   // 野菜詳細確認ハンドラー
   const handleVegetableDetailClick = useCallback((vegetable: any) => {
@@ -388,7 +621,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
   const handleStartEdit = useCallback(() => {
     if (!selectedVegetable) return
     
-    setEditFormData({
+    const formData = {
       name: selectedVegetable.name || '',
       variety_name: selectedVegetable.variety_name || '',
       plot_name: selectedVegetable.plot_name || '',
@@ -396,14 +629,26 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
       planting_date: selectedVegetable.planting_date ? selectedVegetable.planting_date.split('T')[0] : '',
       expected_harvest_start: selectedVegetable.expected_harvest_start ? selectedVegetable.expected_harvest_start.split('T')[0] : '',
       expected_harvest_end: selectedVegetable.expected_harvest_end ? selectedVegetable.expected_harvest_end.split('T')[0] : '',
-      polygon_color: selectedVegetable.polygon_color || '#22c55e',
-      status: selectedVegetable.status || 'planning'
-    })
+      notes: selectedVegetable.notes || '',
+      status: selectedVegetable.status || 'planning',
+      polygon_color: selectedVegetable.polygon_color || '#22c55e'
+    }
+    
+    console.log('📝 編集モード開始 - 選択された野菜:', selectedVegetable)
+    console.log('📝 編集フォームデータ:', formData)
+    
+    setEditFormData(formData)
     setIsEditMode(true)
     
     // 編集対象の野菜ポリゴンを地図上に表示
-    if (selectedVegetable.has_spatial_data && mapEditorRef.current?.showVegetablePolygon) {
-      mapEditorRef.current.showVegetablePolygon(selectedVegetable)
+    if (selectedVegetable.has_spatial_data) {
+      if (mapEditorRef.current?.showPolygon) {
+        mapEditorRef.current.showPolygon(selectedVegetable)
+        console.log('🟢 編集対象をポリゴン表示:', selectedVegetable.name)
+      } else if (mapEditorRef.current?.showVegetablePolygon) {
+        mapEditorRef.current.showVegetablePolygon(selectedVegetable)
+        console.log('🟢 (レガシー) 編集対象をポリゴン表示:', selectedVegetable.name)
+      }
     }
     
     console.log('✏️ 編集モード開始:', selectedVegetable)
@@ -445,16 +690,17 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
           expected_harvest_start: editFormData.expected_harvest_start || null,
           expected_harvest_end: editFormData.expected_harvest_end || null,
           status: editFormData.status,
-          custom_fields: {
-            ...selectedVegetable.custom_fields,
-            polygon_color: editFormData.polygon_color
-          }
+          notes: editFormData.notes || null,
+          polygon_color: editFormData.polygon_color || '#22c55e'
         })
       })
       
       if (response.ok) {
         const result = await response.json()
         console.log('✅ 野菜データ更新成功:', result)
+        
+        // リアルタイム同期通知を送信
+        notifyVegetableChange('updated', result.data)
         
         // 野菜リストを更新
         await loadRegisteredVegetables()
@@ -563,7 +809,12 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
       })
       
       if (response.ok) {
+        const result = await response.json()
         console.log('✅ ポリゴンデータ更新成功')
+        
+        // リアルタイム同期通知を送信
+        notifyVegetableChange('updated', result.data)
+        
         await loadRegisteredVegetables()
         setIsPolygonEditMode(false)
         setShowDetailModal(true) // モーダルを再表示
@@ -616,17 +867,64 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
 
   const handleExecuteMultipleDelete = useCallback(async () => {
     try {
-      // 実際のAPI削除処理（現在はフロントエンドのみ）
-      setRegisteredVegetables(prev => prev.filter(v => !selectedVegetableIds.has(v.id)))
+      console.log('🗑️ 野菜削除処理を開始:', Array.from(selectedVegetableIds))
+      
+      // APIで各野菜を削除
+      const deletePromises = Array.from(selectedVegetableIds).map(async (vegetableId) => {
+        const response = await fetch(`/api/vegetables?id=${vegetableId}`, {
+          method: 'DELETE',
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || `野菜ID ${vegetableId} の削除に失敗`)
+        }
+        
+        const result = await response.json()
+        console.log(`✅ 野菜削除成功:`, result)
+        return result
+      })
+      
+      // 全ての削除処理を並行実行
+      const results = await Promise.all(deletePromises)
+      
+      // 時限ソフトデリート戦略：リアルタイム同期通知を送信
+      Array.from(selectedVegetableIds).forEach(vegetableId => {
+        // アーカイブ通知として送信（完全削除ではないため）
+        notifyVegetableChange('updated', { 
+          id: vegetableId, 
+          action: 'archived',
+          message: '6ヶ月間の時限アーカイブ' 
+        })
+      })
+      
+      // 時限ソフトデリート戦略：ローカル状態の即座更新を削除し、API再読み込みに統一
+      console.log('🔄 削除完了 - 野菜データを再読み込み中...')
+      
+      // 削除後にAPI経由で最新データを取得（ソフトデリートされたデータは自動的に除外される）
+      await loadRegisteredVegetables(false)
+      
       setShowDeleteConfirmDialog(false)
       setDeleteMode(false)
       setSelectedVegetableIds(new Set())
-      alert(`${selectedVegetableIds.size}件の野菜データを削除しました`)
+      
+      // 削除結果の詳細表示
+      const deletedCount = results.filter(r => r.action === 'deleted').length
+      const archivedCount = results.filter(r => r.action === 'archived').length
+      
+      // 時限ソフトデリート戦略：メッセージを統一
+      const totalCount = selectedVegetableIds.size
+      let message = `${totalCount}件の野菜を削除しました。\n`
+      message += `アーカイブ済み: ${archivedCount}件 (6ヶ月後に自動完全削除)\n`
+      message += `削除された野菜は一覧から非表示になりますが、6ヶ月間はデータが保持されます。`
+      
+      alert(message)
+      
     } catch (error) {
-      console.error('削除エラー:', error)
-      alert('削除に失敗しました')
+      console.error('❌ 削除エラー:', error)
+      alert(`削除に失敗しました: ${error.message}`)
     }
-  }, [selectedVegetableIds])
+  }, [selectedVegetableIds, loadRegisteredVegetables])
 
   // 日付フォーマット関数
   const formatDate = (dateString: string) => {
@@ -723,9 +1021,9 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         )}
         
         {/* プロフェッショナル農地管理サイドバー */}
-        <div className={`w-80 md:w-80 lg:w-96 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/60 overflow-y-auto transition-transform duration-300 ease-in-out ${
+        <div className={`w-80 sm:w-80 md:w-80 lg:w-96 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/60 transition-transform duration-300 ease-in-out ${
           showSidebar ? 'translate-x-0' : '-translate-x-full'
-        } ${showSidebar ? 'relative md:relative' : 'absolute'} z-10 h-full shadow-lg`}>
+        } ${showSidebar ? 'relative md:relative' : 'absolute'} z-10 h-full shadow-lg flex flex-col max-h-screen`}>
           
           {/* サイドバーヘッダー */}
           <div className="bg-gradient-to-r from-green-600 to-green-700 p-4 text-white">
@@ -742,9 +1040,13 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
             </div>
           </div>
 
-          <div className="p-5 space-y-5">
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-3">
+          <div className="flex-1 p-5 space-y-5 overflow-y-auto min-h-0 scroll-smooth scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-gray-100 hover:scrollbar-thumb-green-400">
+            {/* スクロール可能エリアのヒント */}
+            <div className="sticky top-0 z-10 bg-gradient-to-b from-white/90 to-transparent pb-2 mb-2">
+              <div className="w-full h-0.5 bg-gradient-to-r from-green-200 via-green-300 to-green-200 rounded-full opacity-30"></div>
+            </div>
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="pb-3 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Info className="w-3 h-3 text-blue-600" />
@@ -897,19 +1199,61 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
               </Card>
             )}
 
-            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-3">
+            <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm flex flex-col flex-1 min-h-0 hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="pb-3 flex-shrink-0">
+                {/* 1行目: タイトルと件数 */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Sprout className="w-3 h-3 text-green-600" />
+                  </div>
+                  <CardTitle className="text-base font-semibold text-gray-800">登録野菜一覧</CardTitle>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs px-2 py-0.5">
+                    {registeredVegetables.length}件
+                  </Badge>
+                </div>
+                
+                {/* 2行目: アクションボタンとステータス */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Sprout className="w-3 h-3 text-green-600" />
-                    </div>
-                    <CardTitle className="text-base font-semibold text-gray-800">登録済野菜一覧</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs px-2 py-0.5">
-                      {registeredVegetables.length}件
+                    {/* 🆕 ポリゴン表示状態インジケーター */}
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs px-2 py-0.5 ${
+                        visiblePolygons.size > 0 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                          : 'bg-gray-50 text-gray-500 border-gray-200'
+                      }`}
+                    >
+                      <Eye className="w-2.5 h-2.5 mr-1" />
+                      {visiblePolygons.size}表示中
                     </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {/* 🆕 全表示/非表示切り替えボタン */}
+                    <Button
+                      onClick={toggleAllPolygons}
+                      variant="outline"
+                      size="sm"
+                      className={`text-xs h-6 px-2 ${
+                        visiblePolygons.size > 0
+                          ? 'text-blue-600 border-blue-200 hover:bg-blue-50'
+                          : 'text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                      disabled={registeredVegetables.filter(v => v.has_spatial_data).length === 0}
+                    >
+                      {visiblePolygons.size > 0 ? (
+                        <>
+                          <EyeOff className="w-3 h-3 mr-1" />
+                          全非表示
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3 h-3 mr-1" />
+                          全表示
+                        </>
+                      )}
+                    </Button>
                     {!deleteMode ? (
                       <Button
                         onClick={handleEnterDeleteMode}
@@ -947,7 +1291,8 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                   登録済み野菜の位置確認・詳細管理
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-1 flex flex-col min-h-0">
+                {/* セクション1: ローディング・空状態（固定エリア） */}
                 {isLoadingVegetables ? (
                   <div className="flex flex-col items-center justify-center py-8">
                     <div className="relative">
@@ -970,14 +1315,45 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[calc(100vh-420px)] min-h-[200px] overflow-y-auto pr-1">
+                  <>
+                    {/* セクション2: 制限表示エリア（5件分の固定高さ） */}
+                    <div 
+                      className="space-y-3 overflow-y-auto pr-1 scroll-smooth scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-gray-100 hover:scrollbar-thumb-green-400 relative overscroll-contain touch-pan-y"
+                      style={{ 
+                        maxHeight: (() => {
+                          if (registeredVegetables.length <= 3) return 'auto'; // 3件以下は全表示
+                          // レスポンシブ対応: モバイル3件, タブレット4件, デスクトップ5件
+                          const maxVisible = window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5;
+                          return registeredVegetables.length <= maxVisible ? 'auto' : `${maxVisible * 140}px`;
+                        })(),
+                        minHeight: registeredVegetables.length > 0 ? '140px' : 'auto'
+                      }}
+                    >
+                      {/* 上部フェード効果とスクロールヒント（レスポンシブ） */}
+                      {(() => {
+                        const maxVisible = typeof window !== 'undefined' ? 
+                          (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                        return registeredVegetables.length > maxVisible;
+                      })() && (
+                        <div className="sticky top-0 z-20 bg-gradient-to-b from-white via-green-50/80 to-transparent p-2 mx-1 rounded-lg">
+                          <div className="text-center">
+                            <p className="text-xs text-green-700 font-medium mb-1">↓ 他の野菜を確認（全{registeredVegetables.length}件）</p>
+                            <div className="flex justify-center space-x-1">
+                              <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
+                              <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                              <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     {registeredVegetables.map((vegetable, index) => (
                       <div
                         key={vegetable.id || index}
                         onClick={() => !deleteMode && handleVegetableAreaClick(vegetable)}
-                        className={`group relative bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded-xl p-4 transition-all duration-200 overflow-hidden ${
-                          deleteMode ? 'cursor-pointer' : 'cursor-pointer hover:shadow-md hover:border-green-300/50'
-                        } ${selectedVegetableIds.has(vegetable.id) ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}`}
+                        className={`group relative bg-white/95 backdrop-blur-sm border border-gray-200/50 rounded-xl p-4 transition-all duration-200 overflow-hidden ${
+                          deleteMode ? 'cursor-pointer hover:bg-blue-50/30' : 'cursor-pointer hover:shadow-lg hover:border-green-300/50 hover:-translate-y-0.5 hover:bg-white'
+                        } ${selectedVegetableIds.has(vegetable.id) ? 'ring-2 ring-blue-500 bg-blue-50/50 shadow-md' : ''} flex-shrink-0`}
+                        style={{ minHeight: '130px' }} // カード高さを統一
                       >
                         {/* 背景装飾 */}
                         <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-green-100/30 to-transparent rounded-full -translate-y-10 translate-x-10"></div>
@@ -1002,9 +1378,15 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                                 {vegetable.name?.charAt(0) || '?'}
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-bold text-gray-800 text-sm leading-tight">
-                                  {vegetable.name}
-                                </h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-gray-800 text-sm leading-tight">
+                                    {vegetable.name}
+                                  </h4>
+                                  {/* 🆕 表示状態インジケーター */}
+                                  {visiblePolygons.has(vegetable.id) && vegetable.has_spatial_data && (
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" title="地図上に表示中" />
+                                  )}
+                                </div>
                                 <p className="text-xs text-gray-600 mt-0.5">
                                   {vegetable.variety_name} • {vegetable.plot_name}
                                 </p>
@@ -1060,15 +1442,28 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="flex-1 text-xs h-8 font-medium hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                                className={`flex-1 text-xs h-8 font-medium transition-all duration-200 ${
+                                  visiblePolygons.has(vegetable.id)
+                                    ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'
+                                    : 'hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'
+                                }`}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleVegetableAreaClick(vegetable)
                                 }}
                                 disabled={!vegetable.has_spatial_data}
                               >
-                                <MapPin className="w-3 h-3 mr-1.5" />
-                                位置移動
+                                {visiblePolygons.has(vegetable.id) ? (
+                                  <>
+                                    <EyeOff className="w-3 h-3 mr-1.5" />
+                                    非表示
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="w-3 h-3 mr-1.5" />
+                                    表示
+                                  </>
+                                )}
                               </Button>
                               <Button
                                 size="sm"
@@ -1087,7 +1482,71 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                         </div>
                       </div>
                     ))}
-                  </div>
+                    
+                    {/* スクロール終端インジケーター（レスポンシブ表示制限超過時のみ） */}
+                    {(() => {
+                      const maxVisible = typeof window !== 'undefined' ? 
+                        (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                      return registeredVegetables.length > maxVisible;
+                    })() && (
+                      <div className="text-center py-3 mt-2">
+                        <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-green-300 to-transparent rounded-full opacity-30 mb-2"></div>
+                        <p className="text-xs text-green-600 opacity-60">全 {registeredVegetables.length} 件を表示中</p>
+                      </div>
+                    )}
+                    </div>
+                    
+                    {/* セクション3: ステータスフッター（固定） */}
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex-shrink-0 bg-gradient-to-r from-gray-50/50 to-green-50/30 rounded-lg p-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            <span className="text-gray-600 font-medium">
+                              {(() => {
+                                const maxVisible = typeof window !== 'undefined' ? 
+                                  (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                                return registeredVegetables.length <= maxVisible 
+                                  ? `全 ${registeredVegetables.length} 件表示` 
+                                  : `${maxVisible}件表示中 / 全 ${registeredVegetables.length} 件`;
+                              })()}
+                            </span>
+                          </div>
+                          {(() => {
+                            const maxVisible = typeof window !== 'undefined' ? 
+                              (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                            return registeredVegetables.length > maxVisible;
+                          })() && (
+                            <div className="flex items-center gap-1 ml-2">
+                              <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300"
+                                  style={{ 
+                                    width: `${Math.min(100, ((typeof window !== 'undefined' ? 
+                                      (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5) / registeredVegetables.length) * 100)}%` 
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {(() => {
+                          const maxVisible = typeof window !== 'undefined' ? 
+                            (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                          return registeredVegetables.length > maxVisible;
+                        })() && (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <span className="font-medium text-xs">スクロール可能</span>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                              <div className="w-1 h-1 bg-green-400 rounded-full"></div>
+                              <div className="w-1 h-1 bg-green-300 rounded-full"></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
                 
                 <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
@@ -1100,11 +1559,20 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                     </p>
                   </div>
                   <p className="text-xs text-blue-600 mt-1 leading-relaxed">
-                    野菜カードをクリックで地図移動 • 位置移動ボタンで精密表示 • 詳細確認で管理画面へ
+                    {isTouchDevice ? (
+                      '🆕 複数表示対応：表示ボタンで重複表示 • 全削除ボタンでリセット • 長押しで個別削除'
+                    ) : (
+                      '🆕 複数表示対応：表示ボタンで重複表示 • 右クリックで全削除 • 全表示ボタンで一括管理'
+                    )}
                   </p>
                 </div>
               </CardContent>
             </Card>
+            
+            {/* サイドバー終端インジケーター */}
+            <div className="text-center py-2 mt-2">
+              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-gray-300 to-transparent rounded-full opacity-20"></div>
+            </div>
           </div>
         </div>
 
@@ -1115,10 +1583,29 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
             ref={mapEditorRef}
             onCellsSelected={handleCellsSelected}
             onAreaSaved={handleAreaSaved}
+            onMapRightClick={handleMapRightClick}
+            onPolygonDoubleClick={handlePolygonDoubleClick}
+            visiblePolygons={visiblePolygons}
+            polygonColors={polygonColors}
+            isTouchDevice={isTouchDevice}
             initialCenter={[139.6917, 35.6895]}
             initialZoom={16}
             height="100%"
           />
+
+          {/* 🆕 モバイル専用：ポリゴンクリアボタン */}
+          {isTouchDevice && visiblePolygons.size > 0 && (
+            <div className="absolute top-4 right-4 z-50">
+              <Button
+                onClick={handleMapRightClick}
+                size="sm"
+                className="bg-red-500 hover:bg-red-600 text-white shadow-lg"
+              >
+                <X className="w-4 h-4 mr-1" />
+                全削除
+              </Button>
+            </div>
+          )}
 
           {/* ポリゴン編集モード制御パネル */}
           {isPolygonEditMode && (
@@ -1376,17 +1863,21 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                         </div>
                         <div>
                           <Label htmlFor="status" className="text-sm font-medium text-gray-700">ステータス</Label>
-                          <Select value={editFormData?.status} onValueChange={(value) => handleEditFormChange('status', value)}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="ステータスを選択" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="planning">計画中</SelectItem>
-                              <SelectItem value="growing">栽培中</SelectItem>
-                              <SelectItem value="harvesting">収穫中</SelectItem>
-                              <SelectItem value="completed">完了</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <select
+                            id="status"
+                            value={editFormData?.status || 'planning'}
+                            onChange={(e) => {
+                              console.log('📝 ステータス変更:', e.target.value)
+                              handleEditFormChange('status', e.target.value)
+                            }}
+                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          >
+                            <option value="planning">計画中</option>
+                            <option value="growing">栽培中</option>
+                            <option value="harvesting">収穫中</option>
+                            <option value="completed">完了</option>
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">現在の値: {editFormData?.status}</p>
                         </div>
                         <div>
                           <Label htmlFor="polygon_color" className="text-sm font-medium text-gray-700 flex items-center">

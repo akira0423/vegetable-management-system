@@ -19,7 +19,10 @@ const nextConfig = {
   // 画像最適化設定
   images: {
     domains: [
-      'rsofuafiacwygmfkcrrk.supabase.co',
+      ...(process.env.NEXT_PUBLIC_SUPABASE_URL 
+        ? [new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname] 
+        : []
+      ),
       'images.unsplash.com',
       'via.placeholder.com'
     ],

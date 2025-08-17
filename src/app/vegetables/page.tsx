@@ -5,7 +5,15 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CalendarDays, MapPin, Sprout, Plus, Eye } from 'lucide-react'
+import { CalendarDays, MapPin, Sprout, Plus, Eye, Trash2, MoreVertical } from 'lucide-react'
+import { VegetableDeletionDialog } from '@/components/vegetable-deletion-dialog'
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { toast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 
 interface Vegetable {
@@ -37,6 +45,10 @@ const statusConfig = {
 export default function VegetablesPage() {
   const [vegetables, setVegetables] = useState<Vegetable[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletionDialog, setDeletionDialog] = useState<{
+    open: boolean
+    vegetableId: string
+  }>({ open: false, vegetableId: '' })
 
   useEffect(() => {
     fetchVegetables()
@@ -131,6 +143,60 @@ export default function VegetablesPage() {
     return new Date(dateString).toLocaleDateString('ja-JP')
   }
 
+  const handleDeleteVegetable = async (deletionData: {
+    reason: string
+    confirmationText: string
+    acknowledgeDataLoss: boolean
+  }) => {
+    try {
+      const response = await fetch('/api/vegetables', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: deletionDialog.vegetableId,
+          ...deletionData
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || '削除に失敗しました')
+      }
+
+      // 成功時の処理
+      toast({
+        title: '削除完了',
+        description: result.message,
+      })
+
+      // UI更新：削除された野菜をリストから除去
+      setVegetables(prev => prev.filter(v => v.id !== deletionDialog.vegetableId))
+
+      // ダイアログを閉じる
+      setDeletionDialog({ open: false, vegetableId: '' })
+
+      // 詳細な削除結果をコンソールに出力（開発者向け）
+      if (result.deletionSummary) {
+        console.log('🗑️ 削除完了サマリー:', result.deletionSummary)
+      }
+
+    } catch (error) {
+      console.error('削除エラー:', error)
+      toast({
+        title: '削除失敗',
+        description: error instanceof Error ? error.message : '削除中にエラーが発生しました',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const openDeletionDialog = (vegetableId: string) => {
+    setDeletionDialog({ open: true, vegetableId })
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto p-4">
@@ -191,12 +257,36 @@ export default function VegetablesPage() {
                       {vegetable.variety?.name} - {vegetable.variety?.variety}
                     </CardDescription>
                   </div>
-                  <Badge 
-                    className={statusConfig[vegetable.status]?.color}
-                    variant="secondary"
-                  >
-                    {statusConfig[vegetable.status]?.label}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      className={statusConfig[vegetable.status]?.color}
+                      variant="secondary"
+                    >
+                      {statusConfig[vegetable.status]?.label}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/vegetables/${vegetable.id}`}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            詳細表示
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => openDeletionDialog(vegetable.id)}
+                          className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          削除
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -247,6 +337,14 @@ export default function VegetablesPage() {
           ))}
         </div>
       )}
+
+      {/* プロフェッショナル削除ダイアログ */}
+      <VegetableDeletionDialog
+        open={deletionDialog.open}
+        onOpenChange={(open) => setDeletionDialog({ ...deletionDialog, open })}
+        vegetableId={deletionDialog.vegetableId}
+        onConfirmDeletion={handleDeleteVegetable}
+      />
     </div>
   )
 }

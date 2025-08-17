@@ -26,7 +26,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     // Get user profile from database
     const { data: profile } = await supabase
       .from('users')
-      .select('company_id, role, full_name')
+      .select('company_id, full_name')
       .eq('id', user.id)
       .single()
 
@@ -35,7 +35,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         id: user.id,
         email: user.email!,
         company_id: profile.company_id,
-        role: profile.role,
+        role: 'user', // 1企業1アカウントモデルでは全員user
         full_name: profile.full_name,
       }
     }

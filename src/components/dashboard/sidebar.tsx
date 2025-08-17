@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { 
   Sprout, 
-  LayoutDashboard, 
   Calendar,
   FileText,
   BarChart3,
@@ -15,11 +14,6 @@ import {
 } from 'lucide-react'
 
 const navigation = [
-  {
-    name: 'ダッシュボード',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
   {
     name: '栽培野菜管理',
     href: '/dashboard/gantt',
@@ -54,7 +48,7 @@ export default function DashboardSidebar() {
     <div className="flex flex-col w-64 bg-white border-r border-gray-200">
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-gray-200">
-        <Link href="/dashboard" className="flex items-center space-x-2">
+        <Link href="/dashboard/gantt" className="flex items-center space-x-2">
           <Sprout className="h-8 w-8 text-green-600" />
           <span className="text-lg font-semibold text-gray-900">
             栽培管理

@@ -820,7 +820,7 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       type={showApiKey ? 'text' : 'password'}
-                      value="sk-1234567890abcdef..."
+                      value="••••••••••••••••••••"
                       readOnly
                       className="font-mono text-sm"
                     />

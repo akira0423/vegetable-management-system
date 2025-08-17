@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { generateMesh, cellsToGeoJSON } from '@/lib/mesh-generator'
 import SearchBox from './search-box'
 import {
-  Map,
+  Map as MapIcon,
   Square,
   Grid3X3,
   Save,
@@ -53,11 +53,28 @@ interface ProfessionalFarmEditorProps {
   initialCenter?: [number, number]
   initialZoom?: number
   height?: string
+  // 🆕 複数ポリゴン表示対応
+  onMapRightClick?: (event: any) => void
+  onPolygonDoubleClick?: (vegetableId: string) => void
+  visiblePolygons?: Set<string>
+  polygonColors?: Map<string, string>
+  isTouchDevice?: boolean
 }
 
 interface ProfessionalFarmEditorRef {
   flyToLocation: (lng: number, lat: number, zoom?: number) => void
   fitBounds: (bounds: [[number, number], [number, number]]) => void
+  // 🆕 複数ポリゴン管理用メソッド
+  showPolygon?: (vegetable: any) => void
+  hidePolygon?: (vegetableId: string) => void
+  showMultiplePolygons?: (vegetables: any[]) => void
+  clearAllPolygons?: () => void
+  // レガシーサポート
+  showVegetablePolygon?: (vegetable: any) => void
+  clearVegetablePolygons?: () => void
+  enablePolygonEditMode?: (vegetable: any) => void
+  saveEditedPolygon?: (vegetableId: string) => any
+  updatePolygonColor?: (vegetableId: string, newColor: string) => void
 }
 
 const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, ProfessionalFarmEditorProps>(({
@@ -65,7 +82,13 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   onCellsSelected,
   initialCenter = [139.6917, 35.6895],
   initialZoom = 16,
-  height = '100vh'
+  height = '100vh',
+  // 🆕 複数ポリゴン表示対応props
+  onMapRightClick,
+  onPolygonDoubleClick,
+  visiblePolygons = new Set(),
+  polygonColors = new Map(),
+  isTouchDevice = false
 }, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -89,6 +112,10 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   
   // シンプルな処理フラグ
   const processingRef = useRef(false)
+  
+  // 🆕 複数ポリゴン表示管理
+  const [vegetablePolygons, setVegetablePolygons] = useState<Map<string, any>>(new Map())
+  const vegetableLayersRef = useRef<Map<string, string>>(new Map()) // vegetableId -> layerId
   const isHandlingCreateRef = useRef(false)
   
   // 地図初期化
@@ -1191,8 +1218,174 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
           geometry: editedFeature.geometry
         }]
       }
+    },
+    
+    // 🆕 複数ポリゴン表示対応メソッド
+    showPolygon: (vegetable: any) => {
+      if (!map.current || !vegetable.farm_area_data?.geometry) {
+        console.warn('⚠️ 地図またはポリゴン情報がありません')
+        return
+      }
+
+      console.log('🟢 野菜ポリゴンを表示:', vegetable)
+      
+      const vegetableId = vegetable.id
+      const geometry = vegetable.farm_area_data.geometry
+      const sourceId = `vegetable-polygon-${vegetableId}`
+      const layerId = `vegetable-polygon-layer-${vegetableId}`
+
+      // 既存のレイヤーとソースがあれば削除
+      try {
+        [`${layerId}`, `${layerId}-stroke`].forEach(id => {
+          if (map.current.getLayer(id)) {
+            map.current.removeLayer(id)
+          }
+        });
+        
+        if (map.current.getSource(sourceId)) {
+          map.current.removeSource(sourceId)
+        }
+      } catch (error) {
+        // エラーは無視（まだ存在しない場合）
+      }
+
+      // ソースを追加
+      map.current.addSource(sourceId, {
+        type: 'geojson',
+        data: geometry
+      })
+
+      // 色を決定（polygonColors Mapまたはデフォルト）
+      const polygonColor = polygonColors?.get(vegetableId) || 
+                          vegetable.polygon_color || 
+                          '#22c55e'
+
+      // 塗りつぶしレイヤー
+      map.current.addLayer({
+        id: layerId,
+        type: 'fill',
+        source: sourceId,
+        paint: {
+          'fill-color': polygonColor,
+          'fill-opacity': 0.4
+        }
+      })
+
+      // 境界線レイヤー
+      const strokeColor = (() => {
+        const hex = polygonColor.replace('#', '')
+        const r = Math.max(0, parseInt(hex.substring(0, 2), 16) - 32)
+        const g = Math.max(0, parseInt(hex.substring(2, 4), 16) - 32)  
+        const b = Math.max(0, parseInt(hex.substring(4, 6), 16) - 32)
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+      })()
+      
+      map.current.addLayer({
+        id: `${layerId}-stroke`,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': strokeColor,
+          'line-width': 2,
+          'line-opacity': 0.8
+        }
+      })
+
+      // レイヤーIDを記録
+      vegetableLayersRef.current.set(vegetableId, layerId)
+      
+      console.log(`✅ ポリゴン表示完了: ${vegetableId}`)
+    },
+
+    hidePolygon: (vegetableId: string) => {
+      if (!map.current) return
+      
+      console.log('🔄 ポリゴンを非表示:', vegetableId)
+      
+      const layerId = `vegetable-polygon-layer-${vegetableId}`
+      const sourceId = `vegetable-polygon-${vegetableId}`
+      
+      try {
+        // レイヤーを削除
+        [`${layerId}`, `${layerId}-stroke`].forEach(id => {
+          if (map.current.getLayer(id)) {
+            map.current.removeLayer(id)
+            console.log(`🗑️ レイヤー削除: ${id}`)
+          }
+        });
+        
+        // ソースを削除
+        if (map.current.getSource(sourceId)) {
+          map.current.removeSource(sourceId)
+          console.log(`🗑️ ソース削除: ${sourceId}`)
+        }
+        
+        // 記録を削除
+        vegetableLayersRef.current.delete(vegetableId)
+        
+      } catch (error) {
+        console.warn(`⚠️ ポリゴン非表示エラー: ${vegetableId}`, error)
+      }
+    },
+
+    showMultiplePolygons: (vegetables: any[]) => {
+      console.log('🔢 複数ポリゴンを表示:', vegetables.length)
+      vegetables.forEach(vegetable => {
+        if (vegetable.farm_area_data?.geometry) {
+          // showPolygonメソッドを再利用
+          ref.current?.showPolygon?.(vegetable)
+        }
+      })
+    },
+
+    clearAllPolygons: () => {
+      if (!map.current) return
+      
+      console.log('🧹 全ポリゴンをクリア')
+      
+      try {
+        const style = map.current.getStyle()
+        if (!style.layers) return
+        
+        // vegetable-polygon で始まるレイヤーを全て削除
+        const layersToRemove = style.layers
+          .filter(layer => layer.id.startsWith('vegetable-polygon-'))
+          .map(layer => layer.id)
+        
+        layersToRemove.forEach(layerId => {
+          try {
+            if (map.current.getLayer(layerId)) {
+              map.current.removeLayer(layerId)
+            }
+          } catch (error) {
+            console.warn(`⚠️ レイヤー削除エラー: ${layerId}`, error)
+          }
+        })
+        
+        // vegetable-polygon で始まるソースを全て削除
+        const sourcesToRemove = Object.keys(style.sources || {})
+          .filter(sourceId => sourceId.startsWith('vegetable-polygon-'))
+        
+        sourcesToRemove.forEach(sourceId => {
+          try {
+            if (map.current.getSource(sourceId)) {
+              map.current.removeSource(sourceId)
+            }
+          } catch (error) {
+            console.warn(`⚠️ ソース削除エラー: ${sourceId}`, error)
+          }
+        })
+        
+        // 記録をクリア
+        vegetableLayersRef.current.clear()
+        
+        console.log('✅ 全ポリゴンクリア完了')
+        
+      } catch (error) {
+        console.error('❌ 全ポリゴンクリアエラー:', error)
+      }
     }
-  }), [])
+  }), [polygonColors])
 
   return (
     <div className="relative w-full" style={{ height }}>
@@ -1368,7 +1561,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
                 mapStyle === 'standard' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'
               }`}
             >
-              <Map className="w-3 h-3 mr-2" />
+              <MapIcon className="w-3 h-3 mr-2" />
               標準地図
             </Button>
             <Button

@@ -26,6 +26,7 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import PhotoUpload from '@/components/photo-upload'
 import { analyticsDataSync } from '@/lib/analytics-data-sync'
+import { useRealtimeSync } from '@/lib/realtime-sync'
 
 interface WorkReport {
   id?: string
@@ -114,6 +115,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
   const [vegetables, setVegetables] = useState<Vegetable[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const { notifyWorkReportChange } = useRealtimeSync()
   
   // フォーム状態
   const [selectedVegetable, setSelectedVegetable] = useState('')
@@ -135,11 +137,38 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
   const fetchVegetables = async () => {
     setLoading(true)
     try {
-      const companyId = 'a1111111-1111-1111-1111-111111111111'
+      // 動的にcompany_idを取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.company_id) {
+          companyId = userData.user.company_id
+          console.log('🌱 作業記録フォーム - 使用するcompany_id:', companyId)
+        } else {
+          console.log('⚠️ 作業記録フォーム - company_id取得失敗、デフォルト使用:', companyId)
+        }
+      } else {
+        console.log('❌ 作業記録フォーム - ユーザー認証API呼び出し失敗')
+      }
+      
       const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
+      
+      console.log('🌱 野菜API レスポンス状況:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      })
       
       if (response.ok) {
         const result = await response.json()
+        console.log('🌱 野菜API データ:', {
+          success: result.success,
+          dataLength: result.data?.length,
+          data: result.data
+        })
+        
         if (result.success && result.data && result.data.length > 0) {
           const vegetables = result.data.map((v: any) => ({
             id: v.id,
@@ -148,36 +177,22 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
             plot_name: v.plot_name,
             status: v.status
           }))
+          console.log('✅ 実際の野菜データを使用:', vegetables)
           setVegetables(vegetables)
         } else {
-          console.log('APIからのデータが空のため、サンプルデータを使用します')
-          // フォールバック用サンプルデータ
-          setVegetables([
-            { id: 'd1111111-1111-1111-1111-111111111111', name: 'A棟トマト（桃太郎）', variety: '桃太郎', plot_name: 'A棟温室', status: 'growing' },
-            { id: 'd2222222-2222-2222-2222-222222222222', name: 'B棟キュウリ（四葉）', variety: '四葉', plot_name: 'B棟温室', status: 'growing' },
-            { id: 'd3333333-3333-3333-3333-333333333333', name: '露地レタス（春作）', variety: 'グリーンリーフ', plot_name: '露地第1圃場', status: 'planning' },
-            { id: 'd4444444-4444-4444-4444-444444444444', name: 'C棟ナス（千両二号）', variety: '千両二号', plot_name: 'C棟温室', status: 'growing' }
-          ])
+          console.warn('⚠️ APIからのデータが空のため、空の配列を設定します')
+          // テストデータを表示せず、空の配列を設定
+          setVegetables([])
         }
       } else {
-        console.log('API呼び出しが失敗しました:', response.status)
-        // レスポンスが失敗した場合もサンプルデータ
-        setVegetables([
-          { id: 'd1111111-1111-1111-1111-111111111111', name: 'A棟トマト（桃太郎）', variety: '桃太郎', plot_name: 'A棟温室', status: 'growing' },
-          { id: 'd2222222-2222-2222-2222-222222222222', name: 'B棟キュウリ（四葉）', variety: '四葉', plot_name: 'B棟温室', status: 'growing' },
-          { id: 'd3333333-3333-3333-3333-333333333333', name: '露地レタス（春作）', variety: 'グリーンリーフ', plot_name: '露地第1圃場', status: 'planning' },
-          { id: 'd4444444-4444-4444-4444-444444444444', name: 'C棟ナス（千両二号）', variety: '千両二号', plot_name: 'C棟温室', status: 'growing' }
-        ])
+        console.error('❌ API呼び出しが失敗しました:', response.status, response.statusText)
+        // エラー時は空の配列を設定
+        setVegetables([])
       }
     } catch (error) {
-      console.error('野菜データ取得エラー:', error)
-      // エラー時もサンプルデータを設定
-      setVegetables([
-        { id: 'd1111111-1111-1111-1111-111111111111', name: 'A棟トマト（桃太郎）', variety: '桃太郎', plot_name: 'A棟温室', status: 'growing' },
-        { id: 'd2222222-2222-2222-2222-222222222222', name: 'B棟キュウリ（四葉）', variety: '四葉', plot_name: 'B棟温室', status: 'growing' },
-        { id: 'd3333333-3333-3333-3333-333333333333', name: '露地レタス（春作）', variety: 'グリーンリーフ', plot_name: '露地第1圃場', status: 'planning' },
-        { id: 'd4444444-4444-4444-4444-444444444444', name: 'C棟ナス（千両二号）', variety: '千両二号', plot_name: 'C棟温室', status: 'growing' }
-      ])
+      console.error('❌ 野菜データ取得エラー:', error)
+      // エラー時は空の配列を設定
+      setVegetables([])
     } finally {
       setLoading(false)
     }
@@ -288,12 +303,66 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
     setSaving(true)
     try {
+      // 動的にcompany_idを取得
+      const userResponse = await fetch('/api/auth/user')
+      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      let createdBy = 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        if (userData.success && userData.user) {
+          companyId = userData.user.company_id || companyId
+          createdBy = userData.user.id || createdBy
+          console.log('🌱 作業記録保存 - 使用するcompany_id:', companyId)
+        }
+      }
+      
+      // プロフェッショナル版：包括的なデータ構造
       const reportToSave = {
         ...currentReport,
-        company_id: 'a1111111-1111-1111-1111-111111111111',
+        company_id: companyId,
         photos: uploadedPhotos,
-        created_by: 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // テスト用ユーザーID
+        created_by: createdBy,
+        
+        // 分析用追加フィールド - 分を時間に変換
+        duration_hours: currentReport.work_duration ? (currentReport.work_duration / 60) : null,
+        worker_count: currentReport.worker_count || 1,
+        
+        // 収穫データ（分析ページ連携用）
+        harvest_amount: currentReport.harvest_amount || null,
+        harvest_unit: currentReport.harvest_unit || null,
+        harvest_quality: currentReport.harvest_quality || null,
+        
+        // 売上データをnotesに構造化形式で保存
+        notes: JSON.stringify({
+          work_notes: currentReport.work_notes || null,
+          expected_revenue: currentReport.expected_revenue || null,
+          estimated_cost: currentReport.estimated_cost || null,
+          sales_amount: currentReport.expected_revenue || null
+        }),
+        
+        // 環境データ
+        weather: currentReport.weather || null,
+        temperature_morning: currentReport.temperature_morning || null,
+        temperature_afternoon: currentReport.temperature_afternoon || null,
+        humidity: currentReport.humidity || null,
+        
+        // 肥料データ
+        fertilizer_type: currentReport.fertilizer_type || null,
+        fertilizer_amount: currentReport.fertilizer_amount || null,
+        fertilizer_unit: currentReport.fertilizer_unit || null,
+        
+        // 土壌データ
+        soil_ph: currentReport.soil_ph || null,
+        soil_moisture: currentReport.soil_moisture || null,
+        soil_temperature: currentReport.soil_temperature || null,
+        
+        // 作業詳細（notes統合）
+        description: currentReport.work_notes || currentReport.description || null,
+        work_notes: currentReport.work_notes || null
       }
+
+      console.log('📤 作業報告データ送信:', reportToSave)
 
       const response = await fetch('/api/reports', {
         method: 'POST',
@@ -306,7 +375,31 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       const result = await response.json()
 
       if (result.success) {
-        alert('作業報告を保存しました！')
+        console.log('✅ 作業報告保存成功:', result.data)
+        
+        // プロフェッショナル通知
+        alert(`作業報告を保存しました！\n\n作業種類: ${WORK_TYPES.find(t => t.value === currentReport.work_type)?.label}\n対象野菜: ${vegetables.find(v => v.id === currentReport.vegetable_id)?.name}\n作業日: ${currentReport.work_date}`)
+        
+        // 分析データ同期通知
+        analyticsDataSync.syncWorkReportToAnalytics(result.data, vegetables)
+        
+        // リアルタイム同期通知
+        notifyWorkReportChange('created', result.data)
+        
+        // フォームリセット
+        setCurrentReport({
+          vegetable_id: '',
+          work_date: format(new Date(), 'yyyy-MM-dd'),
+          work_type: 'other'
+        })
+        setSelectedVegetable('')
+        setUploadedPhotos([])
+        
+        // 成功コールバック
+        if (onSuccess) onSuccess()
+        
+        // モーダル閉じる
+        onOpenChange(false)
         
         // 分析データと自動同期
         try {
@@ -384,16 +477,23 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                         <SelectValue placeholder="報告対象の野菜を選択してください" />
                       </SelectTrigger>
                       <SelectContent>
-                        {vegetables.map(vegetable => (
-                          <SelectItem key={vegetable.id} value={vegetable.id}>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{vegetable.name}</span>
-                              <Badge variant="outline" className="text-xs bg-gray-100">
-                                {vegetable.plot_name}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {vegetables.length > 0 ? (
+                          vegetables.map(vegetable => (
+                            <SelectItem key={vegetable.id} value={vegetable.id}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{vegetable.name}</span>
+                                <Badge variant="outline" className="text-xs bg-gray-100">
+                                  {vegetable.plot_name}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-gray-500 text-sm">
+                            登録された野菜がありません。<br />
+                            まず野菜を登録してから作業記録を作成してください。
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

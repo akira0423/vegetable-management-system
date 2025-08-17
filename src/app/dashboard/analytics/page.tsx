@@ -29,6 +29,7 @@ import {
   Eye,
   RefreshCw
 } from 'lucide-react'
+import DataExportDialog from '@/components/data-export-dialog'
 
 // チャートコンポーネント（シンプルなCSS実装）
 interface ChartData {
@@ -376,75 +377,29 @@ export default function AnalyticsPage() {
         }
       }
       
-      // APIからデータが取得できない場合はサンプルデータを使用
-      if (workReports.length === 0) {
-        workReports = [
-          {
-            id: 'wr1', work_date: '2025-08-05', work_type: 'harvesting', vegetable_id: 'v1',
-            harvest_amount: 15.5, expected_revenue: 3100, work_notes: 'トマト収穫、品質良好'
-          },
-          {
-            id: 'wr2', work_date: '2025-07-15', work_type: 'pruning', vegetable_id: 'v1',
-            estimated_cost: 1200, work_notes: 'トマトの整枝・摘芽作業'
-          },
-          {
-            id: 'wr3', work_date: '2025-08-07', work_type: 'pruning', vegetable_id: 'v2',
-            estimated_cost: 900, work_notes: 'キュウリの整枝・摘芽作業'
-          },
-          {
-            id: 'wr4', work_date: '2025-06-20', work_type: 'harvesting', vegetable_id: 'v2',
-            harvest_amount: 25.2, expected_revenue: 5040, work_notes: 'キュウリの収穫作業'
-          },
-          {
-            id: 'wr5', work_date: '2025-08-22', work_type: 'fertilizing', vegetable_id: 'v3',
-            estimated_cost: 1500, work_notes: 'レタスの施肥作業'
-          },
-          {
-            id: 'wr6', work_date: '2025-07-10', work_type: 'seeding', vegetable_id: 'v1',
-            estimated_cost: 800, work_notes: 'トマトの播種作業'
-          },
-          {
-            id: 'wr7', work_date: '2025-06-15', work_type: 'planting', vegetable_id: 'v2',
-            estimated_cost: 1800, work_notes: 'キュウリの定植作業'
-          },
-          {
-            id: 'wr8', work_date: '2025-08-01', work_type: 'watering', vegetable_id: 'v1',
-            estimated_cost: 300, work_notes: 'トマトの灌水作業'
-          },
-          {
-            id: 'wr9', work_date: '2025-07-20', work_type: 'fertilizing', vegetable_id: 'v2',
-            estimated_cost: 1200, work_notes: 'キュウリの追肥作業'
-          },
-          {
-            id: 'wr10', work_date: '2025-08-10', work_type: 'harvesting', vegetable_id: 'v1',
-            harvest_amount: 18.3, expected_revenue: 3660, work_notes: 'トマトの二回目収穫'
-          }
-        ]
-      }
-      
-      if (vegetables.length === 0) {
-        vegetables = [
-          { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎', status: 'growing' },
-          { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉', status: 'growing' },
-          { id: 'v3', name: '露地レタス（秋作）', variety: 'グリーンリーフ', status: 'planning' }
-        ]
-      }
+      // データが取得できない場合は空状態を維持
+      console.log('📊 分析データ取得結果:', {
+        作業レポート数: workReports.length,
+        野菜データ数: vegetables.length,
+        タスクデータ数: tasks.length
+      })
       
       // 作業レポートから分析データを生成
-      const analyticsFromReports = generateDetailedAnalyticsFromReports(workReports, vegetables)
-      
-      // 分析データとマージ
-      const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
-      
-      setData(mergedData)
+      if (workReports.length > 0 || vegetables.length > 0) {
+        const analyticsFromReports = generateDetailedAnalyticsFromReports(workReports, vegetables)
+        const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
+        setData(mergedData)
+      } else {
+        // データがない場合は null を設定（空状態表示用）
+        setData(null)
+      }
       setLastUpdated(new Date())
       setLoading(false)
       
     } catch (error) {
       console.error('分析データの取得エラー:', error)
-      // エラー時もサンプルデータを用いて分析を実行
-      const fallbackData = generateDetailedAnalyticsFromReports([], [])
-      setData(mergeAnalyticsData(sampleData, fallbackData))
+      // エラー時は空状態を表示
+      setData(null)
       setLastUpdated(new Date())
       setLoading(false)
     }
@@ -452,34 +407,20 @@ export default function AnalyticsPage() {
 
   // 作業レポートから詳細分析データを生成
   const generateDetailedAnalyticsFromReports = (reports: any[], vegetables: any[]) => {
+    // 実際のデータのみを使用（サンプルデータは使用しない）
     if (!reports || reports.length === 0) {
-      // サンプルデータの作業レポートを生成
-      reports = [
-        {
-          id: 'wr1', work_date: '2025-06-05', work_type: 'harvesting', vegetable_id: 'v1',
-          harvest_amount: 15.5, expected_revenue: 3100
-        },
-        {
-          id: 'wr2', work_date: '2025-07-15', work_type: 'harvesting', vegetable_id: 'v1',
-          harvest_amount: 22.3, expected_revenue: 4460
-        },
-        {
-          id: 'wr3', work_date: '2025-08-05', work_type: 'harvesting', vegetable_id: 'v1',
-          harvest_amount: 28.7, expected_revenue: 5740
-        },
-        {
-          id: 'wr4', work_date: '2025-09-10', work_type: 'harvesting', vegetable_id: 'v2',
-          harvest_amount: 18.2, expected_revenue: 3640
-        },
-        {
-          id: 'wr5', work_date: '2025-10-20', work_type: 'harvesting', vegetable_id: 'v2',
-          harvest_amount: 16.8, expected_revenue: 3360
-        },
-        {
-          id: 'wr6', work_date: '2025-11-15', work_type: 'harvesting', vegetable_id: 'v3',
-          harvest_amount: 12.5, expected_revenue: 2500
-        }
-      ]
+      // データがない場合は空の分析結果を返す
+      return {
+        harvestByMonth: {},
+        costByType: {},
+        workFrequency: {},
+        vegetablePerformance: [],
+        totalRevenue: 0,
+        totalCost: 0,
+        totalHarvest: 0,
+        profitMargin: 0,
+        recentActivities: []
+      }
     }
 
     // 月別収穫量データ生成（年跨ぎ対応）
@@ -639,21 +580,14 @@ export default function AnalyticsPage() {
         }))
       : baseData.cost_analysis
 
-    // 作業频度データを更新
+    // 作業頻度データを更新（実データのみ）
     const workFrequencyData = Object.keys(reportsData.workFrequency || {}).length > 0
       ? Object.entries(reportsData.workFrequency).map(([type, count]) => ({
           label: type,
           value: count as number,
           color: 'bg-purple-600'
         }))
-      : [
-          { label: '播種', value: 25, color: 'bg-green-500' },
-          { label: '定植', value: 18, color: 'bg-blue-500' },
-          { label: '施肥', value: 42, color: 'bg-purple-500' },
-          { label: '灌水', value: 89, color: 'bg-cyan-500' },
-          { label: '除草', value: 36, color: 'bg-yellow-500' },
-          { label: '収穫', value: 52, color: 'bg-red-500' }
-        ]
+      : [] // 空配列を返す
 
     // サマリー情報の更新（数値の整合性を保証）
     const updatedSummary = {
@@ -721,15 +655,6 @@ export default function AnalyticsPage() {
     return labels[status as keyof typeof labels] || '平均'
   }
 
-  const exportData = async (format: 'csv' | 'excel') => {
-    try {
-      // 実際のエクスポート処理
-      alert(`${format.toUpperCase()}ファイルのエクスポートを開始します`)
-    } catch (error) {
-      console.error('エクスポートエラー:', error)
-      alert('エクスポートに失敗しました')
-    }
-  }
 
   if (loading) {
     return (
@@ -749,7 +674,8 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-600">分析データを読み込めませんでした</p>
+          <p className="text-gray-600 text-lg font-medium mb-2">登録情報がありません</p>
+          <p className="text-gray-500 text-sm">野菜の登録や作業記録を作成すると、分析データが表示されます</p>
         </div>
       </div>
     )
@@ -982,14 +908,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <SimpleBarChart 
-                  data={data.work_frequency || [
-                    { label: '播種', value: 25, color: 'bg-green-500' },
-                    { label: '定植', value: 18, color: 'bg-blue-500' },
-                    { label: '施肥', value: 42, color: 'bg-purple-500' },
-                    { label: '灌水', value: 89, color: 'bg-cyan-500' },
-                    { label: '除草', value: 36, color: 'bg-yellow-500' },
-                    { label: '収穫', value: 52, color: 'bg-red-500' }
-                  ]} 
+                  data={data.work_frequency && data.work_frequency.length > 0 ? data.work_frequency : []} 
                   height={250} 
                   title="作業回数（件）"
                 />
@@ -1356,37 +1275,38 @@ export default function AnalyticsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* エクスポート機能 */}
+      {/* プロフェッショナルエクスポート機能 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="w-5 h-5" />
-            データエクスポート
+            プロフェッショナルデータエクスポート
           </CardTitle>
-          <CardDescription>分析データをファイルとして出力できます</CardDescription>
+          <CardDescription>
+            農業データを包括的にエクスポートしてExcel等で詳細分析できます
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => exportData('csv')}
-              className="flex items-center gap-2"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              CSV形式
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => exportData('excel')}
-              className="flex items-center gap-2"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Excel形式
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <DataExportDialog />
             <Button variant="outline" className="flex items-center gap-2">
               <Eye className="w-4 h-4" />
               レポート印刷
             </Button>
+            <Button variant="outline" className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              データ同期
+            </Button>
+          </div>
+          
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="font-medium text-blue-800 mb-2">💡 エクスポート可能なデータ</h4>
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>🌱 <strong>野菜管理データ:</strong> 登録済み野菜、品種、圃場情報</p>
+              <p>📋 <strong>作業報告データ:</strong> 日々の作業記録、時間、コスト</p>
+              <p>📊 <strong>分析データ:</strong> 月別集計、生産性レポート</p>
+              <p>💾 <strong>全データ:</strong> 上記すべてを一括エクスポート</p>
+            </div>
           </div>
         </CardContent>
       </Card>

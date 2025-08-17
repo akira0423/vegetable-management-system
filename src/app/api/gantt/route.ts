@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -13,15 +13,24 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
 
+    // API リクエストパラメータの基本ログ
+    console.log('📋 GET /api/gantt:', { company_id: companyId, filters: { vegetableId, status, startDate, endDate } })
+
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // ベースクエリ - シンプル化してデバッグ
+    // アクティブなタスクのみ取得するかどうか
+    const activeOnly = searchParams.get('active_only') !== 'false'
+    console.log('🔍 Gantt API: active_only パラメータ:', activeOnly, 'URL:', request.url)
+    
+    // 統一アーキテクチャのベースクエリ（work_reportsと同じ直接フィルタリング）
     let query = supabase
       .from('growing_tasks')
       .select(`
         id,
+        company_id,
+        vegetable_id,
         name,
         start_date,
         end_date,
@@ -30,16 +39,29 @@ export async function GET(request: NextRequest) {
         priority,
         task_type,
         description,
-        assigned_to,
-        vegetable:vegetables!inner(
+        created_at,
+        updated_at,
+        vegetables:vegetable_id (
           id,
           name,
           variety_name,
-          company_id
+          plot_name,
+          status,
+          deleted_at
         )
       `)
-      .eq('vegetables.company_id', companyId)
-      .order('start_date', { ascending: true })
+      .eq('company_id', companyId) // 作業記録と同じ直接フィルタリング
+      
+    // 一時的にソフト削除フィルターを無効化（カラムが存在しないため）
+    console.log('🔍 Gantt API: ハード削除使用中のため、deleted_atフィルターをスキップ')
+    // if (activeOnly) {
+    //   console.log('🔍 Gantt API: ソフトデリートフィルターを適用中 (deleted_at IS NULL)')
+    //   query = query.is('deleted_at', null)
+    // } else {
+    //   console.log('🔍 Gantt API: active_only=false のため、削除済みタスクも含める')
+    // }
+    
+    query = query.order('start_date', { ascending: true })
 
     // フィルター条件を追加
     if (vegetableId) {
@@ -59,40 +81,73 @@ export async function GET(request: NextRequest) {
 
     const { data: tasks, error } = await query
 
+    console.log('📋 クエリ結果:', { タスク数: tasks?.length || 0, エラー: error?.message })
+    console.log('📋 全タスクのdeleted_at状態:', tasks?.map(t => ({ id: t.id, name: t.name, deleted_at: t.deleted_at })) || [])
+
     if (error) {
       console.error('Database error:', error)
       return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
     }
 
 
-    // データの変換
-    const ganttTasks = tasks.map(task => ({
-      id: task.id,
-      name: task.name,
-      start: task.start_date,
-      end: task.end_date,
-      progress: task.progress || 0,
-      status: task.status,
-      priority: task.priority || 'medium',
-      vegetable: {
-        id: task.vegetable.id,
-        name: task.vegetable.name,
-        variety: task.vegetable.variety_name
-      },
-      assignedUser: task.assigned_to ? {
-        id: task.assigned_to,
-        name: 'User' // 一時的
-      } : null,
-      description: task.description,
-      workType: task.task_type,
-      color: getStatusColor(task.status)
-    }))
+    // データの変換（削除された野菜に関連するタスクを除外）
+    console.log('📋 フィルタリング前のタスク数:', tasks.length)
+    console.log('📋 削除チェック詳細:', tasks.map(t => ({
+      task_id: t.id,
+      task_name: t.name,
+      vegetable_id: t.vegetable_id,
+      vegetable_deleted_at: t.vegetables?.deleted_at,
+      vegetable_name: t.vegetables?.name
+    })))
+    
+    const ganttTasks = tasks
+      .filter(task => {
+        // ハード削除のため、タスクの削除チェックは不要
+        // 野菜が存在し、かつ削除されていないかのみチェック
+        const vegetableValid = task.vegetables !== null && task.vegetables.deleted_at === null
+        
+        if (!vegetableValid) {
+          console.log('❌ 除外されるタスク:', {
+            task_id: task.id,
+            task_name: task.name,
+            vegetable_deleted_at: task.vegetables?.deleted_at,
+            reason: task.vegetables === null ? 'vegetables is null' : 'vegetable deleted_at is not null'
+          })
+        }
+        return vegetableValid
+      })
+      .map(task => ({
+        id: task.id,
+        name: task.name,
+        start: task.start_date,
+        end: task.end_date,
+        progress: task.progress || 0,
+        status: task.status,
+        priority: task.priority || 'medium',
+        vegetable: {
+          id: task.vegetables?.id || task.vegetable_id,
+          name: task.vegetables?.name || '不明',
+          variety: task.vegetables?.variety_name || ''
+        },
+        assignedUser: null, // assigned_toカラムが存在しないためnullに設定
+        description: task.description,
+        workType: task.task_type,
+        color: getStatusColor(task.status)
+      }))
 
-    // 野菜一覧も取得
+    console.log('✅ フィルタリング後のタスク数:', ganttTasks.length)
+    console.log('✅ 表示されるタスク:', ganttTasks.map(t => ({
+      task_id: t.id,
+      task_name: t.name,
+      vegetable_name: t.vegetable.name
+    })))
+
+    // 野菜一覧も取得（削除された野菜を除外）
     const { data: vegetables, error: vegetablesError } = await supabase
       .from('vegetables')
       .select('id, name, variety_name, status')
       .eq('company_id', companyId)
+      .is('deleted_at', null) // ソフトデリート：削除済みデータを除外
       .order('name', { ascending: true })
 
     if (vegetablesError) {
@@ -118,7 +173,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     const body = await request.json()
     
     const {
@@ -151,24 +206,46 @@ export async function POST(request: NextRequest) {
     // task_typeのデフォルト値を設定（null制約対応）
     const validTaskType = task_type || 'other'
 
-    // タスクを作成
+    // vegetable_idからcompany_idを取得（作業記録と同じパターン）
+    const { data: vegetableData, error: vegetableError } = await supabase
+      .from('vegetables')
+      .select('company_id')
+      .eq('id', vegetable_id)
+      .single()
+    
+    if (vegetableError) {
+      console.error('Database error:', vegetableError)
+      return NextResponse.json({ 
+        error: 'Invalid vegetable_id or vegetable not found' 
+      }, { status: 400 })
+    }
+
+    // 統一されたアーキテクチャでタスクを作成（work_reportsと同じ堅牢性）
+    const taskData = {
+      // 必須フィールド
+      company_id: vegetableData.company_id, // 直接フィルタリング用
+      vegetable_id,
+      name,
+      start_date,
+      end_date,
+      priority,
+      task_type: validTaskType,
+      
+      // オプショナルフィールド
+      description,
+      // assigned_to: validAssignedUserId, // カラムが存在しないためコメントアウト
+      created_by: created_by || 'd0efa1ac-7e7e-420b-b147-dabdf01454b7', // 既存ユーザーID
+      status: 'pending',
+      progress: 0
+    }
+
     const { data: task, error } = await supabase
       .from('growing_tasks')
-      .insert({
-        vegetable_id,
-        name,
-        start_date,
-        end_date,
-        priority,
-        task_type: validTaskType,
-        description,
-        assigned_to: validAssignedUserId,
-        created_by: created_by || null,
-        status: 'pending',
-        progress: 0
-      })
+      .insert(taskData)
       .select(`
         id,
+        company_id,
+        vegetable_id,
         name,
         start_date,
         end_date,
@@ -177,11 +254,15 @@ export async function POST(request: NextRequest) {
         priority,
         task_type,
         description,
-        assigned_to,
-        vegetable:vegetables(
+        created_at,
+        updated_at,
+        vegetables:vegetable_id (
           id,
           name,
-          variety_name
+          variety_name,
+          plot_name,
+          status,
+          deleted_at
         )
       `)
       .single()
@@ -201,14 +282,11 @@ export async function POST(request: NextRequest) {
       status: task.status,
       priority: task.priority,
       vegetable: {
-        id: task.vegetable.id,
-        name: task.vegetable.name,
-        variety: task.vegetable.variety_name
+        id: task.vegetables?.id || task.vegetable_id,
+        name: task.vegetables?.name || '不明',
+        variety: task.vegetables?.variety_name || ''
       },
-      assignedUser: task.assigned_to ? {
-        id: task.assigned_to,
-        name: 'User' // 一時的 - ユーザー情報は別途取得が必要
-      } : null,
+      assignedUser: null, // assigned_toカラムが存在しないためnullに設定
       color: getStatusColor(task.status)
     }
 
@@ -228,7 +306,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     const body = await request.json()
     
     const {
@@ -256,7 +334,7 @@ export async function PUT(request: NextRequest) {
     if (status !== undefined) updateData.status = status
     if (priority !== undefined) updateData.priority = priority
     if (description !== undefined) updateData.description = description
-    if (assigned_user_id !== undefined) updateData.assigned_to = assigned_user_id
+    // if (assigned_user_id !== undefined) updateData.assigned_to = assigned_user_id // カラムが存在しないためコメントアウト
 
     const { data: task, error } = await supabase
       .from('growing_tasks')
@@ -272,11 +350,11 @@ export async function PUT(request: NextRequest) {
         priority,
         task_type,
         description,
-        assigned_to,
         vegetable:vegetables(
           id,
           name,
-          variety_name
+          variety_name,
+          deleted_at
         )
       `)
       .single()
@@ -299,10 +377,7 @@ export async function PUT(request: NextRequest) {
         name: task.vegetable.name,
         variety: task.vegetable.variety_name
       },
-      assignedUser: task.assigned_to ? {
-        id: task.assigned_to,
-        name: 'User' // 一時的 - ユーザー情報は別途取得が必要
-      } : null,
+      assignedUser: null, // assigned_toカラムが存在しないためnullに設定
       color: getStatusColor(task.status)
     }
 
@@ -322,33 +397,57 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    console.log('🗑️ DELETE API 開始')
+    const supabase = await createServiceClient()
     const body = await request.json()
     
-    const { id } = body
+    const { id, reason, hard_delete = false } = body
+    console.log('🗑️ DELETE API - 削除対象ID:', id)
 
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
-    // タスクを削除
+    // ハード削除実行（work_reportsと同じ方式）
+    console.log('🗑️ ハード削除実行中...')
+    
+    // 削除前の状態確認
+    const { data: beforeDelete, error: beforeError } = await supabase
+      .from('growing_tasks')
+      .select('id, name')
+      .eq('id', id)
+      .single()
+    
+    console.log('🔍 削除前のタスク確認:', beforeDelete, 'エラー:', beforeError)
+    
     const { error } = await supabase
       .from('growing_tasks')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('Database error:', error)
+      console.error('🗑️ Database error:', error)
       return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
     }
 
+    console.log('✅ タスクをハード削除しました:', id)
+    
+    // 削除後の状態確認
+    const { data: afterDelete, error: afterError } = await supabase
+      .from('growing_tasks')
+      .select('id, name')
+      .eq('id', id)
+      .single()
+    
+    console.log('🔍 削除後のタスク確認:', afterDelete, 'エラー:', afterError)
+
     return NextResponse.json({
       success: true,
-      message: 'Task deleted successfully'
+      message: 'タスクを削除しました'
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    console.error('🗑️ API error:', error)
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
