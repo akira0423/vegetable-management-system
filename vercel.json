@@ -1,16 +1,4 @@
 {
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "runtime": "nodejs18.x",
-      "memory": 1024
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/cleanup-deleted-data",
-      "schedule": "0 2 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
