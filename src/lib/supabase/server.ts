@@ -74,3 +74,6 @@ export async function createServiceClient() {
   
   return client
 }
+
+// エイリアス関数 - 既存コードとの互換性のため
+export const createServerSupabaseClient = createServiceClient
