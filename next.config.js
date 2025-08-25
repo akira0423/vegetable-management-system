@@ -21,6 +21,28 @@ const nextConfig = {
         minimize: false,
       }
     }
+    
+    // Supabase警告を抑制
+    config.module.rules.push({
+      test: /\.js$/,
+      include: /node_modules\/@supabase/,
+      use: {
+        loader: 'babel-loader',
+        options: {
+          presets: ['@babel/preset-env'],
+          plugins: []
+        }
+      }
+    })
+    
+    // WebSocket警告を抑制
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    }
+    
     return config
   },
   // 画像最適化設定

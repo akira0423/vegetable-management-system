@@ -1,10 +1,31 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { format, differenceInDays, addDays, parseISO, isWeekend, getDay, startOfYear, startOfMonth, isSameYear, isSameMonth, getYear, getMonth } from 'date-fns'
+import React, { useMemo, useState } from 'react'
+import { format, differenceInDays, addDays, parseISO, isWeekend, getDay, startOfYear, startOfMonth, isSameYear, isSameMonth, getYear, getMonth, startOfDay, parse } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { WorkReportPopover } from '@/components/work-report-popover'
+import { 
+  ChevronDown, 
+  ChevronRight, 
+  BarChart3, 
+  Calendar as CalendarIcon,
+  Settings,
+  Download,
+  Filter,
+  Loader2
+} from 'lucide-react'
 
 interface GanttTask {
   id: string
@@ -33,7 +54,6 @@ interface WorkReport {
   work_type: 'seeding' | 'planting' | 'fertilizing' | 'watering' | 'weeding' | 'pruning' | 'harvesting' | 'other'
   vegetable_id: string
   work_notes?: string
-  estimated_cost?: number
   harvest_amount?: number
   expected_revenue?: number
 }
@@ -41,24 +61,74 @@ interface WorkReport {
 interface GanttChartProps {
   tasks: GanttTask[]
   workReports?: WorkReport[]
+  vegetables?: any[]
   startDate?: string
   endDate?: string
   viewUnit?: 'day' | 'week' | 'month'
   className?: string
   onTaskClick?: (task: GanttTask) => void
+  onWorkReportView?: (report: WorkReport) => void
+  onWorkReportEdit?: (report: WorkReport) => void
+  // 統合コントロール用props
+  selectedVegetable?: string
+  selectedPriority?: string
+  customStartDate?: string
+  customEndDate?: string
+  onVegetableChange?: (value: string) => void
+  onPriorityChange?: (value: string) => void
+  onDateRangeChange?: (start: string, end: string) => void
+}
+
+// 野菜グループ化された階層データ構造
+interface VegetableGroup {
+  vegetable: {
+    id: string
+    name: string
+    variety: string
+  }
+  tasks: GanttTask[]
+  workReports: WorkReport[]
+  isExpanded: boolean
+  totalProgress: number
+  taskCount: number
 }
 
 export function GanttChart({ 
   tasks, 
   workReports = [],
+  vegetables = [],
   startDate, 
   endDate,
   viewUnit = 'day',
   className,
-  onTaskClick
+  onTaskClick,
+  onWorkReportView,
+  onWorkReportEdit,
+  selectedVegetable = 'all',
+  selectedPriority = 'all',
+  customStartDate = '',
+  customEndDate = '',
+  onVegetableChange,
+  onPriorityChange,
+  onDateRangeChange
 }: GanttChartProps) {
-  // 固定列の幅を定数として定義 (w-48 + w-24 + w-24 + w-20 + w-16 + w-20)
-  const FIXED_COLUMNS_WIDTH = 192 + 96 + 96 + 80 + 64 + 80 // = 608px
+  // 野菜ごとの展開状態管理 - 最初はすべて展開状態
+  const [expandedVegetables, setExpandedVegetables] = useState<Set<string>>(new Set())
+  
+  // フィルター変更時の自動更新
+  const [refreshTrigger, setRefreshTrigger] = React.useState(0)
+  const [isUpdating, setIsUpdating] = React.useState(false)
+  
+  // 初期展開設定
+  React.useEffect(() => {
+    if (vegetables.length > 0 && expandedVegetables.size === 0) {
+      const allVegetableIds = new Set(vegetables.map(v => v.id))
+      setExpandedVegetables(allVegetableIds)
+      console.log('🌱 初期展開設定:', allVegetableIds)
+    }
+  }, [vegetables, expandedVegetables.size])
+  // 固定列の幅を定数として定義 (階層表示用に調整)
+  const FIXED_COLUMNS_WIDTH = 280 + 96 + 96 + 80 + 64 + 80 // = 696px
   // 優先度別背景色設定
   const getPriorityRowColor = (priority: string) => {
     switch (priority) {
@@ -72,19 +142,210 @@ export function GanttChart({
         return 'bg-white border-gray-100'
     }
   }
-  const chartData = useMemo(() => {
-    if (tasks.length === 0) return null
-
-    // Calculate chart boundaries
-    const taskDates = tasks.flatMap(task => [
-      parseISO(task.start),
-      parseISO(task.end)
-    ])
+  // フィルタリングされたタスクを生成
+  const filteredTasks = useMemo(() => {
+    console.log('🔍 filteredTasks useMemo実行 - refreshTrigger:', refreshTrigger)
+    let filtered = [...tasks]
     
-    const chartStart = startDate ? parseISO(startDate) : new Date(Math.min(...taskDates.map(d => d.getTime())))
-    const chartEnd = endDate ? parseISO(endDate) : new Date(Math.max(...taskDates.map(d => d.getTime())))
+    // 野菜フィルター
+    if (selectedVegetable && selectedVegetable !== 'all') {
+      console.log('🔍 野菜フィルター適用:', selectedVegetable)
+      filtered = filtered.filter(task => task.vegetable?.id === selectedVegetable)
+    }
+    
+    // 優先度フィルター
+    if (selectedPriority && selectedPriority !== 'all') {
+      console.log('🔍 優先度フィルター適用:', selectedPriority)
+      filtered = filtered.filter(task => task.priority === selectedPriority)
+    }
+    
+    console.log('🔍 filteredTasks - 元のタスク数:', tasks.length, 'フィルター後:', filtered.length)
+    console.log('🔍 filteredTasks - 選択された野菜:', selectedVegetable, '優先度:', selectedPriority)
+    
+    return filtered
+  }, [tasks, selectedVegetable, selectedPriority, refreshTrigger])
+  
+  // 野菜グループデータの生成（フィルタリングされたタスクを使用）
+  const vegetableGroups = useMemo(() => {
+    const groups = new Map<string, VegetableGroup>()
+    
+    console.log('🔍 vegetableGroups - フィルタリング後タスク:', filteredTasks.length)
+    console.log('🔍 vegetableGroups - 利用可能なレポート:', workReports.length)
+    
+    // フィルタリングされたタスクでグループを作成
+    filteredTasks.forEach(task => {
+      if (task && task.vegetable && task.vegetable.id) {
+        const vegId = task.vegetable.id
+        if (!groups.has(vegId)) {
+          groups.set(vegId, {
+            vegetable: task.vegetable,
+            tasks: [],
+            workReports: [],
+            isExpanded: expandedVegetables.has(vegId),
+            totalProgress: 0,
+            taskCount: 0
+          })
+        }
+        groups.get(vegId)!.tasks.push(task)
+      }
+    })
+    
+    // 作業レポートを追加（フィルタリング対象の野菜のみ）
+    workReports.forEach(report => {
+      if (report && report.vegetable_id) {
+        const vegId = report.vegetable_id
+        // 野菜フィルターが適用されている場合は、対象野菜のレポートのみ追加
+        if (selectedVegetable !== 'all' && vegId !== selectedVegetable) return
+        
+        if (groups.has(vegId)) {
+          groups.get(vegId)!.workReports.push(report)
+        }
+      }
+    })
+    
+    // 進捗率とタスク数を計算
+    groups.forEach(group => {
+      if (group.tasks.length > 0) {
+        group.totalProgress = Math.round(
+          group.tasks.reduce((sum, task) => sum + task.progress, 0) / group.tasks.length
+        )
+      }
+      group.taskCount = group.tasks.length
+    })
+    
+    console.log('🔍 vegetableGroups - 生成されたグループ数:', groups.size)
+    
+    return Array.from(groups.values())
+      .sort((a, b) => a.vegetable.name.localeCompare(b.vegetable.name, 'ja'))
+  }, [filteredTasks, workReports, expandedVegetables, selectedVegetable, refreshTrigger])
+  
+  // 表示用に展開された階層タスク生成
+  const hierarchicalTasks = useMemo(() => {
+    const result: (GanttTask & { 
+      isVegetableHeader?: boolean
+      vegetableGroup?: VegetableGroup
+      indentLevel?: number 
+    })[] = []
+    
+    vegetableGroups.forEach(group => {
+      // 野菜ヘッダーを追加
+      result.push({
+        id: `veg-header-${group.vegetable.id}`,
+        name: group.vegetable.name,
+        start: group.tasks.length > 0 ? group.tasks[0].start : new Date().toISOString(),
+        end: group.tasks.length > 0 ? group.tasks[group.tasks.length - 1].end : new Date().toISOString(),
+        progress: group.totalProgress,
+        status: 'in_progress' as const,
+        priority: 'medium' as const,
+        vegetable: group.vegetable,
+        isVegetableHeader: true,
+        vegetableGroup: group,
+        indentLevel: 0
+      })
+      
+      // 展開されている場合はタスクを表示
+      if (group.isExpanded) {
+        group.tasks.forEach(task => {
+          result.push({
+            ...task,
+            indentLevel: 1
+          })
+        })
+      }
+    })
+    
+    return result
+  }, [vegetableGroups, refreshTrigger])
+
+  // 日本時間（JST: UTC+9）表示用の日付変換関数
+  const parseToJST = (dateString: string): Date | null => {
+    if (!dateString) return null
+    
+    try {
+      // UTC日付文字列を日本時間に変換
+      // データベースのUTC日付（例：2025-08-25）を日本時間として表示
+      const utcDate = parseISO(`${dateString}T00:00:00Z`) // UTC として明示的に解析
+      
+      // 無効な日付をチェック
+      if (isNaN(utcDate.getTime())) {
+        console.warn('無効な日付形式:', dateString)
+        return null
+      }
+      
+      // UTC日付をJST（UTC+9時間）に変換
+      const jstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000))
+      
+      // その日の00:00:00に正規化して返す
+      return startOfDay(jstDate)
+      
+    } catch (error) {
+      console.error('JST日付変換エラー:', dateString, error)
+      return null
+    }
+  }
+  
+  // JST基準の今日の日付を取得する関数
+  const getJSTToday = (): Date => {
+    const now = new Date()
+    const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+    return startOfDay(jstNow)
+  }
+  
+  // 統一された日付解析関数（JST表示対応版）
+  const parseWithFallback = (dateString: string): Date | null => {
+    // JST日付解析を使用
+    const result = parseToJST(dateString)
+    if (result) return result
+    
+    // フォールバック: 標準のdate-fns処理
+    try {
+      console.warn('標準日付解析でフォールバック:', dateString)
+      return startOfDay(parseISO(dateString))
+    } catch (error) {
+      console.error('日付解析完全失敗:', dateString, error)
+      return null
+    }
+  }
+
+  const chartData = useMemo(() => {
+    if (hierarchicalTasks.length === 0) return null
+
+    // タスクの日付範囲をJSTで統一的に計算
+    const taskDates = hierarchicalTasks
+      .filter(task => !task.isVegetableHeader)
+      .flatMap(task => {
+        const startDate = parseWithFallback(task.start)
+        const endDate = parseWithFallback(task.end)
+        
+        if (!startDate || !endDate) {
+          console.warn('タスク日付解析失敗:', { task: task.name, start: task.start, end: task.end })
+          return []
+        }
+        
+        return [startDate, endDate]
+      })
+
+    // チャート範囲をJST基準で統一的に計算
+    const chartStart = startDate ? parseToJST(startDate) : (taskDates.length > 0 ? startOfDay(new Date(Math.min(...taskDates.map(d => d.getTime())))) : getJSTToday())
+    const chartEnd = endDate ? parseToJST(endDate) : (taskDates.length > 0 ? startOfDay(new Date(Math.max(...taskDates.map(d => d.getTime())))) : addDays(getJSTToday(), 30))
+    
+    if (!chartStart || !chartEnd) {
+      console.error('チャート日付範囲の解析に失敗:', { startDate, endDate })
+      return null
+    }
     
     const totalDays = differenceInDays(chartEnd, chartStart) + 1
+    
+    console.log('🔍 JST基準チャート日付範囲:', {
+      入力開始日: startDate,
+      入力終了日: endDate,
+      JST開始日: chartStart.toISOString(),
+      JST終了日: chartEnd.toISOString(),
+      JST開始日表示: format(chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+      JST終了日表示: format(chartEnd, 'yyyy-MM-dd (E)', { locale: ja }),
+      タスク数: taskDates.length / 2,
+      総日数: totalDays
+    })
     
     // 表示モードに応じてスケールを調整
     let dayWidth: number
@@ -113,6 +374,14 @@ export function GanttChart({
     
     let lastYearMonth = null
     
+    console.log('🔍 JST日付ヘッダー生成開始:', {
+      JSTチャート開始: chartStart.toISOString(),
+      JSTチャート開始表示: format(chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+      総日数: totalDays,
+      dayWidth,
+      step
+    })
+
     for (let i = 0; i < totalDays; i++) {
       const date = addDays(chartStart, i)
       const currentYear = getYear(date)
@@ -120,6 +389,16 @@ export function GanttChart({
       const currentYearMonth = `${currentYear}-${currentMonth}`
       const dayOfWeek = getDay(date)
       const isHoliday = isWeekend(date)
+      
+      if (i < 5) {
+        console.log(`🗺 JST日付ヘッダー ${i}:`, {
+          JST日付: date.toISOString(),
+          JST日付表示: format(date, 'yyyy-MM-dd (E)', { locale: ja }),
+          曜日コード: dayOfWeek,
+          休日フラグ: isHoliday,
+          チャート開始日からの日数: i
+        })
+      }
       
       // 日ヘッダーは毎日追加
       dayHeaders.push({
@@ -176,22 +455,33 @@ export function GanttChart({
       }
     })
 
-    // Process tasks - filter only tasks within the display range
-    const processedTasks = tasks
+    // Process hierarchical tasks - filter only tasks within the display range
+    const processedTasks = hierarchicalTasks
       .filter(task => {
-        const taskStart = parseISO(task.start)
-        const taskEnd = parseISO(task.end)
+        const taskStart = parseWithFallback(task.start)
+        const taskEnd = parseWithFallback(task.end)
+        if (!taskStart || !taskEnd) return false
         // Show task if it overlaps with the chart range
         return taskStart <= chartEnd && taskEnd >= chartStart
       })
       .map(task => {
-        const taskStart = parseISO(task.start)
-        const taskEnd = parseISO(task.end)
+        const taskStart = parseWithFallback(task.start)
+        const taskEnd = parseWithFallback(task.end)
+        
+        if (!taskStart || !taskEnd) {
+          console.warn('タスク日付がnull:', task)
+          return null
+        }
+        
         const startOffset = differenceInDays(taskStart, chartStart)
         const taskDuration = differenceInDays(taskEnd, taskStart) + 1
         
+        // 🎯 プロット位置を2日右にずらして表示調整
+        const DISPLAY_OFFSET_DAYS = 2
+        const adjustedStartOffset = startOffset + DISPLAY_OFFSET_DAYS
+        
         // Adjust left position and width for tasks that start before or end after the chart range
-        const adjustedLeft = Math.max(0, startOffset * dayWidth)
+        const adjustedLeft = Math.max(0, adjustedStartOffset * dayWidth)
         const adjustedWidth = taskDuration * dayWidth
         
         // Calculate clipped width based on chart boundaries
@@ -199,13 +489,13 @@ export function GanttChart({
         let clippedLeft = adjustedLeft
         
         // If task starts before chart, adjust left and width
-        if (startOffset < 0) {
+        if (adjustedStartOffset < 0) {
           clippedLeft = 0
-          clippedWidth = adjustedWidth + (startOffset * dayWidth)
+          clippedWidth = adjustedWidth + (adjustedStartOffset * dayWidth)
         }
         
         // If task extends beyond chart, clip the width
-        const taskEndOffset = startOffset + taskDuration - 1
+        const taskEndOffset = adjustedStartOffset + taskDuration - 1
         if (taskEndOffset >= totalDays) {
           const excessDays = taskEndOffset - totalDays + 1
           clippedWidth = clippedWidth - (excessDays * dayWidth)
@@ -225,47 +515,55 @@ export function GanttChart({
           formattedEnd: format(taskEnd, 'yyyy/MM/dd', { locale: ja })
         }
       })
+      .filter(task => task !== null) // nullになったタスクを除外
 
     // 作業レポートデータの処理
     const processedReports = workReports
       .filter(report => {
         // work_dateが存在し、有効な日付形式かをチェック
         if (!report.work_date) return false
-        try {
-          const reportDate = parseISO(report.work_date)
-          return !isNaN(reportDate.getTime()) && reportDate >= chartStart && reportDate <= chartEnd
-        } catch (error) {
-          console.warn('無効な作業日付をスキップ:', report.work_date, error)
+        const reportDate = parseWithFallback(report.work_date)
+        if (!reportDate) {
+          console.warn('無効な作業日付をスキップ:', report.work_date)
           return false
         }
+        return reportDate >= chartStart && reportDate <= chartEnd
       })
       .map(report => {
-        try {
-          const reportDate = parseISO(report.work_date)
-          const dateOffset = differenceInDays(reportDate, chartStart)
-          const position = dateOffset * dayWidth
-        
-        // 作業種類に応じた色とアイコン
-        const workTypeConfig = {
-          seeding: { color: '#10b981', icon: '🌱', label: '播種' },
-          planting: { color: '#3b82f6', icon: '🌿', label: '定植' },
-          fertilizing: { color: '#8b5cf6', icon: '🧪', label: '施肥' },
-          watering: { color: '#06b6d4', icon: '💧', label: '灌水' },
-          weeding: { color: '#eab308', icon: '🌾', label: '除草' },
-          pruning: { color: '#f97316', icon: '✂️', label: '整枝' },
-          harvesting: { color: '#ef4444', icon: '🍅', label: '収穫' },
-          other: { color: '#6b7280', icon: '⚡', label: 'その他' }
+        const reportDate = parseWithFallback(report.work_date)
+        if (!reportDate) {
+          console.warn('作業レポート日付解析失敗:', report.work_date)
+          return null
         }
         
-        const config = workTypeConfig[report.work_type] || workTypeConfig.other
-        
+        try {
+          const dateOffset = differenceInDays(reportDate, chartStart)
+          // 🎯 作業報告プロット位置も2日右にずらして表示調整
+          const REPORT_DISPLAY_OFFSET_DAYS = 2
+          const adjustedDateOffset = dateOffset + REPORT_DISPLAY_OFFSET_DAYS
+          const position = adjustedDateOffset * dayWidth
+          
+          // 作業種類に応じた色とアイコン
+          const workTypeConfig = {
+            seeding: { color: '#10b981', icon: '🌱', label: '播種' },
+            planting: { color: '#3b82f6', icon: '🌿', label: '定植' },
+            fertilizing: { color: '#8b5cf6', icon: '🧪', label: '施肥' },
+            watering: { color: '#06b6d4', icon: '💧', label: '灌水' },
+            weeding: { color: '#eab308', icon: '🌾', label: '除草' },
+            pruning: { color: '#f97316', icon: '✂️', label: '整枝' },
+            harvesting: { color: '#ef4444', icon: '🍅', label: '収穫' },
+            other: { color: '#6b7280', icon: '⚡', label: 'その他' }
+          }
+          
+          const config = workTypeConfig[report.work_type] || workTypeConfig.other
+          
           return {
             ...report,
             position,
             config,
             // ツールチップ用の詳細データ
             details: {
-              cost: report.estimated_cost,
+              cost: 0, // 会計データベースから取得
               harvest: report.harvest_amount,
               revenue: report.expected_revenue,
               notes: report.work_notes
@@ -291,15 +589,145 @@ export function GanttChart({
       processedReports,
       totalWidth: totalDays * dayWidth
     }
-  }, [tasks, workReports, startDate, endDate, viewUnit])
+  }, [hierarchicalTasks, workReports, startDate, endDate, viewUnit, selectedVegetable, selectedPriority, refreshTrigger])
+  
+  React.useEffect(() => {
+    // 親コンポーネントでのデータ再取得に依存するため、
+    // ここでは視覚的フィードバックのみ提供
+    setIsUpdating(true)
+    setRefreshTrigger(prev => prev + 1)
+    
+    const timer = setTimeout(() => {
+      setIsUpdating(false)
+    }, 500) // 少し長めにして視覚的フィードバックを確保
+    
+    return () => clearTimeout(timer)
+  }, [selectedVegetable, selectedPriority, customStartDate, customEndDate])
 
-  if (!chartData) {
+  // 野菜の展開/折りたたみトグル
+  const toggleVegetableExpansion = (vegetableId: string) => {
+    setExpandedVegetables(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(vegetableId)) {
+        newSet.delete(vegetableId)
+      } else {
+        newSet.add(vegetableId)
+      }
+      return newSet
+    })
+  }
+
+  if (!chartData || hierarchicalTasks.length === 0) {
     return (
       <Card className={className}>
+        {/* ヘッダーとフィルターは常に表示 */}
+        <CardHeader className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white rounded-t-lg">
+          <div className="space-y-4">
+            {/* タイトル行 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
+                  <p className="text-sm text-blue-100 mt-1 opacity-90">
+                    階層表示・フィルタリング・期間設定を統合管理
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm">
+                {isUpdating && (
+                  <div className="bg-amber-500/20 px-3 py-2 rounded-lg backdrop-blur-sm border border-amber-300/30">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="font-medium text-amber-100">更新中...</span>
+                    </div>
+                  </div>
+                )}
+                <div className="bg-white/20 px-3 py-2 rounded-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="font-medium">{filteredTasks.length}/{tasks.length}タスク</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* 統合コントロール行 */}
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/20">
+              {/* 野菜選択 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">🥬野菜:</span>
+                <Select value={selectedVegetable} onValueChange={onVegetableChange}>
+                  <SelectTrigger className="w-40 h-8 bg-white/90 border-white/50 text-gray-800 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="all">すべて</SelectItem>
+                    {vegetables.map(vegetable => (
+                      <SelectItem key={vegetable.id} value={vegetable.id}>
+                        {vegetable.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* 優先度選択 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">⚡優先度:</span>
+                <Select value={selectedPriority} onValueChange={onPriorityChange}>
+                  <SelectTrigger className="w-32 h-8 bg-white/90 border-white/50 text-gray-800 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="all">すべて</SelectItem>
+                    <SelectItem value="high">高</SelectItem>
+                    <SelectItem value="medium">中</SelectItem>
+                    <SelectItem value="low">低</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* 期間設定 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">📅期間:</span>
+                <Input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => onDateRangeChange?.(e.target.value, customEndDate)}
+                  className="w-36 h-8 bg-white/90 border-white/50 text-gray-800 text-sm"
+                  placeholder="開始日"
+                />
+                <span className="text-white/80">〜</span>
+                <Input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => onDateRangeChange?.(customStartDate, e.target.value)}
+                  className="w-36 h-8 bg-white/90 border-white/50 text-gray-800 text-sm"
+                  placeholder="終了日"
+                />
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        
+        {/* 空の状態のコンテンツ部分のみ */}
         <CardContent className="p-6">
-          <p className="text-muted-foreground text-center">
-            表示するタスクがありません
-          </p>
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">📊</div>
+            <p className="text-lg font-semibold text-gray-700 mb-2">
+              表示するタスクがありません
+            </p>
+            <p className="text-sm text-gray-500">
+              フィルター条件を変更するか、タスクを追加してください
+            </p>
+            <div className="mt-4 text-xs text-gray-400">
+              利用可能なタスク: {tasks.length}件 | 野菜: {vegetables.length}種類
+            </div>
+          </div>
         </CardContent>
       </Card>
     )
@@ -309,9 +737,99 @@ export function GanttChart({
 
   return (
     <Card className={className}>
-      <CardHeader>
-        <CardTitle>ガントチャート</CardTitle>
-      </CardHeader>
+        {/* 改善されたヘッダーデザイン */}
+        <CardHeader className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white rounded-t-lg">
+          <div className="space-y-4">
+            {/* タイトル行 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
+                  <p className="text-sm text-blue-100 mt-1 opacity-90">
+                    階層表示・フィルタリング・期間設定を統合管理
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm">
+                {isUpdating && (
+                  <div className="bg-amber-500/20 px-3 py-2 rounded-lg backdrop-blur-sm border border-amber-300/30">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="font-medium text-amber-100">更新中...</span>
+                    </div>
+                  </div>
+                )}
+                <div className="bg-white/20 px-3 py-2 rounded-lg backdrop-blur-sm">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="font-medium">{filteredTasks.length}/{tasks.length}タスク</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* 統合コントロール行 */}
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/20">
+              {/* 野菜選択 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">🥬野菜:</span>
+                <Select value={selectedVegetable} onValueChange={onVegetableChange}>
+                  <SelectTrigger className="w-40 h-8 bg-white/90 border-white/50 text-gray-800 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="all">すべて</SelectItem>
+                    {vegetables.map(vegetable => (
+                      <SelectItem key={vegetable.id} value={vegetable.id}>
+                        {vegetable.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* 優先度選択 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">⚡優先度:</span>
+                <Select value={selectedPriority} onValueChange={onPriorityChange}>
+                  <SelectTrigger className="w-32 h-8 bg-white/90 border-white/50 text-gray-800 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="all">すべて</SelectItem>
+                    <SelectItem value="high">高</SelectItem>
+                    <SelectItem value="medium">中</SelectItem>
+                    <SelectItem value="low">低</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* 期間設定 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">📅期間:</span>
+                <Input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => onDateRangeChange?.(e.target.value, customEndDate)}
+                  className="w-36 h-8 bg-white/90 border-white/50 text-gray-800 text-sm"
+                  placeholder="開始日"
+                />
+                <span className="text-white/80">〜</span>
+                <Input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => onDateRangeChange?.(customStartDate, e.target.value)}
+                  className="w-36 h-8 bg-white/90 border-white/50 text-gray-800 text-sm"
+                  placeholder="終了日"
+                />
+              </div>
+            </div>
+          </div>
+        </CardHeader>
       <CardContent className="p-0">
         <div className="relative">
           {/* スクロール可能エリア */}
@@ -325,8 +843,8 @@ export function GanttChart({
                 {/* タスク情報ヘッダー - 上下左右固定 */}
                 <div className="sticky top-0 left-0 z-50 bg-white border-r border-gray-200 shadow-sm">
                   <div className="flex" style={{ height: viewUnit === 'day' ? '84px' : '68px' }}>
-                    <div className="w-48 px-2 py-1 border-r border-gray-100 font-bold text-sm text-gray-800 flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-100">
-                      タスク名
+                    <div className="w-80 px-2 py-1 border-r border-gray-100 font-bold text-sm text-gray-800 flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-100">
+                      野菜・タスク名 (階層表示)
                     </div>
                     <div className="w-24 px-2 py-1 border-r border-gray-100 font-bold text-xs text-gray-800 text-center flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-100">
                       開始日
@@ -427,49 +945,115 @@ export function GanttChart({
                       {/* Task info - 固定列 */}
                       <div className="sticky left-0 z-20 bg-white/95 border-r border-gray-200 shadow-sm">
                         <div className="flex" style={{ height: viewUnit === 'day' ? '64px' : '56px' }}>
-                          {/* タスク名 */}
+                          {/* 階層タスク名表示 */}
                           <div 
-                            className="w-48 p-3 border-r border-gray-100 flex items-center cursor-pointer hover:bg-blue-50 transition-colors duration-200 select-none" 
+                            className={`w-80 p-3 border-r border-gray-100 flex items-center transition-colors duration-200 select-none ${
+                              task.isVegetableHeader 
+                                ? 'bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 cursor-pointer border-l-4 border-l-green-500' 
+                                : 'hover:bg-blue-50 cursor-pointer'
+                            }`}
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              onTaskClick?.(task)
+                              if (task.isVegetableHeader && task.vegetableGroup) {
+                                toggleVegetableExpansion(task.vegetableGroup.vegetable.id)
+                              } else {
+                                onTaskClick?.(task)
+                              }
                             }}
                             onMouseDown={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
                             }}
-                            style={{ userSelect: 'none' }}
+                            style={{ 
+                              userSelect: 'none',
+                              paddingLeft: task.indentLevel ? `${12 + (task.indentLevel * 24)}px` : '12px'
+                            }}
                           >
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-900 truncate mb-1">
-                                {task.name}
+                            {task.isVegetableHeader ? (
+                              // 野菜ヘッダー表示
+                              <>
+                                <div className="flex items-center mr-3">
+                                  {task.vegetableGroup?.isExpanded ? (
+                                    <ChevronDown className="w-5 h-5 text-green-600" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-green-600" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                      <span className="text-white text-lg">🥬</span>
+                                    </div>
+                                    <div>
+                                      <div className="text-lg font-bold text-green-800">
+                                        {task.name}
+                                      </div>
+                                      <div className="flex items-center gap-4 text-sm">
+                                        <div className="flex items-center gap-1 text-green-600">
+                                          <BarChart3 className="w-4 h-4" />
+                                          <span className="font-medium">{task.vegetableGroup?.taskCount || 0}タスク</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-green-500 h-2 rounded-full transition-all"
+                                              style={{ width: `${task.progress}%` }}
+                                            />
+                                          </div>
+                                          <span className="text-green-700 font-semibold text-xs">{task.progress}%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              // 通常タスク表示
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-blue-400 rounded-full" />
+                                  <div className="text-sm font-medium text-gray-900 truncate">
+                                    {task.name}
+                                  </div>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${
+                                      task.priority === 'high' ? 'bg-red-50 text-red-700 border-red-200' :
+                                      task.priority === 'medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                      'bg-gray-50 text-gray-600 border-gray-200'
+                                    }`}
+                                  >
+                                    {task.priority === 'high' ? '高' :
+                                     task.priority === 'medium' ? '中' : '低'}
+                                  </Badge>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1 ml-4">
+                                  進捗: {task.progress}% | {task.assignedUser?.name || '未割当'}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500 truncate">
-                                {task.vegetable.name}
-                              </div>
-                            </div>
+                            )}
                           </div>
                           
                           {/* 開始日 */}
-                          <div className="w-24 p-3 border-r border-gray-100 flex items-center justify-center">
+                          <div className="hidden lg:flex w-24 p-3 border-r border-gray-100 items-center justify-center">
                             <div className="text-xs text-gray-600 text-center">
                               {(task as any).formattedStart}
                             </div>
                           </div>
                           
                           {/* 終了日 */}
-                          <div className="w-24 p-3 border-r border-gray-100 flex items-center justify-center">
+                          <div className="hidden lg:flex w-24 p-3 border-r border-gray-100 items-center justify-center">
                             <div className="text-xs text-gray-600 text-center">
                               {(task as any).formattedEnd}
                             </div>
                           </div>
                           
                           {/* 進捗率 */}
-                          <div className="w-20 p-3 border-r border-gray-100 flex items-center justify-center">
+                          <div className="w-16 lg:w-20 p-2 lg:p-3 border-r border-gray-100 flex items-center justify-center">
                             <div className="text-center">
-                              <div className="text-sm font-bold text-gray-800">{task.progress}%</div>
-                              <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                              <div className="text-xs lg:text-sm font-bold text-gray-800">{task.progress}%</div>
+                              <div className="w-8 lg:w-full bg-gray-200 rounded-full h-1 mt-1">
                                 <div 
                                   className="bg-blue-500 h-1 rounded-full transition-all"
                                   style={{ width: `${task.progress}%` }}
@@ -479,8 +1063,8 @@ export function GanttChart({
                           </div>
                           
                           {/* 優先度 */}
-                          <div className="w-16 p-3 border-r border-gray-100 flex items-center justify-center">
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          <div className="hidden sm:flex w-16 p-3 border-r border-gray-100 items-center justify-center">
+                            <div className={`px-1.5 lg:px-2 py-1 rounded-full text-xs font-medium ${
                               task.priority === 'high' ? 'bg-red-100 text-red-800' :
                               task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-600'
@@ -491,7 +1075,7 @@ export function GanttChart({
                           </div>
                           
                           {/* 担当者 */}
-                          <div className="w-20 p-3 flex items-center justify-center">
+                          <div className="hidden lg:flex w-20 p-3 items-center justify-center">
                             <div className="text-xs text-gray-600 text-center truncate">
                               {task.assignedUser?.name || '未割当'}
                             </div>
@@ -536,35 +1120,65 @@ export function GanttChart({
                           return null
                         })}
 
-                        {/* Task bar */}
-                        <div
-                          className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30 select-none"
-                          style={{
-                            left: task.left,
-                            width: Math.max(task.width, 40),
-                            backgroundColor: task.color,
-                            userSelect: 'none'
-                          }}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onTaskClick?.(task)
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          title={`${task.name}\n進捗率: ${task.progress}%\n期間: ${(task as any).formattedStart} ～ ${(task as any).formattedEnd}\n担当者: ${task.assignedUser?.name || '未割当'}\n優先度: ${task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}`}
-                        >
-                          {/* Progress indicator */}
+                        {/* Task bar - 野菜ヘッダーかタスクかで表示を変更 */}
+                        {task.isVegetableHeader ? (
+                          // 野菜ヘッダーのバー表示
                           <div
-                            className="absolute top-0 left-0 h-full bg-white/25 rounded-l-lg"
-                            style={{ width: `${task.progress}%` }}
-                          />
-                          <span className="relative z-10 truncate font-semibold select-none" style={{ userSelect: 'none' }}>
-                            {task.progress}%
-                          </span>
-                        </div>
+                            className="absolute top-2 h-12 rounded-lg flex items-center px-4 text-white text-sm font-bold shadow-lg border-2 border-white/30 select-none"
+                            style={{
+                              left: 0,
+                              width: totalWidth,
+                              backgroundColor: '#10b981',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
+                              userSelect: 'none'
+                            }}
+                            title={`${task.vegetableGroup?.vegetable.name}\n全体進捗: ${task.progress}%\nタスク数: ${task.vegetableGroup?.taskCount || 0}\n作業レポート数: ${task.vegetableGroup?.workReports.length || 0}`}
+                          >
+                            {/* Progress indicator */}
+                            <div
+                              className="absolute top-0 left-0 h-full bg-white/20 rounded-l-lg"
+                              style={{ width: `${task.progress}%` }}
+                            />
+                            <div className="relative z-10 flex items-center justify-between w-full">
+                              <span className="font-bold text-white">
+                                🥬 {task.vegetableGroup?.vegetable.name}
+                              </span>
+                              <span className="text-sm bg-white/20 px-2 py-1 rounded">
+                                {task.progress}% ({task.vegetableGroup?.taskCount || 0}タスク)
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          // 通常タスクのバー表示
+                          <div
+                            className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30 select-none"
+                            style={{
+                              left: task.left,
+                              width: Math.max(task.width, 40),
+                              backgroundColor: task.color,
+                              userSelect: 'none'
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onTaskClick?.(task)
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                            title={`${task.name}\n進捗率: ${task.progress}%\n期間: ${(task as any).formattedStart} ～ ${(task as any).formattedEnd}\n担当者: ${task.assignedUser?.name || '未割当'}\n優先度: ${task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}`}
+                          >
+                            {/* Progress indicator */}
+                            <div
+                              className="absolute top-0 left-0 h-full bg-white/25 rounded-l-lg"
+                              style={{ width: `${task.progress}%` }}
+                            />
+                            <span className="relative z-10 truncate font-semibold select-none" style={{ userSelect: 'none' }}>
+                              {task.progress}%
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -607,45 +1221,71 @@ export function GanttChart({
               return (
                 <div
                   key={`report-${report.id}-${index}`}
-                  className="absolute z-30 pointer-events-none"
+                  className="absolute z-30"
                   style={{ 
                     left: FIXED_COLUMNS_WIDTH + report.position,
                     top: verticalPosition
                   }}
                 >
-                  <div className="relative">
-                    {/* Work report marker */}
-                    <div
-                      className="w-5 h-5 rounded-full border-2 border-white shadow-lg cursor-pointer pointer-events-auto hover:scale-125 transition-all duration-200 select-none"
-                      style={{ backgroundColor: report.config.color, userSelect: 'none' }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      title={`${report.config.label} - ${format(parseISO(report.work_date), 'MM/dd', { locale: ja })}${report.details.cost ? `\nコスト: ¥${report.details.cost.toLocaleString()}` : ''}${report.details.harvest ? `\n収穫: ${report.details.harvest}kg` : ''}${report.details.revenue ? `\n売上: ¥${report.details.revenue.toLocaleString()}` : ''}${report.details.notes ? `\n備考: ${report.details.notes}` : ''}`}
-                    >
+                  <WorkReportPopover
+                    report={report}
+                    onView={onWorkReportView}
+                    onEdit={onWorkReportEdit}
+                  >
+                    <div className="relative cursor-pointer">
+                      {/* Work report marker */}
+                      <div
+                        className="w-5 h-5 rounded-full border-2 border-white shadow-lg hover:shadow-xl hover:scale-125 transition-all duration-200 select-none"
+                        style={{ backgroundColor: report.config.color, userSelect: 'none' }}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
+                      >
+                      </div>
+                      {/* Work type icon */}
+                      <div className="absolute -top-1 -left-1 text-sm pointer-events-none flex items-center justify-center w-6 h-6">
+                        <span className="drop-shadow-sm">{report.config.icon}</span>
+                      </div>
+                      {/* Date label */}
+                      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs bg-white border border-gray-200 rounded px-1 py-0.5 shadow-sm whitespace-nowrap pointer-events-none">
+                        {format(parseWithFallback(report.work_date) || new Date(), 'MM/dd', { locale: ja })}
+                      </div>
                     </div>
-                    {/* Work type icon */}
-                    <div className="absolute -top-1 -left-1 text-sm pointer-events-none flex items-center justify-center w-6 h-6">
-                      <span className="drop-shadow-sm">{report.config.icon}</span>
-                    </div>
-                    {/* Date label */}
-                    <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs bg-white border border-gray-200 rounded px-1 py-0.5 shadow-sm whitespace-nowrap pointer-events-none">
-                      {format(parseISO(report.work_date), 'MM/dd', { locale: ja })}
-                    </div>
-                  </div>
+                  </WorkReportPopover>
                 </div>
               )
             })}
 
               {/* Today line */}
               {(() => {
-                const today = new Date()
-                const todayOffset = differenceInDays(today, chartData.chartStart)
+                // 今日の日付をJST基準で処理
+                const todayJST = getJSTToday()
+                
+                // チャート開始日と同じJST処理で統一
+                const chartStartDate = chartData.chartStart
+                
+                const todayOffset = differenceInDays(todayJST, chartStartDate)
+                // 🎯 今日線も2日右にずらして表示調整
+                const TODAY_DISPLAY_OFFSET_DAYS = 2
+                const adjustedTodayOffset = todayOffset + TODAY_DISPLAY_OFFSET_DAYS
+                
+                console.log('🔍 JST今日線の位置計算:', {
+                  現在時刻UTC: new Date().toISOString(),
+                  現在時刻JST: format(todayJST, 'yyyy-MM-dd (E) HH:mm:ss', { locale: ja }),
+                  JST今日: todayJST.toISOString(),
+                  JST今日表示: format(todayJST, 'yyyy-MM-dd (E)', { locale: ja }),
+                  JSTチャート開始: chartData.chartStart.toISOString(),
+                  JSTチャート開始表示: format(chartData.chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+                  日数差: todayOffset,
+                  調整後日数差: adjustedTodayOffset,
+                  総日数: chartData.totalDays,
+                  計算確認: `${format(todayJST, 'yyyy-MM-dd')} - ${format(chartStartDate, 'yyyy-MM-dd')} = ${todayOffset} days (調整後: ${adjustedTodayOffset})`
+                })
                 
                 // 今日が表示範囲内にある場合のみ表示
-                if (todayOffset >= 0 && todayOffset <= chartData.totalDays) {
-                  const todayPosition = FIXED_COLUMNS_WIDTH + (todayOffset * dayWidth)
+                if (adjustedTodayOffset >= 0 && adjustedTodayOffset <= chartData.totalDays) {
+                  const todayPosition = FIXED_COLUMNS_WIDTH + (adjustedTodayOffset * dayWidth)
                   const headerHeight = viewUnit === 'day' ? 84 : 68 // ヘッダーの高さ調整（年月8px + 日7px + 曜日5px = 20px、曜日なし時15px）
                   
                   return (
@@ -657,7 +1297,7 @@ export function GanttChart({
                       }}
                     >
                       <div className="absolute -top-2 -left-8 bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap font-medium">
-                        今日 {format(today, 'MM/dd', { locale: ja })}
+                        今日 {format(todayJST, 'MM/dd', { locale: ja })}
                       </div>
                     </div>
                   )

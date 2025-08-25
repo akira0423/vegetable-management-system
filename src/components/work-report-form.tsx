@@ -20,13 +20,18 @@ import {
   TrendingUp,
   MapPin,
   Clock,
-  X
+  X,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  TestTube
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import PhotoUpload from '@/components/photo-upload'
 import { analyticsDataSync } from '@/lib/analytics-data-sync'
 import { useRealtimeSync } from '@/lib/realtime-sync'
+import WorkAccountingInput from '@/components/work-accounting-input'
 
 interface WorkReport {
   id?: string
@@ -56,14 +61,33 @@ interface WorkReport {
   expected_price?: number // 想定単価
   expected_revenue?: number // 想定売上高
   
-  // コスト管理
-  estimated_cost?: number // 想定コスト（円）
+  // コスト管理は会計記録で管理（想定コストは廃止）
   
   // 天候・環境
   weather?: 'sunny' | 'cloudy' | 'rainy' | 'windy'
-  temperature_morning?: number
-  temperature_afternoon?: number
+  temperature?: number
   humidity?: number
+
+  // 土壌情報（プロフェッショナル土壌検査）
+  soil_ph?: number                    // pH値
+  soil_ec?: number                    // EC（mS/cm）
+  phosphorus_absorption?: number      // りん酸吸収係数
+  available_phosphorus?: number       // 有効態りん酸（mg/100g）
+  cec?: number                       // CEC（me/100g）
+  exchangeable_calcium?: number       // 交換性石灰（mg/100g）
+  exchangeable_magnesium?: number     // 交換性苦土（mg/100g）
+  exchangeable_potassium?: number     // 交換性加里（mg/100g）
+  base_saturation?: number           // 塩基飽和度（%）
+  calcium_magnesium_ratio?: number   // 石灰苦土比
+  magnesium_potassium_ratio?: number // 苦土加里比
+  available_silica?: number          // 有効態けい酸（mg/100g）
+  free_iron_oxide?: number           // 遊離酸化鉄（%）
+  humus_content?: number             // 腐植含量（%）
+  ammonium_nitrogen?: number         // アンモニア態窒素（mg/100g）
+  nitrate_nitrogen?: number          // 硝酸態窒素（mg/100g）
+  manganese?: number                 // マンガン（mg/100g）
+  boron?: number                     // ホウ素（mg/100g）
+  soil_notes?: string                // 土壌観察メモ
   
   // その他
   work_duration?: number // 分
@@ -115,10 +139,13 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
   const [vegetables, setVegetables] = useState<Vegetable[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
   const { notifyWorkReportChange } = useRealtimeSync()
   
   // フォーム状態
   const [selectedVegetable, setSelectedVegetable] = useState('')
+  const [soilInfoVisible, setSoilInfoVisible] = useState(false)
   const [currentReport, setCurrentReport] = useState<WorkReport>({
     vegetable_id: '',
     work_date: format(new Date(), 'yyyy-MM-dd'),
@@ -127,31 +154,93 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
   
   // 写真アップロード状態
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([])
+  
+  // 会計データ状態
+  const [accountingData, setAccountingData] = useState<{
+    income_items: any[]
+    expense_items: any[]
+    income_total: number
+    expense_total: number
+    net_income: number
+  }>({
+    income_items: [],
+    expense_items: [],
+    income_total: 0,
+    expense_total: 0,
+    net_income: 0
+  })
+
+  // バリデーション状態
+  const [showValidationModal, setShowValidationModal] = useState(false)
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([])
+
+  // 手動反映機能用の参照
+  const [manualReflectFunction, setManualReflectFunction] = useState<((amount: number, itemName: string) => void) | null>(null)
+
+  // デバッグ用: onManualReflectコールバック
+  const handleManualReflectCallback = (reflectFunction: (amount: number, itemName: string) => void) => {
+    console.log('🔄 手動反映機能がコールバック経由で設定されました:', !!reflectFunction)
+    setManualReflectFunction(() => reflectFunction)
+  }
+  
+  // ユーザー情報（会計機能用）
+  const [userInfo, setUserInfo] = useState<{
+    company_id: string
+    user_id: string
+  }>({
+    company_id: '',
+    user_id: ''
+  })
+
+  // 認証情報の取得
+  useEffect(() => {
+    const fetchUserAuth = async () => {
+      try {
+        console.log('🔍 WorkReport: 認証情報取得開始')
+        const response = await fetch('/api/auth/user')
+        
+        if (!response.ok) {
+          throw new Error(`認証エラー: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        if (result.success && result.user?.company_id) {
+          console.log('✅ WorkReport: 認証成功, company_id:', result.user.company_id)
+          setCompanyId(result.user.company_id)
+          setUserInfo({
+            company_id: result.user.company_id,
+            user_id: result.user.id || ''
+          })
+          setAuthError(null)
+        } else {
+          throw new Error('ユーザー情報の取得に失敗しました')
+        }
+      } catch (error) {
+        console.error('❌ WorkReport: 認証エラー:', error)
+        setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
+        setCompanyId(null)
+      }
+    }
+    
+    fetchUserAuth()
+  }, [])
 
   useEffect(() => {
-    if (open) {
+    if (open && companyId) {
       fetchVegetables()
     }
-  }, [open])
+  }, [open, companyId])
 
   const fetchVegetables = async () => {
+    if (!companyId) {
+      console.log('❌ WorkReport: companyIdが未設定のため、野菜データ取得をスキップ')
+      return
+    }
+    
     setLoading(true)
     try {
-      // 動的にcompany_idを取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        if (userData.success && userData.user?.company_id) {
-          companyId = userData.user.company_id
-          console.log('🌱 作業記録フォーム - 使用するcompany_id:', companyId)
-        } else {
-          console.log('⚠️ 作業記録フォーム - company_id取得失敗、デフォルト使用:', companyId)
-        }
-      } else {
-        console.log('❌ 作業記録フォーム - ユーザー認証API呼び出し失敗')
-      }
+      console.log('📊 WorkReport: fetchVegetables開始, companyId:', companyId)
       
       const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
       
@@ -224,13 +313,32 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
     })
   }
 
+  // 会計記録に手動反映する関数
+  const handleReflectToAccounting = () => {
+    console.log('🚀 会計記録反映ボタンがクリックされました')
+    console.log('📊 反映データ:', { 
+      manualReflectFunction: !!manualReflectFunction, 
+      expected_revenue: currentReport.expected_revenue 
+    })
+    
+    if (manualReflectFunction && currentReport.expected_revenue && currentReport.expected_revenue > 0) {
+      console.log('✅ 反映実行中...')
+      manualReflectFunction(currentReport.expected_revenue, '収穫売上')
+    } else {
+      console.log('❌ 反映条件を満たしていません:', {
+        hasFunction: !!manualReflectFunction,
+        revenue: currentReport.expected_revenue
+      })
+    }
+  }
+
   // 作業種類に応じた動的フィールドを取得
   const getDynamicFields = (workType: string) => {
     switch (workType) {
       case 'seeding':
         return {
           showAmount: true,
-          showCost: true,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: false,
           showHarvest: false,
           amountLabel: '播種量',
@@ -239,7 +347,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       case 'planting':
         return {
           showAmount: true,
-          showCost: true,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: false,
           showHarvest: false,
           amountLabel: '定植数',
@@ -248,14 +356,14 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       case 'fertilizing':
         return {
           showAmount: false,
-          showCost: true,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: true,
           showHarvest: false
         }
       case 'watering':
         return {
           showAmount: true,
-          showCost: true,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: false,
           showHarvest: false,
           amountLabel: '灌水量',
@@ -264,14 +372,14 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       case 'harvesting':
         return {
           showAmount: false,
-          showCost: false,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: false,
           showHarvest: true
         }
       default:
         return {
           showAmount: false,
-          showCost: true,
+          showCost: false, // 旧コスト情報は廃止
           showFertilizer: false,
           showHarvest: false
         }
@@ -294,6 +402,38 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
     return errors
   }
 
+  const validateAccountingData = (): string[] => {
+    const warnings: string[] = []
+    
+    // 会計データに不完全なエントリがあるかチェック
+    const hasIncompleteIncome = accountingData.income_items.some(item => 
+      !item.accounting_item_id || item.accounting_item_id === ''
+    )
+    const hasIncompleteExpense = accountingData.expense_items.some(item => 
+      !item.accounting_item_id || item.accounting_item_id === ''
+    )
+    
+    if (hasIncompleteIncome) {
+      warnings.push('収入項目で選択されていない項目があります')
+    }
+    if (hasIncompleteExpense) {
+      warnings.push('支出項目で選択されていない項目があります')
+    }
+    
+    // 金額が入力されているのに項目が選択されていない場合もチェック
+    const hasAmountWithoutItem = accountingData.income_items.some(item => 
+      item.amount > 0 && (!item.accounting_item_id || item.accounting_item_id === '')
+    ) || accountingData.expense_items.some(item => 
+      item.amount > 0 && (!item.accounting_item_id || item.accounting_item_id === '')
+    )
+    
+    if (hasAmountWithoutItem) {
+      warnings.push('金額が入力されているのに項目が選択されていない記録があります')
+    }
+    
+    return warnings
+  }
+
   const handleSubmit = async () => {
     const validationErrors = validateReport()
     if (validationErrors.length > 0) {
@@ -301,21 +441,27 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       return
     }
 
+    // 会計データのバリデーション
+    const accountingWarnings = validateAccountingData()
+    if (accountingWarnings.length > 0) {
+      setValidationWarnings(accountingWarnings)
+      setShowValidationModal(true)
+      return
+    }
+
+    await proceedWithSave()
+  }
+
+  const proceedWithSave = async () => {
+    if (!companyId) {
+      console.log('❌ WorkReport: companyIdが未設定のため、保存をスキップ')
+      return
+    }
+    
     setSaving(true)
     try {
-      // 動的にcompany_idを取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      let createdBy = 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        if (userData.success && userData.user) {
-          companyId = userData.user.company_id || companyId
-          createdBy = userData.user.id || createdBy
-          console.log('🌱 作業記録保存 - 使用するcompany_id:', companyId)
-        }
-      }
+      console.log('💾 WorkReport: proceedWithSave開始, companyId:', companyId)
+      let createdBy = userInfo.user_id || 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
       
       // プロフェッショナル版：包括的なデータ構造
       const reportToSave = {
@@ -332,12 +478,12 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         harvest_amount: currentReport.harvest_amount || null,
         harvest_unit: currentReport.harvest_unit || null,
         harvest_quality: currentReport.harvest_quality || null,
+        expected_price: currentReport.expected_price || null,
         
         // 売上データをnotesに構造化形式で保存
         notes: JSON.stringify({
           work_notes: currentReport.work_notes || null,
           expected_revenue: currentReport.expected_revenue || null,
-          estimated_cost: currentReport.estimated_cost || null,
           sales_amount: currentReport.expected_revenue || null
         }),
         
@@ -377,8 +523,56 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       if (result.success) {
         console.log('✅ 作業報告保存成功:', result.data)
         
+        // 会計データの保存（完全なデータのみ）
+        const validIncomeItems = accountingData.income_items.filter(item => 
+          item.accounting_item_id && item.accounting_item_id !== '' && item.amount > 0
+        )
+        const validExpenseItems = accountingData.expense_items.filter(item => 
+          item.accounting_item_id && item.accounting_item_id !== '' && item.amount > 0
+        )
+        
+        if (validIncomeItems.length > 0 || validExpenseItems.length > 0) {
+          try {
+            const accountingPayload = {
+              work_report_id: result.data.id,
+              company_id: userInfo.company_id,
+              work_type: currentReport.work_type,
+              income_items: validIncomeItems,
+              expense_items: validExpenseItems
+            }
+            
+            console.log('💰 会計データ保存開始:', accountingPayload)
+            
+            const accountingResponse = await fetch('/api/work-accounting', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(accountingPayload)
+            })
+            
+            console.log('📡 会計データ保存レスポンス状態:', accountingResponse.status)
+            
+            const accountingResult = await accountingResponse.json()
+            console.log('📋 会計データ保存レスポンス内容:', accountingResult)
+            
+            if (accountingResult.success) {
+              console.log('✅ 会計データ保存成功')
+            } else {
+              console.error('❌ 会計データ保存失敗:', accountingResult.error)
+              console.error('📄 詳細エラー情報:', accountingResult.details)
+              alert(`❌ 会計データ保存失敗: "${accountingResult.error}"`)
+              setSaving(false)
+              return
+            }
+          } catch (accountingError) {
+            console.error('❌ 会計データ保存エラー:', accountingError)
+          }
+        }
+        
         // プロフェッショナル通知
-        alert(`作業報告を保存しました！\n\n作業種類: ${WORK_TYPES.find(t => t.value === currentReport.work_type)?.label}\n対象野菜: ${vegetables.find(v => v.id === currentReport.vegetable_id)?.name}\n作業日: ${currentReport.work_date}`)
+        const netIncomeText = accountingData.net_income !== 0 ? `\n純損益: ¥${accountingData.net_income.toLocaleString()}` : ''
+        alert(`作業報告を保存しました！\n\n作業種類: ${WORK_TYPES.find(t => t.value === currentReport.work_type)?.label}\n対象野菜: ${vegetables.find(v => v.id === currentReport.vegetable_id)?.name}\n作業日: ${currentReport.work_date}${netIncomeText}`)
         
         // 分析データ同期通知
         analyticsDataSync.syncWorkReportToAnalytics(result.data, vegetables)
@@ -394,6 +588,15 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         })
         setSelectedVegetable('')
         setUploadedPhotos([])
+        
+        // 会計データリセット
+        setAccountingData({
+          income_items: [],
+          expense_items: [],
+          income_total: 0,
+          expense_total: 0,
+          net_income: 0
+        })
         
         // 成功コールバック
         if (onSuccess) onSuccess()
@@ -417,6 +620,15 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         setSelectedVegetable('')
         setUploadedPhotos([])
         
+        // 会計データリセット
+        setAccountingData({
+          income_items: [],
+          expense_items: [],
+          income_total: 0,
+          expense_total: 0,
+          net_income: 0
+        })
+        
         // コールバック実行
         if (onSuccess) {
           onSuccess()
@@ -437,7 +649,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] xl:max-w-[1200px] max-h-[95vh] p-0 bg-white overflow-hidden">
+      <DialogContent className="max-w-[95vw] xl:max-w-[1200px] max-h-[95vh] p-0 bg-white overflow-hidden flex flex-col">
         <DialogTitle className="sr-only">新規作業記録</DialogTitle>
         {/* ヘッダー */}
         <div className="border-b border-gray-200 px-6 py-4 bg-white">
@@ -455,15 +667,16 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         </div>
         
         {loading ? (
-          <div className="py-8 text-center bg-white">
+          <div className="py-8 text-center bg-white flex-1 flex flex-col items-center justify-center">
             <Clock className="w-8 h-8 mx-auto mb-4 animate-spin text-green-600" />
             <p className="text-gray-600">データを読み込み中...</p>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row h-full min-h-0 bg-white">
+          <>
+            <div className="flex flex-col lg:flex-row flex-1 min-h-0 bg-white">
             {/* メインフォーム */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              <div className="space-y-6 max-w-3xl">
+            <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 lg:py-6 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+              <div className="space-y-6 max-w-3xl pb-6">
                 {/* 野菜選択 */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <h4 className="text-lg font-semibold text-blue-800 mb-3 flex items-center">
@@ -555,7 +768,8 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {/* 天候・環境情報 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label>天候</Label>
                             <Select 
@@ -576,26 +790,339 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                           </div>
 
                           <div className="space-y-2">
-                            <Label>作業時間 (分)</Label>
+                            <Label>気温（℃）</Label>
                             <Input
                               type="number"
-                              value={currentReport.work_duration || ''}
-                              onChange={(e) => handleInputChange('work_duration', parseInt(e.target.value) || undefined)}
-                              placeholder="120"
+                              value={currentReport.temperature || ''}
+                              onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value) || undefined)}
+                              placeholder="例: 25.3"
+                              step="0.1"
                             />
                           </div>
 
                           <div className="space-y-2">
-                            <Label>作業人数</Label>
+                            <Label>湿度（%）</Label>
+                            <Input
+                              type="number"
+                              value={currentReport.humidity || ''}
+                              onChange={(e) => handleInputChange('humidity', parseInt(e.target.value) || undefined)}
+                              placeholder="例: 65"
+                              min="0"
+                              max="100"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 作業・人員情報 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>作業時間（分）</Label>
+                            <Input
+                              type="number"
+                              value={currentReport.work_duration || ''}
+                              onChange={(e) => handleInputChange('work_duration', parseInt(e.target.value) || undefined)}
+                              placeholder="例: 120"
+                              min="1"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>作業人数（人）</Label>
                             <Input
                               type="number"
                               value={currentReport.worker_count || ''}
                               onChange={(e) => handleInputChange('worker_count', parseInt(e.target.value) || undefined)}
-                              placeholder="2"
+                              placeholder="例: 2"
+                              min="1"
                             />
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* 土壌情報記録セクション */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-amber-800 flex items-center">
+                          <Layers className="w-5 h-5 mr-2" />
+                          土壌情報記録
+                        </h4>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSoilInfoVisible(!soilInfoVisible)}
+                          className="flex items-center gap-2 text-amber-700 border-amber-300 hover:bg-amber-100"
+                        >
+                          <TestTube className="w-4 h-4" />
+                          詳細土壌状況記録
+                          {soilInfoVisible ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      
+                      {soilInfoVisible && (
+                        <div className="space-y-6 pt-4 border-t border-amber-200">
+                          {/* 基本土壌化学性 */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3 flex items-center">
+                              <TestTube className="w-4 h-4 mr-2" />
+                              基本土壌化学性
+                            </h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">pH</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.soil_ph || ''}
+                                  onChange={(e) => handleInputChange('soil_ph', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 6.5"
+                                  step="0.1"
+                                  min="3.0"
+                                  max="10.0"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">EC（mS/cm）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.soil_ec || ''}
+                                  onChange={(e) => handleInputChange('soil_ec', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 0.8"
+                                  step="0.01"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">りん酸吸収係数</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.phosphorus_absorption || ''}
+                                  onChange={(e) => handleInputChange('phosphorus_absorption', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 1500"
+                                  step="1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">CEC（me/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.cec || ''}
+                                  onChange={(e) => handleInputChange('cec', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 25.0"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 交換性塩基類 */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3">交換性塩基類</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">交換性石灰（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.exchangeable_calcium || ''}
+                                  onChange={(e) => handleInputChange('exchangeable_calcium', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 350"
+                                  step="1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">交換性苦土（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.exchangeable_magnesium || ''}
+                                  onChange={(e) => handleInputChange('exchangeable_magnesium', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 60"
+                                  step="1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">交換性加里（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.exchangeable_potassium || ''}
+                                  onChange={(e) => handleInputChange('exchangeable_potassium', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 25"
+                                  step="1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">塩基飽和度（%）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.base_saturation || ''}
+                                  onChange={(e) => handleInputChange('base_saturation', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 85.0"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 塩基バランス */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3">塩基バランス</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">石灰苦土比</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.calcium_magnesium_ratio || ''}
+                                  onChange={(e) => handleInputChange('calcium_magnesium_ratio', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 5.8"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">苦土加里比</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.magnesium_potassium_ratio || ''}
+                                  onChange={(e) => handleInputChange('magnesium_potassium_ratio', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 2.4"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 養分・有機物 */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3">養分・有機物</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">有効態りん酸（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.available_phosphorus || ''}
+                                  onChange={(e) => handleInputChange('available_phosphorus', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 30"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">有効態けい酸（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.available_silica || ''}
+                                  onChange={(e) => handleInputChange('available_silica', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 15"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">腐植含量（%）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.humus_content || ''}
+                                  onChange={(e) => handleInputChange('humus_content', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 4.2"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 窒素形態 */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3">窒素形態</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">アンモニア態窒素（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.ammonium_nitrogen || ''}
+                                  onChange={(e) => handleInputChange('ammonium_nitrogen', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 5.2"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">硝酸態窒素（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.nitrate_nitrogen || ''}
+                                  onChange={(e) => handleInputChange('nitrate_nitrogen', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 8.5"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 微量要素・その他 */}
+                          <div>
+                            <h5 className="text-md font-medium text-amber-800 mb-3">微量要素・その他</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">マンガン（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.manganese || ''}
+                                  onChange={(e) => handleInputChange('manganese', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 15.0"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">ホウ素（mg/100g）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.boron || ''}
+                                  onChange={(e) => handleInputChange('boron', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 0.8"
+                                  step="0.1"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-amber-700">遊離酸化鉄（%）</Label>
+                                <Input
+                                  type="number"
+                                  value={currentReport.free_iron_oxide || ''}
+                                  onChange={(e) => handleInputChange('free_iron_oxide', parseFloat(e.target.value) || undefined)}
+                                  placeholder="例: 2.5"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 土壌観察メモ */}
+                          <div className="space-y-2">
+                            <Label className="text-amber-700">土壌観察メモ</Label>
+                            <Textarea
+                              value={currentReport.soil_notes || ''}
+                              onChange={(e) => handleInputChange('soil_notes', e.target.value)}
+                              placeholder="土壌の色、質感、構造、根張りの状況、土壌検査機関の所見など..."
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="mt-4 p-3 bg-amber-100 border border-amber-300 rounded-lg">
+                            <p className="text-sm text-amber-800">
+                              💡 <strong>プロフェッショナル土壌診断：</strong>
+                              pH6.0-6.8、CEC20以上、塩基飽和度80%以上、石灰苦土比5-7、苦土加里比2-3が理想的です。
+                              定期検査で土壌改良効果を科学的に追跡できます。
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                 {/* 動的フィールド */}
@@ -673,13 +1200,27 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
                             <div className="space-y-2">
                               <Label>想定売上高（円）</Label>
-                              <Input
-                                type="number"
-                                value={currentReport.expected_revenue || ''}
-                                readOnly
-                                className="bg-gray-50"
-                                placeholder="自動計算されます"
-                              />
+                              <div className="flex gap-2 items-end">
+                                <Input
+                                  type="number"
+                                  value={currentReport.expected_revenue || ''}
+                                  readOnly
+                                  className="bg-gray-50 flex-1"
+                                  placeholder="自動計算されます"
+                                />
+                                {currentReport.expected_revenue && currentReport.expected_revenue > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleReflectToAccounting}
+                                    className="whitespace-nowrap bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                                  >
+                                    <TrendingUp className="w-4 h-4 mr-1" />
+                                    会計記録反映
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -771,30 +1312,37 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                         </div>
                       )}
 
-                      {/* コスト情報 */}
-                      {dynamicFields.showCost && (
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-                          <h4 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
-                            <TrendingUp className="w-5 h-5 mr-2" />
-                            コスト情報
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>想定コスト（円）</Label>
-                              <Input
-                                type="number"
-                                value={currentReport.estimated_cost || ''}
-                                onChange={(e) => handleInputChange('estimated_cost', parseFloat(e.target.value) || undefined)}
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {/* 旧コスト情報セクションは削除 - 新しい会計記録システムに統合 */}
                     </>
                   )
                 })()}
 
+                    {/* 会計入力セクション */}
+                    <div className="bg-gradient-to-br from-emerald-50 via-blue-50 to-indigo-50 rounded-xl p-5 border border-emerald-200">
+                      <h4 className="text-lg font-semibold text-emerald-800 mb-4 flex items-center">
+                        <TrendingUp className="w-5 h-5 mr-2" />
+                        収入・支出記録 （実績会計データ）
+                      </h4>
+                      <div className="text-sm text-emerald-700 mb-4">
+                        この作業に関連する収入・支出を記録して、経営分析に活用しましょう。
+                        <br />
+                        <span className="text-emerald-600 font-medium">💡 作業種類に応じてAIが適切な会計項目を推奨します。実績金額を入力するだけで正確な経営分析が可能です。</span>
+                      </div>
+                      
+                      {userInfo.company_id ? (
+                        <WorkAccountingInput
+                          workType={currentReport.work_type}
+                          companyId={userInfo.company_id}
+                          onDataChange={setAccountingData}
+                          onManualReflect={handleManualReflectCallback}
+                        />
+                      ) : (
+                        <div className="text-center py-6">
+                          <div className="text-gray-500">会社情報の取得中...</div>
+                        </div>
+                      )}
+                    </div>
+                    
                     {/* 写真アップロード */}
                     <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
                       <h4 className="text-lg font-semibold text-purple-800 mb-4 flex items-center">
@@ -814,7 +1362,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
             </div>
 
             {/* サイドバー（アクション） */}
-            <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-6">
+            <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 bg-gray-50 p-4 lg:p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100" style={{ maxHeight: 'calc(100vh - 120px)' }}>
               <div className="space-y-4">
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">作業記録の保存</h3>
@@ -875,6 +1423,54 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
               </div>
             </div>
           </div>
+
+          {/* バリデーション警告モーダル */}
+          <Dialog open={showValidationModal} onOpenChange={setShowValidationModal}>
+            <DialogContent className="max-w-md bg-white border shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-gray-900">
+                  <span className="text-orange-600">⚠️</span>
+                  入力内容の確認
+                </DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  以下の項目に不完全な入力があります：
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <ul className="text-sm space-y-1 bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  {validationWarnings.map((warning, index) => (
+                    <li key={index} className="text-orange-600 font-medium">• {warning}</li>
+                  ))}
+                </ul>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-sm text-orange-700">
+                    このまま保存すると、未選択の項目は保存されません。
+                    <br />
+                    <strong>続行しますか？</strong>
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowValidationModal(false)}
+                    className="flex-1 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    戻って修正
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setShowValidationModal(false)
+                      await proceedWithSave()
+                    }}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    このまま保存
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          </>
         )}
       </DialogContent>
     </Dialog>

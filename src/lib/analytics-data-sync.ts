@@ -1,7 +1,10 @@
 /**
- * 作業レポートとデータ分析の自動同期ユーティリティ
+ * 作業レポートとデータ分析の自動同期ユーティリティ（会計データ統合版）
  * データ整合性を確保し、リアルタイム分析を提供
+ * プロフェッショナル会計データ統合・予実差異分析対応
  */
+
+import { accountingAnalyticsProcessor, AccountingSummary, DataSource } from './accounting-analytics-processor'
 
 export interface WorkReport {
   id: string
@@ -9,11 +12,36 @@ export interface WorkReport {
   work_type: 'seeding' | 'planting' | 'fertilizing' | 'watering' | 'weeding' | 'pruning' | 'harvesting' | 'other'
   vegetable_id: string
   work_notes?: string
-  estimated_cost?: number
   harvest_amount?: number
   expected_revenue?: number
   work_duration?: number
   worker_count?: number
+  // 会計データを追加（プロフェッショナル版）
+  work_report_accounting?: Array<{
+    id: string
+    accounting_item_id: string
+    amount: number
+    custom_item_name?: string
+    notes?: string
+    is_ai_recommended?: boolean
+    accounting_items?: {
+      id: string
+      code: string
+      name: string
+      type: 'income' | 'expense' | 'both'
+      category: string
+    }
+  }>
+  // 会計集計データ（プロフェッショナル版）
+  total_income?: number
+  total_expense?: number
+  net_income?: number
+  // データソース品質情報
+  data_quality?: {
+    cost_source: DataSource
+    income_source: DataSource
+    reliability_score: number
+  }
 }
 
 export interface Vegetable {
@@ -105,9 +133,15 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
         return false
       }
 
-      // 数値データ検証
+      // 数値データ検証（会計データベース対応）
       const numbersValid = reports.every(report => {
-        if (report.estimated_cost && report.estimated_cost < 0) return false
+        // 会計データの検証
+        if (report.work_report_accounting) {
+          const invalidAccounting = report.work_report_accounting.some(item => 
+            item.amount < 0 || item.amount > 10000000
+          )
+          if (invalidAccounting) return false
+        }
         if (report.harvest_amount && report.harvest_amount < 0) return false
         if (report.expected_revenue && report.expected_revenue < 0) return false
         if (report.work_duration && (report.work_duration < 0 || report.work_duration > 1440)) return false
@@ -157,10 +191,13 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       // 効率スコア
       const efficiencyScore = this.calculateEfficiencyScore(reports)
 
+      // 会計サマリーを追加
+      const accountingSummary = this.calculateAccountingSummary(reports)
+
       return {
         todayStats: {
           totalReports: todayReports.length,
-          totalCost: todayReports.reduce((sum, r) => sum + (r.estimated_cost || 0), 0),
+          totalCost: this.calculateTotalCostFromAccounting(todayReports),
           totalRevenue: todayReports.reduce((sum, r) => sum + (r.expected_revenue || 0), 0),
           totalHarvest: todayReports.reduce((sum, r) => sum + (r.harvest_amount || 0), 0)
         },
@@ -169,6 +206,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
         costAnalysis,
         vegetablePerformance,
         efficiencyScore,
+        accountingSummary,
         lastUpdated: new Date().toISOString(),
         dataIntegrity: true
       }
@@ -176,6 +214,81 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
     } catch (error) {
       console.error('リアルタイムメトリクス生成エラー:', error)
       return null
+    }
+  }
+
+  // 会計サマリー計算
+  private calculateAccountingSummary(reports: WorkReport[]): any {
+    // 会計データがある作業レポートのみフィルタリング
+    const reportsWithAccounting = reports.filter(r => 
+      r.work_report_accounting && r.work_report_accounting.length > 0
+    )
+
+    if (reportsWithAccounting.length === 0) {
+      return {
+        actualIncome: 0,
+        actualExpense: 0,
+        netIncome: 0,
+        aiUsageRate: 0,
+        recordCount: 0,
+        topIncomeCategories: [],
+        topExpenseCategories: []
+      }
+    }
+
+    let totalIncome = 0
+    let totalExpense = 0
+    let aiRecommendedCount = 0
+    let totalAccountingEntries = 0
+
+    const incomeCategories: { [key: string]: number } = {}
+    const expenseCategories: { [key: string]: number } = {}
+
+    reportsWithAccounting.forEach(report => {
+      report.work_report_accounting!.forEach(accounting => {
+        totalAccountingEntries++
+        
+        if (accounting.is_ai_recommended) {
+          aiRecommendedCount++
+        }
+
+        const itemName = accounting.accounting_items?.name || accounting.custom_item_name || '不明'
+        const itemType = accounting.accounting_items?.type || 'expense'
+        const amount = accounting.amount || 0
+
+        if (itemType === 'income') {
+          totalIncome += amount
+          incomeCategories[itemName] = (incomeCategories[itemName] || 0) + amount
+        } else {
+          totalExpense += amount
+          expenseCategories[itemName] = (expenseCategories[itemName] || 0) + amount
+        }
+      })
+    })
+
+    // 上位カテゴリーを計算
+    const topIncomeCategories = Object.entries(incomeCategories)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+
+    const topExpenseCategories = Object.entries(expenseCategories)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+
+    const aiUsageRate = totalAccountingEntries > 0 
+      ? Math.round((aiRecommendedCount / totalAccountingEntries) * 100) 
+      : 0
+
+    return {
+      actualIncome: Math.round(totalIncome),
+      actualExpense: Math.round(totalExpense),
+      netIncome: Math.round(totalIncome - totalExpense),
+      aiUsageRate,
+      recordCount: reportsWithAccounting.length,
+      topIncomeCategories,
+      topExpenseCategories
     }
   }
 
@@ -236,7 +349,27 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
     }))
   }
 
-  // コスト分析計算
+  // 会計データベースから総コストを計算
+  private calculateTotalCostFromAccounting(reports: WorkReport[]): number {
+    return reports.reduce((total, report) => {
+      const accountingCost = report.work_report_accounting?.filter(accounting => 
+        accounting.accounting_items?.type === 'expense'
+      ).reduce((sum, item) => sum + (item.amount || 0), 0) || 0
+      return total + accountingCost
+    }, 0)
+  }
+
+  // 会計データベースから総収入を計算
+  private calculateTotalIncomeFromAccounting(reports: WorkReport[]): number {
+    return reports.reduce((total, report) => {
+      const accountingIncome = report.work_report_accounting?.filter(accounting => 
+        accounting.accounting_items?.type === 'income'
+      ).reduce((sum, item) => sum + (item.amount || 0), 0) || 0
+      return total + accountingIncome
+    }, 0)
+  }
+
+  // コスト分析計算（会計データベース対応）
   private calculateCostAnalysis(reports: WorkReport[]): any[] {
     const costData: { [key: string]: number } = {}
     const workTypeLabels: { [key: string]: string } = {
@@ -250,12 +383,17 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       other: 'その他'
     }
 
-    reports
-      .filter(r => r.estimated_cost)
-      .forEach(report => {
+    reports.forEach(report => {
+      // 会計データから支出を取得
+      const expenseAmount = report.work_report_accounting?.filter(accounting => 
+        accounting.accounting_items?.type === 'expense'
+      ).reduce((sum, item) => sum + (item.amount || 0), 0) || 0
+
+      if (expenseAmount > 0) {
         const label = workTypeLabels[report.work_type] || 'その他'
-        costData[label] = (costData[label] || 0) + report.estimated_cost!
-      })
+        costData[label] = (costData[label] || 0) + expenseAmount
+      }
+    })
 
     return Object.entries(costData).map(([type, amount]) => ({
       label: type,
@@ -273,9 +411,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
         .filter(r => r.expected_revenue)
         .reduce((sum, r) => sum + r.expected_revenue!, 0)
       
-      const totalCost = vegReports
-        .filter(r => r.estimated_cost)
-        .reduce((sum, r) => sum + r.estimated_cost!, 0)
+      const totalCost = this.calculateTotalCostFromAccounting(vegReports)
       
       const totalHarvest = vegReports
         .filter(r => r.harvest_amount)
@@ -313,9 +449,9 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
     const harvestEfficiency = harvestReports.length > 0 ? 
       (harvestReports.reduce((sum, r) => sum + (r.harvest_amount || 0), 0) / harvestReports.length) * 2 : 50
 
-    // コスト効率
+    // コスト効率（会計データベース対応）
     const totalRevenue = reports.reduce((sum, r) => sum + (r.expected_revenue || 0), 0)
-    const totalCost = reports.reduce((sum, r) => sum + (r.estimated_cost || 0), 0)
+    const totalCost = this.calculateTotalCostFromAccounting(reports)
     const costEfficiency = totalRevenue > 0 ? (totalRevenue - totalCost) / totalRevenue * 100 : 50
 
     // 作業バランス効率

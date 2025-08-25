@@ -30,6 +30,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import DataExportDialog from '@/components/data-export-dialog'
+import MonthlyCashflowChart from '@/components/charts/monthly-cashflow-chart'
 
 // チャートコンポーネント（シンプルなCSS実装）
 interface ChartData {
@@ -157,11 +158,14 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState('3months')
   const [selectedVegetable, setSelectedVegetable] = useState('all')
+  const [availableVegetables, setAvailableVegetables] = useState<Array<{id: string, name: string}>>([])
+  const [vegetableOptions, setVegetableOptions] = useState<Array<{id: string, name: string}>>([{id: 'all', name: 'すべての野菜'}])
   const [selectedPlot, setSelectedPlot] = useState('all')
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   // サンプルデータ
   const sampleData: AnalyticsData = {
@@ -281,9 +285,43 @@ export default function AnalyticsPage() {
     ]
   }
 
+  // 認証情報の取得
   useEffect(() => {
-    fetchAnalyticsData()
-  }, [dateRange, selectedVegetable, selectedPlot])
+    const fetchUserAuth = async () => {
+      try {
+        console.log('🔍 Analytics: 認証情報取得開始')
+        const response = await fetch('/api/auth/user')
+        
+        if (!response.ok) {
+          throw new Error(`認証エラー: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        if (result.success && result.user?.company_id) {
+          console.log('✅ Analytics: 認証成功, company_id:', result.user.company_id)
+          setCompanyId(result.user.company_id)
+          setAuthError(null)
+        } else {
+          throw new Error('ユーザー情報の取得に失敗しました')
+        }
+      } catch (error) {
+        console.error('❌ Analytics: 認証エラー:', error)
+        setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
+        setCompanyId(null)
+      }
+    }
+    
+    fetchUserAuth()
+  }, [])
+
+  // データの取得（companyIdが取得できた後に実行）
+  useEffect(() => {
+    if (companyId) {
+      console.log('📊 Analytics: companyId取得完了、データフェッチ開始:', companyId)
+      fetchAnalyticsData()
+    }
+  }, [companyId, selectedVegetable, selectedPlot])
 
   // リアルタイムデータ同期リスナー
   const handleAnalyticsUpdate = useCallback((updateData: any) => {
@@ -328,7 +366,7 @@ export default function AnalyticsPage() {
 
   // 自動更新機能（5分ごと）
   useEffect(() => {
-    if (!autoRefresh) return
+    if (!autoRefresh || !companyId) return
     
     const interval = setInterval(() => {
       fetchAnalyticsData()
@@ -336,17 +374,23 @@ export default function AnalyticsPage() {
     }, 5 * 60 * 1000) // 5分ごと
     
     return () => clearInterval(interval)
-  }, [autoRefresh, dateRange, selectedVegetable, selectedPlot])
+  }, [autoRefresh, companyId, selectedVegetable, selectedPlot])
 
   const fetchAnalyticsData = async () => {
+    if (!companyId) {
+      console.log('❌ Analytics: companyIdが未設定のため、データ取得をスキップ')
+      return
+    }
+    
     try {
+      console.log('📊 Analytics: データ取得開始, companyId:', companyId)
       setLoading(true)
       
       // 作業レポートデータと野菜データを並行取得
       const [reportsResponse, vegetablesResponse, ganttResponse] = await Promise.all([
-        fetch(`/api/reports?company_id=a1111111-1111-1111-1111-111111111111&limit=200`),
-        fetch(`/api/gantt?company_id=a1111111-1111-1111-1111-111111111111&start_date=2024-01-01&end_date=2025-12-31`),
-        fetch(`/api/gantt?company_id=a1111111-1111-1111-1111-111111111111&start_date=2024-01-01&end_date=2025-12-31`)
+        fetch(`/api/reports?company_id=${companyId}&limit=200`),
+        fetch(`/api/gantt?company_id=${companyId}&start_date=2024-01-01&end_date=2025-12-31`),
+        fetch(`/api/gantt?company_id=${companyId}&start_date=2024-01-01&end_date=2025-12-31`)
       ])
       
       let workReports = []
@@ -366,6 +410,14 @@ export default function AnalyticsPage() {
         const vegetablesResult = await vegetablesResponse.json()
         if (vegetablesResult.success && vegetablesResult.data.vegetables) {
           vegetables = vegetablesResult.data.vegetables
+          
+          // 野菜オプションリストを更新
+          const vegOptions = vegetables.map((veg: any) => ({
+            id: veg.id,
+            name: veg.name.split('（')[0] || veg.name
+          }))
+          setAvailableVegetables(vegOptions)
+          setVegetableOptions([{id: 'all', name: 'すべての野菜'}, ...vegOptions])
         }
       }
       
@@ -384,9 +436,25 @@ export default function AnalyticsPage() {
         タスクデータ数: tasks.length
       })
       
+      // 選択された野菜によるフィルタリング
+      let filteredWorkReports = workReports
+      let filteredVegetables = vegetables
+      
+      if (selectedVegetable !== 'all') {
+        const selectedVegId = selectedVegetable
+        filteredWorkReports = workReports.filter((report: any) => report.vegetable_id === selectedVegId)
+        filteredVegetables = vegetables.filter((veg: any) => veg.id === selectedVegId)
+      }
+      
+      console.log('🔍 Analytics: フィルター後のデータ', {
+        選択野菜: selectedVegetable,
+        フィルター後作業レポート数: filteredWorkReports.length,
+        フィルター後野菜数: filteredVegetables.length
+      })
+
       // 作業レポートから分析データを生成
-      if (workReports.length > 0 || vegetables.length > 0) {
-        const analyticsFromReports = generateDetailedAnalyticsFromReports(workReports, vegetables)
+      if (filteredWorkReports.length > 0 || filteredVegetables.length > 0) {
+        const analyticsFromReports = generateDetailedAnalyticsFromReports(filteredWorkReports, filteredVegetables)
         const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
         setData(mergedData)
       } else {
@@ -656,7 +724,24 @@ export default function AnalyticsPage() {
   }
 
 
-  if (loading) {
+  // 認証エラーの表示
+  if (authError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-red-400" />
+          <p className="text-red-600 text-lg font-medium mb-2">認証エラー</p>
+          <p className="text-gray-500 text-sm mb-4">{authError}</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            再読み込み
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ローディング状態（companyIdを待っている状態も含む）
+  if (loading || !companyId) {
     return (
       <div className="space-y-6">
         <div className="h-8 bg-gray-200 rounded animate-pulse" />
@@ -665,6 +750,11 @@ export default function AnalyticsPage() {
             <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse" />
           ))}
         </div>
+        {!companyId && (
+          <div className="text-center text-gray-500 text-sm">
+            認証情報を確認しています...
+          </div>
+        )}
       </div>
     )
   }
@@ -676,6 +766,7 @@ export default function AnalyticsPage() {
           <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
           <p className="text-gray-600 text-lg font-medium mb-2">登録情報がありません</p>
           <p className="text-gray-500 text-sm">野菜の登録や作業記録を作成すると、分析データが表示されます</p>
+          <p className="text-xs text-gray-400 mt-2">使用中の会社ID: {companyId}</p>
         </div>
       </div>
     )
@@ -691,15 +782,16 @@ export default function AnalyticsPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
+          <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="野菜を選択" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1month">1ヶ月</SelectItem>
-              <SelectItem value="3months">3ヶ月</SelectItem>
-              <SelectItem value="6months">6ヶ月</SelectItem>
-              <SelectItem value="1year">1年間</SelectItem>
+              {vegetableOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           
@@ -794,48 +886,62 @@ export default function AnalyticsPage() {
       </div>
 
       {/* メインコンテンツタブ */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">概要</TabsTrigger>
-          <TabsTrigger value="worklog">作業分析</TabsTrigger>
-          <TabsTrigger value="harvest">収穫分析</TabsTrigger>
-          <TabsTrigger value="financial">収益分析</TabsTrigger>
-          <TabsTrigger value="efficiency">効率性</TabsTrigger>
+      <Tabs defaultValue="performance" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="performance">パフォーマンス</TabsTrigger>
+          <TabsTrigger value="worklog-cost">作業・コスト分析</TabsTrigger>
+          <TabsTrigger value="harvest-revenue">収穫・収益分析</TabsTrigger>
+          <TabsTrigger value="simulation">シミュレーション</TabsTrigger>
         </TabsList>
 
-        {/* 概要タブ */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 収穫量推移 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  月別収穫量推移
-                </CardTitle>
-                <CardDescription>過去6ヶ月の収穫量変化</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimpleBarChart data={data.harvest_analysis} height={250} />
+        {/* パフォーマンスタブ */}
+        <TabsContent value="performance" className="space-y-6">
+          {/* 月次キャッシュフロー推移グラフ */}
+          <MonthlyCashflowChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          
+          {/* パフォーマンスサマリー */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-r from-green-50 to-green-100">
+              <CardContent className="p-4 text-center">
+                <Award className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                <div className="text-2xl font-bold text-green-700">
+                  {data.vegetable_performance.filter(v => v.status === 'excellent').length}
+                </div>
+                <div className="text-sm text-gray-600">優秀野菜</div>
               </CardContent>
             </Card>
-
-            {/* 効率性トレンド */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  作業効率トレンド
-                </CardTitle>
-                <CardDescription>月次効率スコアの変化</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimpleLineChart data={data.efficiency_trends} height={250} />
+            
+            <Card className="bg-gradient-to-r from-blue-50 to-blue-100">
+              <CardContent className="p-4 text-center">
+                <TrendingUp className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+                <div className="text-2xl font-bold text-blue-700">
+                  {formatNumber(data.vegetable_performance.reduce((avg, v) => avg + v.roi, 0) / data.vegetable_performance.length)}%
+                </div>
+                <div className="text-sm text-gray-600">平均ROI</div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-r from-yellow-50 to-yellow-100">
+              <CardContent className="p-4 text-center">
+                <DollarSign className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
+                <div className="text-2xl font-bold text-yellow-700">
+                  {formatCurrency(data.vegetable_performance.reduce((sum, v) => sum + v.profit, 0))}
+                </div>
+                <div className="text-sm text-gray-600">総利益</div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-r from-purple-50 to-purple-100">
+              <CardContent className="p-4 text-center">
+                <Sprout className="w-8 h-8 mx-auto mb-2 text-purple-600" />
+                <div className="text-2xl font-bold text-purple-700">
+                  {formatNumber(data.vegetable_performance.reduce((sum, v) => sum + v.harvest_amount, 0), 0)}kg
+                </div>
+                <div className="text-sm text-gray-600">総収穫量</div>
               </CardContent>
             </Card>
           </div>
-
+          
           {/* 最近のアクティビティ */}
           <Card>
             <CardHeader>
@@ -894,8 +1000,8 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        {/* 作業分析タブ */}
-        <TabsContent value="worklog" className="space-y-6">
+        {/* 作業・コスト分析タブ */}
+        <TabsContent value="worklog-cost" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 作業種別頻度 */}
             <Card>
@@ -1012,8 +1118,8 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        {/* 収穫分析タブ */}
-        <TabsContent value="harvest" className="space-y-6">
+        {/* 収穫・収益分析タブ */}
+        <TabsContent value="harvest-revenue" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -1026,13 +1132,37 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>季節別パフォーマンス</CardTitle>
+                <CardTitle>コスト内訳</CardTitle>
               </CardHeader>
               <CardContent>
-                <SimpleBarChart data={data.seasonal_performance} height={300} />
+                <SimpleBarChart data={data.cost_analysis} height={300} />
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>収益サマリー</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                <span className="text-gray-700">売上高</span>
+                <span className="font-bold text-green-700">{formatCurrency(data.summary.total_revenue)}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-red-50 rounded">
+                <span className="text-gray-700">総コスト</span>
+                <span className="font-bold text-red-700">{formatCurrency(data.summary.total_cost)}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
+                <span className="text-gray-700">利益</span>
+                <span className="font-bold text-blue-700">{formatCurrency(data.summary.total_revenue - data.summary.total_cost)}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
+                <span className="text-gray-700">利益率</span>
+                <span className="font-bold text-yellow-700">{formatNumber(data.summary.profit_margin)}%</span>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -1060,49 +1190,14 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        {/* 収益分析タブ */}
-        <TabsContent value="financial" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>コスト内訳</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SimpleBarChart data={data.cost_analysis} height={300} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>収益サマリー</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                  <span className="text-gray-700">売上高</span>
-                  <span className="font-bold text-green-700">{formatCurrency(data.summary.total_revenue)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-red-50 rounded">
-                  <span className="text-gray-700">総コスト</span>
-                  <span className="font-bold text-red-700">{formatCurrency(data.summary.total_cost)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                  <span className="text-gray-700">利益</span>
-                  <span className="font-bold text-blue-700">{formatCurrency(data.summary.total_revenue - data.summary.total_cost)}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                  <span className="text-gray-700">利益率</span>
-                  <span className="font-bold text-yellow-700">{formatNumber(data.summary.profit_margin)}%</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* 効率性タブ */}
-        <TabsContent value="efficiency" className="space-y-6">
+        {/* シミュレーションタブ */}
+        <TabsContent value="simulation" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>作業効率推移</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                作業効率推移
+              </CardTitle>
               <CardDescription>月次効率スコアと改善トレンド</CardDescription>
             </CardHeader>
             <CardContent>
@@ -1140,139 +1235,6 @@ export default function AnalyticsPage() {
           </div>
         </TabsContent>
 
-        {/* パフォーマンスタブ - 作業レポートデータ連携 */}
-        <TabsContent value="performance" className="space-y-6">
-          {/* パフォーマンスサマリー */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-r from-green-50 to-green-100">
-              <CardContent className="p-4 text-center">
-                <Award className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                <div className="text-2xl font-bold text-green-700">
-                  {data.vegetable_performance.filter(v => v.status === 'excellent').length}
-                </div>
-                <div className="text-sm text-gray-600">優秀野菜</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-blue-50 to-blue-100">
-              <CardContent className="p-4 text-center">
-                <TrendingUp className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                <div className="text-2xl font-bold text-blue-700">
-                  {formatNumber(data.vegetable_performance.reduce((avg, v) => avg + v.roi, 0) / data.vegetable_performance.length)}%
-                </div>
-                <div className="text-sm text-gray-600">平均ROI</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-yellow-50 to-yellow-100">
-              <CardContent className="p-4 text-center">
-                <DollarSign className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
-                <div className="text-2xl font-bold text-yellow-700">
-                  {formatCurrency(data.vegetable_performance.reduce((sum, v) => sum + v.profit, 0))}
-                </div>
-                <div className="text-sm text-gray-600">総利益</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-purple-50 to-purple-100">
-              <CardContent className="p-4 text-center">
-                <Sprout className="w-8 h-8 mx-auto mb-2 text-purple-600" />
-                <div className="text-2xl font-bold text-purple-700">
-                  {formatNumber(data.vegetable_performance.reduce((sum, v) => sum + v.harvest_amount, 0), 0)}kg
-                </div>
-                <div className="text-sm text-gray-600">総収穫量</div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* 野菜別パフォーマンステーブル */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                野菜別パフォーマンス詳細
-              </CardTitle>
-              <CardDescription>作業レポートデータから自動集計されたパフォーマンス指標</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-3 font-semibold">野菜・品種</th>
-                      <th className="text-right p-3 font-semibold">面積</th>
-                      <th className="text-right p-3 font-semibold">収穫量</th>
-                      <th className="text-right p-3 font-semibold">売上</th>
-                      <th className="text-right p-3 font-semibold">コスト</th>
-                      <th className="text-right p-3 font-semibold">利益</th>
-                      <th className="text-right p-3 font-semibold">ROI</th>
-                      <th className="text-right p-3 font-semibold">収穫効率</th>
-                      <th className="text-center p-3 font-semibold">評価</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.vegetable_performance.map((item, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                              <Sprout className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{item.name}</div>
-                              <div className="text-xs text-gray-500">{item.variety}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="text-right p-3">{item.plot_size}㎡</td>
-                        <td className="text-right p-3 font-medium">{formatNumber(item.harvest_amount, 1)}kg</td>
-                        <td className="text-right p-3 text-green-600 font-medium">{formatCurrency(item.revenue)}</td>
-                        <td className="text-right p-3 text-red-600">{formatCurrency(item.cost)}</td>
-                        <td className="text-right p-3 font-bold">
-                          <span className={item.profit > 0 ? 'text-green-700' : 'text-red-700'}>
-                            {formatCurrency(item.profit)}
-                          </span>
-                        </td>
-                        <td className="text-right p-3">
-                          <span className={`font-medium ${
-                            item.roi > 100 ? 'text-green-600' : 
-                            item.roi > 50 ? 'text-blue-600' : 'text-red-600'
-                          }`}>
-                            {formatNumber(item.roi, 1)}%
-                          </span>
-                        </td>
-                        <td className="text-right p-3 text-purple-600 font-medium">
-                          {formatNumber(item.yield_per_sqm, 1)}kg/㎡
-                        </td>
-                        <td className="text-center p-3">
-                          <Badge className={`${getPerformanceColor(item.status)} font-medium`}>
-                            {getPerformanceLabel(item.status)}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              {/* パフォーマンスチャート */}
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium mb-4">野菜別ROI比較</h4>
-                <SimpleBarChart 
-                  data={data.vegetable_performance.map(v => ({
-                    label: v.name.split('、')[0] || v.name.substring(0, 6), // 簡略名
-                    value: Math.round(v.roi),
-                    color: v.status === 'excellent' ? 'bg-green-500' :
-                           v.status === 'good' ? 'bg-blue-500' :
-                           v.status === 'average' ? 'bg-yellow-500' : 'bg-red-500'
-                  }))}
-                  height={200}
-                  title="ROI (%)"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* プロフェッショナルエクスポート機能 */}

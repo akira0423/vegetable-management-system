@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     // アクティブな記録のみ取得するかどうか
     const activeOnly = searchParams.get('active_only') !== 'false'
     
-    // ベースクエリ
+    // ベースクエリ（会計データも含めて取得）
     let query = supabase
       .from('work_reports')
       .select(`
@@ -40,20 +40,48 @@ export async function GET(request: NextRequest) {
         harvest_amount,
         harvest_unit,
         harvest_quality,
+        expected_price,
         worker_count,
         notes,
         created_by,
         created_at,
-        deleted_at,
+        soil_ph,
+        soil_ec,
+        phosphorus_absorption,
+        cec,
+        base_saturation,
+        exchangeable_calcium,
+        exchangeable_magnesium,
+        exchangeable_potassium,
+        humus_content,
+        available_phosphorus,
+        available_silica,
+        ammonium_nitrogen,
+        nitrate_nitrogen,
+        soil_notes,
         vegetables:vegetable_id (
           id,
           name,
           variety_name,
           plot_name
+        ),
+        work_report_accounting (
+          id,
+          accounting_item_id,
+          amount,
+          custom_item_name,
+          notes,
+          is_ai_recommended,
+          accounting_items:accounting_item_id (
+            id,
+            code,
+            name,
+            type,
+            category
+          )
         )
       `)
       .eq('company_id', companyId)
-      .is('deleted_at', null) // ソフト削除フィルター
     
     query = query.order('work_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -154,6 +182,7 @@ export async function POST(request: NextRequest) {
       harvest_amount: body.harvest_amount || null,
       harvest_unit: body.harvest_unit || null,
       harvest_quality: body.harvest_quality || null,
+      expected_price: body.expected_price || null,
       
       // 売上データはnotesフィールドに統合保存するため、ここでは削除
       
@@ -180,6 +209,7 @@ export async function POST(request: NextRequest) {
         harvest_amount,
         harvest_unit,
         harvest_quality,
+        expected_price,
         worker_count,
         notes,
         created_by,

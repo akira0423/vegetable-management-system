@@ -31,8 +31,6 @@ export interface WorkReport {
   work_amount?: number
   work_unit?: string
   
-  // コスト情報
-  estimated_cost?: number
   
   // 肥料情報
   fertilizer_type?: string
@@ -135,7 +133,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_notes: 'トマトの播種作業。種子200粒使用。',
       work_amount: 0.2,
       work_unit: 'kg',
-      estimated_cost: 3200,
+      : 3200,
       work_duration: 180,
       worker_count: 2,
       weather: 'sunny',
@@ -151,7 +149,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_notes: 'トマト苗の定植作業。120株定植完了。',
       work_amount: 120,
       work_unit: '株',
-      estimated_cost: 8400,
+      : 8400,
       work_duration: 240,
       worker_count: 3,
       weather: 'cloudy',
@@ -168,7 +166,7 @@ export const unifiedTestData: UnifiedTestData = {
       fertilizer_type: '化成肥料8-8-8',
       fertilizer_amount: 15,
       fertilizer_unit: 'kg',
-      estimated_cost: 4500,
+      : 4500,
       work_duration: 90,
       worker_count: 1,
       weather: 'sunny',
@@ -180,7 +178,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_type: 'pruning',
       vegetable_id: '11111111-2222-3333-4444-555555555501', // v1のUUID版
       work_notes: 'トマト整枝・摘芽作業。わき芽除去。',
-      estimated_cost: 2800,
+      : 2800,
       work_duration: 150,
       worker_count: 2,
       weather: 'sunny',
@@ -252,7 +250,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_notes: 'キュウリの播種作業。',
       work_amount: 0.15,
       work_unit: 'kg',
-      estimated_cost: 2800,
+      : 2800,
       work_duration: 120,
       worker_count: 1,
       weather: 'sunny',
@@ -266,7 +264,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_notes: 'キュウリ苗の定植作業。100株定植。',
       work_amount: 100,
       work_unit: '株',
-      estimated_cost: 6800,
+      : 6800,
       work_duration: 200,
       worker_count: 2,
       weather: 'cloudy',
@@ -281,7 +279,7 @@ export const unifiedTestData: UnifiedTestData = {
       fertilizer_type: 'ハイポネックス液肥',
       fertilizer_amount: 8,
       fertilizer_unit: 'L',
-      estimated_cost: 3200,
+      : 3200,
       work_duration: 75,
       worker_count: 1,
       weather: 'sunny',
@@ -293,7 +291,7 @@ export const unifiedTestData: UnifiedTestData = {
       work_type: 'pruning',
       vegetable_id: '11111111-2222-3333-4444-555555555502', // v2のUUID版
       work_notes: 'キュウリ整枝・誘引作業。',
-      estimated_cost: 2400,
+      : 2400,
       work_duration: 130,
       worker_count: 2,
       weather: 'sunny',
@@ -342,7 +340,7 @@ export const unifiedTestData: UnifiedTestData = {
       fertilizer_type: '完熟堆肥',
       fertilizer_amount: 200,
       fertilizer_unit: 'kg',
-      estimated_cost: 5200,
+      : 5200,
       work_duration: 180,
       worker_count: 2,
       weather: 'sunny',
@@ -488,9 +486,8 @@ export const calculateUnifiedStats = () => {
   const vegetableStats = vegetables.map(vegetable => {
     const vegReports = workReports.filter(r => r.vegetable_id === vegetable.id)
     
-    const totalCost = vegReports
-      .filter(r => r.estimated_cost)
-      .reduce((sum, r) => sum + r.estimated_cost!, 0)
+    // 会計データからコスト計算（会計記録がない場合は0）
+    const totalCost = 0 // TODO: 会計データベースから取得
     
     const totalRevenue = vegReports
       .filter(r => r.expected_revenue)

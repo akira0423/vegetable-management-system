@@ -22,6 +22,10 @@ import NewTaskForm from '@/components/forms/NewTaskForm'
 // サンプルデータのインポートを削除
 // import { unifiedTestData } from '@/lib/unified-test-data'
 import WorkReportForm from '@/components/work-report-form'
+import WorkReportViewModal from '@/components/work-report-view-modal'
+import WorkReportEditModalFull from '@/components/work-report-edit-modal-full'
+import { WorkReportCard } from '@/components/work-report-card'
+import { AdvancedSearchFilter } from '@/components/advanced-search-filter'
 import FarmMapView from '@/components/farm-map-view'
 import { 
   Calendar, 
@@ -122,6 +126,8 @@ export default function GanttPage() {
   const [vegetables, setVegetables] = useState<Vegetable[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
   
   // フィルター状態
   const [selectedVegetable, setSelectedVegetable] = useState<string>('all')
@@ -140,10 +146,111 @@ export default function GanttPage() {
   const [isUsingCustomRange, setIsUsingCustomRange] = useState<boolean>(false)
   const [customRange, setCustomRange] = useState<{start: Date, end: Date} | null>(null)
   
+  // フィルター状態変更の監視
+  useEffect(() => {
+    console.log('🔄 親コンポーネント - フィルター状態変更:', {
+      selectedVegetable,
+      selectedPriority,
+      customStartDate,
+      customEndDate
+    })
+  }, [selectedVegetable, selectedPriority, customStartDate, customEndDate])
+  
   // タスク詳細モーダル
   const [selectedTask, setSelectedTask] = useState<GanttTask | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   
+  // 実績記録モーダル管理
+  const [selectedWorkReport, setSelectedWorkReport] = useState<any>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  
+  // 実績記録のクリックハンドラー
+  const handleWorkReportClick = (workReport: any) => {
+    setSelectedWorkReport(workReport)
+    setIsViewModalOpen(true)
+  }
+
+  // 編集モーダルを開く
+  const handleEditWorkReport = (workReport: any) => {
+    console.log('🔧 handleEditWorkReport - 受け取った作業レポート:', workReport)
+    console.log('🔧 handleEditWorkReport - 作業レポートのID:', workReport?.id)
+    setSelectedWorkReport(workReport)
+    setIsViewModalOpen(false)
+    setIsEditModalOpen(true)
+  }
+
+  // 実績記録の更新
+  const handleUpdateWorkReport = async (updatedReport: any) => {
+    try {
+      const response = await fetch(`/api/reports/${updatedReport.id || updatedReport.report_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedReport),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update work report')
+      }
+
+      const result = await response.json()
+      
+      if (result.success) {
+        // データを再取得してUI更新
+        await fetchData()
+        setIsEditModalOpen(false)
+        setSelectedWorkReport(null)
+        
+        // 成功メッセージ（必要に応じて）
+        console.log('実績記録が更新されました')
+      } else {
+        throw new Error(result.error || 'Update failed')
+      }
+    } catch (error) {
+      console.error('実績記録の更新エラー:', error)
+      // エラーハンドリング（トースト通知など）
+    }
+  }
+
+  // モーダルを閉じる
+  const handleCloseModals = () => {
+    setIsViewModalOpen(false)
+    setIsEditModalOpen(false)
+    setSelectedWorkReport(null)
+  }
+  
+  // 認証情報の取得
+  useEffect(() => {
+    const fetchUserAuth = async () => {
+      try {
+        console.log('🔍 Gantt: 認証情報取得開始')
+        const response = await fetch('/api/auth/user')
+        
+        if (!response.ok) {
+          throw new Error(`認証エラー: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        if (result.success && result.user?.company_id) {
+          console.log('✅ Gantt: 認証成功, company_id:', result.user.company_id)
+          setCompanyId(result.user.company_id)
+          setAuthError(null)
+        } else {
+          throw new Error('ユーザー情報の取得に失敗しました')
+        }
+      } catch (error) {
+        console.error('❌ Gantt: 認証エラー:', error)
+        setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
+        setCompanyId(null)
+      }
+    }
+    
+    fetchUserAuth()
+  }, [])
+
   // selectedTaskの変化を監視
   useEffect(() => {
     if (selectedTask) {
@@ -190,10 +297,38 @@ export default function GanttPage() {
   const [networkError, setNetworkError] = useState(false)
   const [error, setError] = useState('')
   
+  // 検索フィルター状態
+  const [filteredVegetableData, setFilteredVegetableData] = useState<{
+    filteredVegetables: any[]
+    filteredTasks: any[]
+    filteredReports: any[]
+    resultSummary: string
+  }>({
+    filteredVegetables: [],
+    filteredTasks: [],
+    filteredReports: [],
+    resultSummary: ''
+  })
+  
+  // 検索フィルター変更ハンドラー
+  const handleFiltersChange = useCallback((filters: any, filteredData: any) => {
+    setFilteredVegetableData(filteredData)
+  }, [])
+  
   // 期間計算
   const getDateRange = useCallback(() => {
-    // カスタム範囲が設定されている場合はそれを使用
+    // ガントチャートヘッダー内のカスタム期間設定を優先
+    if (customStartDate && customEndDate) {
+      console.log('🔍 getDateRange - ガントチャートカスタム期間使用:', { customStartDate, customEndDate })
+      return {
+        start: customStartDate,
+        end: customEndDate
+      }
+    }
+    
+    // レガシーカスタム範囲が設定されている場合はそれを使用
     if (isUsingCustomRange && customRange) {
+      console.log('🔍 getDateRange - レガシーカスタム範囲使用:', customRange)
       return {
         start: format(customRange.start, 'yyyy-MM-dd'),
         end: format(customRange.end, 'yyyy-MM-dd')
@@ -201,6 +336,7 @@ export default function GanttPage() {
     }
 
     // デフォルトの期間計算
+    console.log('🔍 getDateRange - デフォルト期間計算:', { viewPeriod, currentDate })
     const now = currentDate
     let start: Date, end: Date
 
@@ -228,11 +364,13 @@ export default function GanttPage() {
         break
     }
 
-    return {
+    const result = {
       start: format(start, 'yyyy-MM-dd'),
       end: format(end, 'yyyy-MM-dd')
     }
-  }, [viewPeriod, currentDate, isUsingCustomRange, customRange])
+    console.log('🔍 getDateRange - 計算結果:', result)
+    return result
+  }, [viewPeriod, currentDate, isUsingCustomRange, customRange, customStartDate, customEndDate])
 
   // 作業レポート状態
   const [workReports, setWorkReports] = useState([])
@@ -338,12 +476,21 @@ export default function GanttPage() {
     return () => document.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  // フィルター変更時にデータを再取得
+  // 初回データ取得（companyIdが取得された後に実行）
   useEffect(() => {
-    if (tasks.length > 0) { // 初回読み込み後のフィルター変更のみ
+    if (companyId) {
+      console.log('📊 Gantt: companyId取得完了、初回データフェッチ開始:', companyId)
       fetchData()
     }
-  }, [selectedVegetable, viewPeriod, currentDate])
+  }, [companyId])
+
+  // フィルター変更時にデータを再取得
+  useEffect(() => {
+    if (companyId) {
+      console.log('🔄 フィルター変更でデータ再取得:', { selectedVegetable, viewPeriod, currentDate, customStartDate, customEndDate })
+      fetchData()
+    }
+  }, [companyId, selectedVegetable, viewPeriod, currentDate, customStartDate, customEndDate])
 
   // viewPeriodが変更された際にカスタム範囲をリセット
   useEffect(() => {
@@ -358,19 +505,14 @@ export default function GanttPage() {
 
   // タスク作成後の専用データ取得関数（作成されたタスクの日付範囲を考慮）
   const fetchDataWithTaskDateRange = async (newTask?: any) => {
+    if (!companyId) {
+      console.log('❌ Gantt: companyIdが未設定のため、データ取得をスキップ')
+      return
+    }
+    
     setLoading(true)
     try {
-      // 現在のユーザー情報を取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        if (userData.success && userData.user?.company_id) {
-          companyId = userData.user.company_id
-          console.log('✅ fetchDataWithTaskDateRange - ユーザーのcompany_id:', companyId)
-        }
-      }
+      console.log('📊 Gantt: fetchDataWithTaskDateRange開始, companyId:', companyId)
       let { start, end } = getDateRange()
       
       // 新しく作成されたタスクの日付範囲を既存の表示範囲に含める
@@ -482,25 +624,14 @@ export default function GanttPage() {
   }
 
   const fetchData = async () => {
+    if (!companyId) {
+      console.log('❌ Gantt: companyIdが未設定のため、データ取得をスキップ')
+      return
+    }
+    
     setLoading(true)
     try {
-      // 現在のユーザー情報を取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      
-      console.log('🔍 fetchData - ユーザー認証レスポンス:', userResponse.ok)
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        console.log('🔍 fetchData - ユーザーデータ:', userData)
-        if (userData.success && userData.user?.company_id) {
-          companyId = userData.user.company_id
-          console.log('✅ fetchData - 決定されたcompany_id:', companyId)
-        } else {
-          console.log('⚠️ fetchData - company_id取得失敗、デフォルト使用:', companyId)
-        }
-      } else {
-        console.log('❌ fetchData - ユーザー認証API呼び出し失敗')
-      }
+      console.log('📊 Gantt: fetchData開始, companyId:', companyId, 'selectedVegetable:', selectedVegetable)
       const { start, end } = getDateRange()
       
       const params = new URLSearchParams({
@@ -511,9 +642,14 @@ export default function GanttPage() {
 
       if (selectedVegetable !== 'all') {
         params.append('vegetable_id', selectedVegetable)
+        console.log('🔍 fetchData - 野菜フィルター適用:', selectedVegetable)
+      } else {
+        console.log('🔍 fetchData - 全野菜表示')
       }
 
       params.append('active_only', 'true')
+      
+      console.log('🔍 fetchData - APIパラメータ:', params.toString())
       
       // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
       console.log('🔍 fetchData - 野菜API呼び出し準備 company_id:', companyId)
@@ -566,6 +702,13 @@ export default function GanttPage() {
 
       // 作業レポートデータの設定（実データのみ）
       if (reportsResult.success) {
+        console.log('📊 fetchData - 作業レポートデータ詳細:', reportsResult.data?.map(r => ({ 
+          id: r.id, 
+          work_date: r.work_date, 
+          work_type: r.work_type,
+          vegetable_id: r.vegetable_id 
+        })) || [])
+        console.log('📊 fetchData - 作業レポート生データ（最初の3件）:', reportsResult.data?.slice(0, 3) || [])
         setWorkReports(reportsResult.data || [])
       } else {
         console.log('作業レポートAPI エラー:', reportsResult.error)
@@ -612,18 +755,14 @@ export default function GanttPage() {
 
   // カスタム期間でのデータ取得関数
   const fetchDataWithCustomRange = async (startDate: Date, endDate: Date) => {
+    if (!companyId) {
+      console.log('❌ Gantt: companyIdが未設定のため、カスタム範囲データ取得をスキップ')
+      return
+    }
+    
     setLoading(true)
     try {
-      // 現在のユーザー情報を取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        if (userData.success && userData.user?.company_id) {
-          companyId = userData.user.company_id
-        }
-      }
+      console.log('📊 Gantt: fetchDataWithCustomRange開始, companyId:', companyId)
       
       const startStr = format(startDate, 'yyyy-MM-dd')
       const endStr = format(endDate, 'yyyy-MM-dd')
@@ -769,19 +908,14 @@ export default function GanttPage() {
   }
 
   const handleNewTask = async () => {
+    if (!companyId) {
+      console.log('❌ Gantt: companyIdが未設定のため、新規タスク作成をスキップ')
+      return
+    }
+    
     // タスク作成前に最新の野菜データを取得
     try {
-      // 動的にcompany_idを取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        if (userData.success && userData.user?.company_id) {
-          companyId = userData.user.company_id
-          console.log('🎯 handleNewTask - 使用するcompany_id:', companyId)
-        }
-      }
+      console.log('🎯 Gantt: handleNewTask開始, companyId:', companyId)
       
       const response = await fetch(`/api/vegetables?company_id=${companyId}`)
       
@@ -860,17 +994,15 @@ export default function GanttPage() {
     setError('')
     
     try {
-      // 現在のユーザー情報を取得
-      const userResponse = await fetch('/api/auth/user')
-      let companyId = 'a1111111-1111-1111-1111-111111111111' // デフォルト
+      // 認証情報から作成者IDを取得
       let createdBy = 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
       
+      const userResponse = await fetch('/api/auth/user')
       if (userResponse.ok) {
         const userData = await userResponse.json()
-        if (userData.success && userData.user) {
-          companyId = userData.user.company_id || companyId
-          createdBy = userData.user.id || createdBy
-          console.log('✅ handleCreateTask - ユーザー情報:', { companyId, createdBy })
+        if (userData.success && userData.user?.id) {
+          createdBy = userData.user.id
+          console.log('✅ handleCreateTask - 作成者ID:', createdBy)
         }
       }
       
@@ -1661,160 +1793,6 @@ export default function GanttPage() {
         </CardContent>
       </Card>
 
-      {/* コントロールパネル */}
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center text-gray-800">
-            <Settings className="w-5 h-5 mr-2 text-blue-600" />
-            表示コントロール
-          </CardTitle>
-          <CardDescription className="text-gray-600">
-            データの表示方法とフィルタリング条件を設定
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-lg">
-              <TabsTrigger 
-                value="filters" 
-                className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                フィルター設定
-              </TabsTrigger>
-              <TabsTrigger 
-                value="display"
-                className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-medium"
-              >
-                <CalendarDays className="w-4 h-4 mr-2" />
-                表示設定
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="filters" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>野菜で絞り込み</Label>
-                  <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {vegetables.map(vegetable => (
-                        <SelectItem key={vegetable.id} value={vegetable.id}>
-                          {vegetable.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-
-                <div className="space-y-2">
-                  <Label>優先度</Label>
-                  <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="high">高</SelectItem>
-                      <SelectItem value="medium">中</SelectItem>
-                      <SelectItem value="low">低</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>タスク検索</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="タスク名で検索..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="display" className="space-y-6">
-              {/* 日付選択エリア */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">開始日</Label>
-                  <Input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full"
-                  />
-                  {/* 表示単位を開始日の下に配置 */}
-                  <div className="space-y-2">
-                    <Select value={viewUnit} onValueChange={(value: 'day' | 'week' | 'month') => setViewUnit(value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">日単位</SelectItem>
-                        <SelectItem value="week">週単位</SelectItem>
-                        <SelectItem value="month">月単位</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">終了日</Label>
-                  <Input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full"
-                  />
-                  {/* 期間適用ボタンを終了日の下に配置 */}
-                  <Button 
-                    onClick={handleCustomDateChange}
-                    className="w-full bg-green-100 hover:bg-green-200 text-green-800 font-medium py-3 px-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border border-green-300"
-                    disabled={!customStartDate || !customEndDate}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      期間を適用する
-                    </span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* 現在の表示範囲 */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <Label className="text-sm font-medium text-blue-800">現在の表示範囲</Label>
-                <div className="text-sm text-blue-700 mt-1 font-medium">
-                  {format(new Date(start), 'yyyy/MM/dd', { locale: ja })} 〜{' '}
-                  {format(new Date(end), 'yyyy/MM/dd', { locale: ja })}
-                </div>
-              </div>
-
-              {/* エラーメッセージ */}
-              {dateRangeError && (
-                <div className="text-sm text-red-600 p-3 bg-red-50 rounded-lg border border-red-200 shadow-sm">
-                  <div className="flex items-start gap-2">
-                    <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{dateRangeError}</span>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
 
 
       {/* 栽培野菜管理チャート */}
@@ -1822,11 +1800,31 @@ export default function GanttPage() {
         <GanttChart 
           tasks={filteredTasks}
           workReports={workReports}
+          vegetables={vegetables}
           startDate={start}
           endDate={end}
           viewUnit={viewUnit}
           onTaskClick={handleTaskClick}
+          onWorkReportView={handleWorkReportClick}
+          onWorkReportEdit={handleEditWorkReport}
           className="min-h-[500px]"
+          selectedVegetable={selectedVegetable}
+          selectedPriority={selectedPriority}
+          customStartDate={customStartDate}
+          customEndDate={customEndDate}
+          onVegetableChange={(value) => {
+            console.log('🔄 親コンポーネント - 野菜変更:', value)
+            setSelectedVegetable(value)
+          }}
+          onPriorityChange={(value) => {
+            console.log('🔄 親コンポーネント - 優先度変更:', value)
+            setSelectedPriority(value)
+          }}
+          onDateRangeChange={(startDate, endDate) => {
+            console.log('🔄 親コンポーネント - 日付変更:', startDate, endDate)
+            setCustomStartDate(startDate)
+            setCustomEndDate(endDate)
+          }}
         />
       ) : (
         <Card className="min-h-[500px]">
@@ -1868,6 +1866,27 @@ export default function GanttPage() {
           </Badge>
         </div>
 
+        {/* AI支援統合検索フィルター */}
+        <AdvancedSearchFilter
+          vegetables={vegetables}
+          workReports={workReports}
+          tasks={filteredTasks}
+          onFiltersChange={handleFiltersChange}
+        />
+
+        {/* フィルター結果がない場合のメッセージ */}
+        {filteredVegetableData.filteredVegetables.length === 0 && filteredVegetableData.resultSummary && (
+          <Card className="py-8 border-orange-200 bg-orange-50">
+            <CardContent className="text-center">
+              <div className="text-orange-600">
+                <Search className="w-12 h-12 mx-auto mb-2" />
+                <p className="font-medium">検索条件に該当する記録が見つかりません</p>
+                <p className="text-sm mt-1">検索条件を変更してお試しください</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {vegetables.length === 0 ? (
           <Card className="py-16">
             <CardContent className="flex items-center justify-center">
@@ -1887,9 +1906,10 @@ export default function GanttPage() {
             </CardContent>
           </Card>
         ) : (
-          vegetables.map(vegetable => {
-            const vegetableTasks = filteredTasks.filter(task => task.vegetable.id === vegetable.id)
-            const vegetableReports = workReports.filter((report: any) => report.vegetable_id === vegetable.id)
+          // フィルター結果が存在する場合はそれを使用、そうでなければ全データを表示
+          (filteredVegetableData.filteredVegetables.length > 0 ? filteredVegetableData.filteredVegetables : vegetables).map(vegetable => {
+            const vegetableTasks = (filteredVegetableData.filteredTasks.length > 0 ? filteredVegetableData.filteredTasks : filteredTasks).filter(task => task.vegetable?.id === vegetable.id)
+            const vegetableReports = (filteredVegetableData.filteredReports.length > 0 ? filteredVegetableData.filteredReports : workReports).filter((report: any) => report.vegetable_id === vegetable.id)
             
             // データがない野菜はスキップ
             if (vegetableTasks.length === 0 && vegetableReports.length === 0) {
@@ -2090,116 +2110,15 @@ export default function GanttPage() {
                     </div>
                     <div className="p-4 min-h-[200px] max-h-96 overflow-y-auto">
                       {vegetableReports.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {vegetableReports.map((report: any) => (
-                            <div 
+                            <WorkReportCard 
                               key={report.id}
-                              className="border rounded-lg p-3 bg-white hover:bg-green-50/50 transition-all duration-200 group relative select-none"
-                              style={{ userSelect: 'none' }}
-                            >
-                              {/* アクションメニュー */}
-                              <div className="absolute top-2 right-2">
-                                <DropdownMenu onOpenChange={(open) => {
-                                  if (!open) {
-                                    // ドロップダウンが閉じられた時にフォーカスをリセット
-                                    setTimeout(() => {
-                                      if (document.activeElement instanceof HTMLElement) {
-                                        document.activeElement.blur()
-                                      }
-                                      document.body.focus()
-                                    }, 10)
-                                  }
-                                }}>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button 
-                                      size="sm" 
-                                      variant="ghost" 
-                                      className="h-7 w-7 p-1.5 text-slate-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                      }}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                      }}
-                                      style={{ userSelect: 'none' }}
-                                    >
-                                      <Settings className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent 
-                                    align="end" 
-                                    className="w-40 bg-white border border-gray-200 rounded-lg shadow-lg p-1 backdrop-blur-sm"
-                                  >
-                                    <DropdownMenuItem 
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        showDeleteConfirmation(report, 'report')
-                                      }}
-                                      className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md cursor-pointer transition-colors duration-200"
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-3 text-red-500" />
-                                      削除
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                              <div className="mb-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                  <span className="font-medium text-sm">
-                                    {getWorkTypeLabel(report.work_type)}
-                                  </span>
-                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                                    {safeFormatDate(report.work_date, 'MM/dd')}
-                                  </Badge>
-                                </div>
-                              </div>
-                              
-                              {report.work_notes && (
-                                <div className="text-sm text-gray-600 mb-2 line-clamp-2">
-                                  {report.work_notes}
-                                </div>
-                              )}
-                              
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                {report.duration_hours && (
-                                  <div>
-                                    <span className="text-gray-500">時間: </span>
-                                    <span className="font-medium">{(report.duration_hours * 60).toFixed(0)}分</span>
-                                  </div>
-                                )}
-                                {report.estimated_cost && (
-                                  <div>
-                                    <span className="text-gray-500">コスト: </span>
-                                    <span className="font-medium">¥{report.estimated_cost.toLocaleString()}</span>
-                                  </div>
-                                )}
-                                {report.harvest_amount && (
-                                  <div>
-                                    <span className="text-gray-500">収穫: </span>
-                                    <span className="font-medium">{report.harvest_amount}{report.harvest_unit}</span>
-                                  </div>
-                                )}
-                                {(() => {
-                                  let revenue = report.expected_revenue
-                                  if (!revenue && report.notes) {
-                                    try {
-                                      const notesData = JSON.parse(report.notes)
-                                      revenue = notesData.sales_amount || notesData.expected_revenue
-                                    } catch (e) {}
-                                  }
-                                  return revenue ? (
-                                    <div>
-                                      <span className="text-gray-500">売上: </span>
-                                      <span className="font-medium text-green-600">¥{revenue.toLocaleString()}</span>
-                                    </div>
-                                  ) : null
-                                })()}
-                              </div>
-                            </div>
+                              report={report}
+                              onClick={handleWorkReportClick}
+                              onEdit={handleEditWorkReport}
+                              onDelete={(report) => showDeleteConfirmation(report, 'report')}
+                            />
                           ))}
                         </div>
                       ) : (
@@ -2381,6 +2300,23 @@ export default function GanttPage() {
         open={showWorkReportForm}
         onOpenChange={setShowWorkReportForm}
         onSuccess={handleWorkReportSuccess}
+      />
+
+      {/* 実績記録詳細表示モーダル（第1段階） */}
+      <WorkReportViewModal
+        workReport={selectedWorkReport}
+        isOpen={isViewModalOpen}
+        onClose={handleCloseModals}
+        onEdit={handleEditWorkReport}
+      />
+
+      {/* 実績記録編集モーダル（第2段階） */}
+      <WorkReportEditModalFull
+        workReport={selectedWorkReport}
+        isOpen={isEditModalOpen}
+        onClose={handleCloseModals}
+        onSave={handleUpdateWorkReport}
+        onCancel={handleCloseModals}
       />
 
       {/* 削除確認ダイアログ */}

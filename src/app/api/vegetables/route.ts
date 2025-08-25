@@ -79,6 +79,14 @@ export async function GET(request: NextRequest) {
     // ソフトデリートフィルタによりアクティブな野菜のみ取得済み
     const activeVegetables = vegetables || []
     console.log('🔍 野菜API - アクティブな野菜数:', activeVegetables.length)
+    
+    // 面積データの詳細ログ
+    console.log('🗺️ vegetables API - 面積データ詳細:', activeVegetables.map(v => ({
+      id: v.id,
+      name: v.name,
+      area_size: v.area_size,
+      面積データソース: v.area_size ? `area_size (${v.area_size}㎡)` : '面積データなし'
+    })))
 
     // 各野菜の統計情報を取得
     const vegetablesWithStats = await Promise.all(

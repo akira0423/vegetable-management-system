@@ -42,7 +42,6 @@ interface WorkReportExportData {
   temperature: number
   harvest_amount: number
   harvest_unit: string
-  estimated_cost: number
   created_at: string
 }
 
@@ -253,7 +252,6 @@ class DataExportManager {
       '気温',
       '収穫量',
       '収穫単位',
-      '想定コスト（円）',
       '登録日'
     ]
     
@@ -271,7 +269,6 @@ class DataExportManager {
         w.temperature || '',
         w.harvest_amount || '',
         w.harvest_unit || '',
-        w.estimated_cost || '',
         this.formatDateForExport(w.created_at)
       ].join(','))
     ].join('\n')

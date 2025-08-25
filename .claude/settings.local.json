@@ -7,8 +7,13 @@
       "Bash(claude config list)",
       "Bash(cp:*)",
       "Bash(node:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(git add:*)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "C:\\c\\work"
+    ]
   }
 }

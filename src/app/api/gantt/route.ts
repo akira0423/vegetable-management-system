@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
     // 野菜一覧も取得（削除された野菜を除外）
     const { data: vegetables, error: vegetablesError } = await supabase
       .from('vegetables')
-      .select('id, name, variety_name, status')
+      .select('id, name, variety_name, status, area_size')
       .eq('company_id', companyId)
       .is('deleted_at', null) // ソフトデリート：削除済みデータを除外
       .order('name', { ascending: true })
@@ -153,6 +153,14 @@ export async function GET(request: NextRequest) {
     if (vegetablesError) {
       console.error('Vegetables fetch error:', vegetablesError)
     }
+
+    // 野菜データの面積情報をログ出力
+    console.log('🗺️ 野菜データ面積確認:', vegetables?.map(v => ({
+      id: v.id,
+      name: v.name,
+      area_size: v.area_size,
+      面積データソース: v.area_size ? 'area_size (地図自動算出)' : '面積データなし'
+    })) || [])
 
     return NextResponse.json({
       success: true,
