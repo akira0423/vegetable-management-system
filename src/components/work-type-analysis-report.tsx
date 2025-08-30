@@ -33,6 +33,8 @@ interface WorkAnalysisData {
   costPerSqm: number
   totalRevenue: number
   revenuePerSqm: number
+  harvestAmount: number
+  costPerUnit: number
 }
 
 interface GroupedVegetableData {
@@ -40,7 +42,10 @@ interface GroupedVegetableData {
   vegetableName: string
   varietyName: string
   plotSize: number
+  harvestUnit: string // 収穫単位
   works: WorkAnalysisData[]
+  totalHarvestAmount: number
+  unitCostPerVegetable: number
 }
 
 
@@ -154,7 +159,10 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
         vegetableName: vegetable.name?.split('（')[0] || vegetable.name,
         varietyName: vegetable.variety_name || vegetable.name?.match(/（(.+?)）/)?.[1] || '',
         plotSize: vegetable.area_size || 100, // area_size を使用、なければデフォルト100
-        works: []
+        harvestUnit: vegetable.harvest_unit || '個', // 収穫単位、デフォルトは「個」
+        works: [],
+        totalHarvestAmount: 0,
+        unitCostPerVegetable: 0
       })
     })
 
@@ -176,11 +184,18 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
         count: 0,
         totalHours: 0,
         totalCost: 0,
-        totalRevenue: 0
+        totalRevenue: 0,
+        harvestAmount: 0,
+        costPerUnit: 0
       }
 
       existing.count += 1
       existing.totalHours += (report.duration_hours || 0) * (report.worker_count || 1)
+      
+      // 収穫量の集計（収穫作業の場合）
+      if (report.work_type === 'harvesting' && report.harvest_amount) {
+        existing.harvestAmount += report.harvest_amount
+      }
       
       // 会計データから実際のコストと収入を計算
       if (report.work_report_accounting && report.work_report_accounting.length > 0) {
@@ -240,13 +255,28 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
       if (vegetableData) {
         const costPerSqm = workData.totalCost / workData.plotSize
         const revenuePerSqm = workData.totalRevenue / workData.plotSize
+        
+        // 収穫量がある場合の単位当たりコスト計算
+        const costPerUnit = workData.harvestAmount > 0 ? workData.totalCost / workData.harvestAmount : 0
 
         vegetableData.works.push({
           ...workData,
           costPerSqm,
-          revenuePerSqm
+          revenuePerSqm,
+          costPerUnit
         })
+        
+        // 野菜全体の収穫量を累計
+        vegetableData.totalHarvestAmount += workData.harvestAmount
       }
+    })
+    
+    // 野菜全体の単位当たりコスト計算
+    vegetableMap.forEach(vegetableData => {
+      const totalCost = vegetableData.works.reduce((sum, w) => sum + w.totalCost, 0)
+      vegetableData.unitCostPerVegetable = vegetableData.totalHarvestAmount > 0 
+        ? totalCost / vegetableData.totalHarvestAmount 
+        : 0
     })
 
     // 作業がある野菜のみ返す
@@ -477,6 +507,15 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                             <span className="text-green-600">収入:</span>
                             <span className="font-bold ml-1">{formatCurrency(vegetableTotalRevenue)}</span>
                           </div>
+                          <div>
+                            <span className="text-blue-600">原価コスト:</span>
+                            <span className="font-bold ml-1">
+                              {vegetableData.totalHarvestAmount > 0 
+                                ? `${formatCurrency(vegetableData.unitCostPerVegetable)}/${vegetableData.harvestUnit}`
+                                : '--'
+                              }
+                            </span>
+                          </div>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           クリックで詳細を{isExpanded ? '非表示' : '表示'}
@@ -499,6 +538,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                               <th className="text-right p-3 font-medium text-gray-600">㎡単価</th>
                               <th className="text-right p-3 font-medium text-gray-600">収入</th>
                               <th className="text-right p-3 font-medium text-gray-600">㎡単価</th>
+                              <th className="text-right p-3 font-medium text-gray-600">原価コスト</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -523,6 +563,12 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                                 </td>
                                 <td className="text-right p-3 font-mono text-green-600 text-xs">
                                   {formatCurrency(work.revenuePerSqm)}/㎡
+                                </td>
+                                <td className="text-right p-3 font-mono text-blue-700 text-xs font-semibold">
+                                  {work.harvestAmount > 0 
+                                    ? `${formatCurrency(work.costPerUnit)}/${vegetableData.harvestUnit}`
+                                    : '--'
+                                  }
                                 </td>
                               </tr>
                             ))}

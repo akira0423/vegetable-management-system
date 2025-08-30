@@ -131,6 +131,7 @@ export interface Database {
           farm_plot_id?: string
           selected_cells_count?: number
           total_cultivation_area_sqm?: number
+          harvest_unit?: string // 収穫単位（kg、個、束等）
           created_by?: string
           created_at: string
           updated_at: string
@@ -155,6 +156,7 @@ export interface Database {
           farm_plot_id?: string
           selected_cells_count?: number
           total_cultivation_area_sqm?: number
+          harvest_unit?: string // 収穫単位（kg、個、束等）
           created_by?: string
           created_at?: string
           updated_at?: string

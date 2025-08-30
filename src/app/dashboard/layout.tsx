@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth'
-import DashboardSidebar from '@/components/dashboard/sidebar'
+import ResponsiveSidebar from '@/components/dashboard/responsive-sidebar'
 import DashboardHeader from '@/components/dashboard/header'
 import { ToastProvider } from '@/components/ui/toast'
 
@@ -14,11 +14,11 @@ export default async function DashboardLayout({
     <ToastProvider>
       <div className="h-screen bg-gray-50">
       <div className="flex h-full">
-        {/* Sidebar */}
-        <DashboardSidebar />
+        {/* Responsive Sidebar */}
+        <ResponsiveSidebar />
         
         {/* Main content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
           {/* Header */}
           <DashboardHeader user={user} />
           

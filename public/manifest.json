@@ -1,0 +1,205 @@
+{
+  "name": "AgriFinance Pro - 農業経営管理システム",
+  "short_name": "AgriFinance Pro",
+  "description": "プロフェッショナル農業経営管理システム - 作業記録、農薬管理、収支分析、JA出荷対応",
+  "version": "1.0.0",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#059669",
+  "background_color": "#f0fdf4",
+  "scope": "/",
+  "lang": "ja",
+  "dir": "ltr",
+  
+  "icons": [
+    {
+      "src": "/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-96x96.png", 
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-128x128.png",
+      "sizes": "128x128", 
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  
+  "shortcuts": [
+    {
+      "name": "作業記録",
+      "short_name": "作業記録",
+      "description": "農作業記録の追加",
+      "url": "/dashboard/gantt",
+      "icons": [
+        {
+          "src": "/shortcut-work.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "農薬記録", 
+      "short_name": "農薬記録",
+      "description": "農薬散布記録の追加",
+      "url": "/dashboard/pesticides",
+      "icons": [
+        {
+          "src": "/shortcut-pesticide.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "天気確認",
+      "short_name": "天気",
+      "description": "天気予報と農作業適性",
+      "url": "/dashboard/weather",
+      "icons": [
+        {
+          "src": "/shortcut-weather.png", 
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "JA帳票",
+      "short_name": "JA帳票",
+      "description": "JA出荷用記録帳票",
+      "url": "/dashboard/ja-reports",
+      "icons": [
+        {
+          "src": "/shortcut-report.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  
+  "categories": [
+    "agriculture",
+    "business", 
+    "productivity",
+    "finance",
+    "utilities"
+  ],
+  
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "農作業ガントチャート画面"
+    },
+    {
+      "src": "/screenshot-mobile-2.png", 
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "農薬使用記録画面"
+    },
+    {
+      "src": "/screenshot-desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png", 
+      "form_factor": "wide",
+      "label": "経営分析ダッシュボード"
+    }
+  ],
+  
+  "related_applications": [
+    {
+      "platform": "web",
+      "url": "https://agrifinance-pro.vercel.app",
+      "id": "agrifinance-pro-web"
+    }
+  ],
+  
+  "prefer_related_applications": false,
+  
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  
+  "handle_links": "preferred",
+  
+  "capture_links": "existing-client-navigate",
+  
+  "file_handlers": [
+    {
+      "action": "/dashboard/import",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/vnd.ms-excel": [".xls", ".xlsx"],
+        "application/json": [".json"]
+      }
+    }
+  ],
+  
+  "protocol_handlers": [
+    {
+      "protocol": "web+agrifinance",
+      "url": "/dashboard?action=%s"
+    }
+  ],
+  
+  "share_target": {
+    "action": "/dashboard/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "photos",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  }
+}
