@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,8 +20,6 @@ import {
   Trash2,
   Shield,
   Mail,
-  Phone,
-  MapPin,
   Clock,
   Activity,
   Crown,
@@ -30,7 +29,15 @@ import {
   RefreshCw,
   Download,
   Upload,
-  AlertTriangle
+  AlertTriangle,
+  Sprout,
+  TrendingUp,
+  DollarSign,
+  BarChart3,
+  Leaf,
+  PiggyBank,
+  Banknote,
+  Wallet
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -43,10 +50,6 @@ interface User {
   role: 'admin' | 'manager' | 'operator'
   is_active: boolean
   last_login_at?: string
-  profile_image_url?: string
-  phone?: string
-  department?: string
-  position?: string
   settings?: Record<string, any>
   created_at: string
   updated_at: string
@@ -65,46 +68,36 @@ interface UserFormData {
   email: string
   full_name: string
   role: 'admin' | 'manager' | 'operator'
-  phone?: string
-  department?: string
-  position?: string
   is_active: boolean
 }
 
 const USER_ROLES = [
   { 
     value: 'admin', 
-    label: '管理者', 
-    description: '全機能へのアクセス権限',
-    color: 'bg-red-100 text-red-800',
+    label: '農場管理責任者', 
+    description: '全機能・財務管理・意思決定',
+    color: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     icon: Crown
   },
   { 
     value: 'manager', 
-    label: 'マネージャー', 
-    description: '管理・レポート機能',
-    color: 'bg-blue-100 text-blue-800',
-    icon: UserCog
+    label: '農場マネージャー', 
+    description: '営農管理・収支分析・レポート',
+    color: 'bg-green-100 text-green-800 border-green-200',
+    icon: BarChart3
   },
   { 
     value: 'operator', 
-    label: 'オペレーター', 
-    description: '基本操作のみ',
-    color: 'bg-green-100 text-green-800',
-    icon: Users
+    label: '農場作業員', 
+    description: '日常作業・データ入力',
+    color: 'bg-amber-100 text-amber-800 border-amber-200',
+    icon: Sprout
   }
 ]
 
-const DEPARTMENTS = [
-  '栽培部',
-  '品質管理部',
-  '営業部',
-  '管理部',
-  '技術部',
-  'その他'
-]
 
 export default function UsersPage() {
+  const { user: currentUser, loading: authLoading } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -112,7 +105,6 @@ export default function UsersPage() {
   // フィルター・検索状態
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<string>('all')
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('name')
   
@@ -127,32 +119,54 @@ export default function UsersPage() {
     email: '',
     full_name: '',
     role: 'operator',
-    phone: '',
-    department: '',
-    position: '',
     is_active: true
   })
   const [formLoading, setFormLoading] = useState(false)
 
   useEffect(() => {
-    fetchUsers()
-  }, [])
+    if (currentUser?.company_id) {
+      fetchUsers()
+    }
+  }, [currentUser])
 
   const fetchUsers = async () => {
+    if (!currentUser?.company_id) {
+      console.error('Company ID not available')
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
-      // 会社IDは将来的に認証から取得
-      const companyId = 'a1111111-1111-1111-1111-111111111111'
+      // 認証されたユーザーの実際の会社IDを使用
+      const companyId = currentUser.company_id
       
-      const response = await fetch(`/api/users?company_id=${companyId}`)
+      const response = await fetch(`/api/users?company_id=${companyId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include' // 認証クッキーを含める
+      })
+      
       const result = await response.json()
 
-      if (result.success) {
+      if (response.ok && result.success) {
         setUsers(result.data)
       } else {
-        // APIエラーの場合はサンプルデータを使用
-        console.log('API エラー、サンプルデータを使用:', result.error)
-        loadSampleData()
+        console.error('API エラー:', result.error)
+        
+        if (response.status === 401) {
+          // 認証が必要
+          alert('ログインが必要です')
+          // ログインページにリダイレクト（実装時に追加）
+        } else if (response.status === 403) {
+          // 権限不足
+          alert('管理者権限が必要です')
+        } else {
+          // その他のエラー - サンプルデータを使用
+          console.log('サンプルデータを使用します')
+          loadSampleData()
+        }
       }
     } catch (error) {
       console.error('データ取得エラー:', error)
@@ -171,10 +185,6 @@ export default function UsersPage() {
         role: 'admin',
         is_active: true,
         last_login_at: '2024-08-09T09:30:00Z',
-        profile_image_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-        phone: '090-1234-5678',
-        department: '管理部',
-        position: '部長',
         created_at: '2024-01-15T00:00:00Z',
         updated_at: '2024-08-09T09:30:00Z',
         activity_stats: {
@@ -190,10 +200,6 @@ export default function UsersPage() {
         role: 'manager',
         is_active: true,
         last_login_at: '2024-08-08T16:45:00Z',
-        profile_image_url: 'https://images.unsplash.com/photo-1494790108755-2616b612b3d4?w=150&h=150&fit=crop&crop=face',
-        phone: '090-2345-6789',
-        department: '栽培部',
-        position: '課長',
         created_at: '2024-02-20T00:00:00Z',
         updated_at: '2024-08-08T16:45:00Z',
         activity_stats: {
@@ -209,10 +215,6 @@ export default function UsersPage() {
         role: 'operator',
         is_active: true,
         last_login_at: '2024-08-07T14:20:00Z',
-        profile_image_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        phone: '090-3456-7890',
-        department: '栽培部',
-        position: '作業員',
         created_at: '2024-03-10T00:00:00Z',
         updated_at: '2024-08-07T14:20:00Z',
         activity_stats: {
@@ -228,10 +230,6 @@ export default function UsersPage() {
         role: 'operator',
         is_active: false,
         last_login_at: '2024-07-15T10:30:00Z',
-        profile_image_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-        phone: '090-4567-8901',
-        department: '品質管理部',
-        position: '検査員',
         created_at: '2024-04-05T00:00:00Z',
         updated_at: '2024-07-15T10:30:00Z',
         activity_stats: {
@@ -247,9 +245,6 @@ export default function UsersPage() {
         role: 'operator',
         is_active: true,
         last_login_at: null,
-        phone: '090-5678-9012',
-        department: '栽培部',
-        position: '新人作業員',
         created_at: '2024-08-01T00:00:00Z',
         updated_at: '2024-08-01T00:00:00Z',
         activity_stats: {
@@ -277,10 +272,8 @@ export default function UsersPage() {
         const query = searchQuery.toLowerCase()
         const matchesName = user.full_name?.toLowerCase().includes(query)
         const matchesEmail = user.email.toLowerCase().includes(query)
-        const matchesDepartment = user.department?.toLowerCase().includes(query)
-        const matchesPosition = user.position?.toLowerCase().includes(query)
         
-        if (!matchesName && !matchesEmail && !matchesDepartment && !matchesPosition) {
+        if (!matchesName && !matchesEmail) {
           return false
         }
       }
@@ -290,10 +283,6 @@ export default function UsersPage() {
         return false
       }
       
-      // 部署フィルター
-      if (selectedDepartment !== 'all' && user.department !== selectedDepartment) {
-        return false
-      }
       
       // ステータスフィルター
       if (selectedStatus !== 'all') {
@@ -328,9 +317,6 @@ export default function UsersPage() {
       email: '',
       full_name: '',
       role: 'operator',
-      phone: '',
-      department: '',
-      position: '',
       is_active: true
     })
   }
@@ -345,7 +331,7 @@ export default function UsersPage() {
         },
         body: JSON.stringify({
           ...formData,
-          company_id: 'a1111111-1111-1111-1111-111111111111'
+          company_id: currentUser?.company_id
         })
       })
 
@@ -463,9 +449,6 @@ export default function UsersPage() {
       email: user.email,
       full_name: user.full_name || '',
       role: user.role,
-      phone: user.phone || '',
-      department: user.department || '',
-      position: user.position || '',
       is_active: user.is_active
     })
     setShowEditModal(true)
@@ -492,15 +475,39 @@ export default function UsersPage() {
     return { status: 'inactive', label: '非アクティブ', color: 'bg-yellow-100 text-yellow-800' }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded-lg"></div>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 p-6">
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center">
+                  <Sprout className="w-8 h-8 text-white animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-8 bg-green-200 rounded-lg w-48 mb-2 animate-pulse"></div>
+                  <div className="h-4 bg-green-100 rounded w-64 animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
+                <div className="animate-pulse">
+                  <div className="h-8 bg-green-200 rounded w-16 mb-2"></div>
+                  <div className="h-4 bg-green-100 rounded w-24"></div>
+                </div>
+              </div>
             ))}
+          </div>
+          <div className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-green-50 rounded-xl animate-pulse"></div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -508,46 +515,72 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* ヘッダー */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">ユーザー管理</h1>
-          <p className="text-gray-600">
-            企業内ユーザーの管理・権限設定 • {filteredAndSortedUsers.length}名のユーザー
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+      <div className="space-y-6 p-6">
+        {/* ヘッダー */}
+        <div className="bg-white rounded-2xl shadow-lg border border-green-100 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg">
+                <Users className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-green-800 to-emerald-700 bg-clip-text text-transparent">
+                  農場メンバー管理
+                </h1>
+                <p className="text-green-600 font-medium">
+                  <Sprout className="w-4 h-4 inline mr-2" />
+                  農場スタッフの権限・役割管理 • {filteredAndSortedUsers.length}名のメンバー
+                  <Wallet className="w-4 h-4 inline ml-4 mr-2" />
+                  収支管理・営農分析
+                </p>
+              </div>
+            </div>
         
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            更新
-          </Button>
-          
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            CSVエクスポート
-          </Button>
-          
-          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={resetForm}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                新規ユーザー
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="border-green-200 text-green-700 hover:bg-green-50 shadow-sm"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                更新
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>新規ユーザー作成</DialogTitle>
-                <DialogDescription>
-                  新しいユーザーアカウントを作成します
-                </DialogDescription>
-              </DialogHeader>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                <BarChart3 className="w-4 h-4 mr-1" />
+                メンバー分析
+              </Button>
+          
+              <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    onClick={resetForm}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg border-0"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    <Sprout className="w-4 h-4 mr-2" />
+                    新メンバー追加
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl bg-white rounded-2xl border border-green-100 shadow-2xl">
+                  <DialogHeader className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-2xl p-6 border-b border-green-100">
+                    <DialogTitle className="text-xl font-bold text-green-800 flex items-center gap-2">
+                      <Sprout className="w-6 h-6 text-green-600" />
+                      新メンバー追加
+                    </DialogTitle>
+                    <DialogDescription className="text-green-600">
+                      農場に新しいメンバーを追加して、招待メールを送信します
+                    </DialogDescription>
+                  </DialogHeader>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -601,43 +634,6 @@ export default function UsersPage() {
                   </Select>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label>電話番号</Label>
-                  <Input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="090-1234-5678"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>部署</Label>
-                  <Select 
-                    value={formData.department} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="部署を選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map(dept => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>役職</Label>
-                  <Input
-                    value={formData.position}
-                    onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                    placeholder="部長、課長、主任など"
-                  />
-                </div>
               </div>
               
               <div className="flex items-center gap-2 mt-4">
@@ -666,129 +662,209 @@ export default function UsersPage() {
                   {formLoading ? '作成中...' : 'ユーザーを作成'}
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* 統計サマリー */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{users.filter(u => u.is_active).length}</div>
-            <div className="text-sm text-gray-600">アクティブユーザー</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{users.filter(u => u.role === 'admin').length}</div>
-            <div className="text-sm text-gray-600">管理者</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">{users.filter(u => !u.last_login_at).length}</div>
-            <div className="text-sm text-gray-600">未ログイン</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-600">{users.length}</div>
-            <div className="text-sm text-gray-600">総ユーザー数</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* フィルター・検索バー */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <Filter className="w-5 h-5 mr-2" />
-            フィルター・検索
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label>検索</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="名前・メール・部署で検索"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>権限</Label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべて</SelectItem>
-                  {USER_ROLES.map(role => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>部署</Label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべて</SelectItem>
-                  {DEPARTMENTS.map(dept => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>ステータス</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべて</SelectItem>
-                  <SelectItem value="active">アクティブ</SelectItem>
-                  <SelectItem value="inactive">非アクティブ</SelectItem>
-                  <SelectItem value="never_logged_in">未ログイン</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>並び順</Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">名前順</SelectItem>
-                  <SelectItem value="email">メール順</SelectItem>
-                  <SelectItem value="role">権限順</SelectItem>
-                  <SelectItem value="last_login">最終ログイン順</SelectItem>
-                  <SelectItem value="created">作成日順</SelectItem>
-                </SelectContent>
-              </Select>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* 農場メンバー統計 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-emerald-700">{users.filter(u => u.is_active).length}</div>
+                  <div className="text-sm text-emerald-600 font-medium flex items-center mt-1">
+                    <Activity className="w-4 h-4 mr-1" />
+                    稼働中メンバー
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Sprout className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-green-700">{users.filter(u => u.role === 'admin').length}</div>
+                  <div className="text-sm text-green-600 font-medium flex items-center mt-1">
+                    <Crown className="w-4 h-4 mr-1" />
+                    管理責任者
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-100 border-amber-200 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-amber-700">{users.filter(u => !u.last_login_at).length}</div>
+                  <div className="text-sm text-amber-600 font-medium flex items-center mt-1">
+                    <AlertTriangle className="w-4 h-4 mr-1" />
+                    未アクセス
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-teal-50 to-cyan-100 border-teal-200 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold text-teal-700">{users.length}</div>
+                  <div className="text-sm text-teal-600 font-medium flex items-center mt-1">
+                    <Users className="w-4 h-4 mr-1" />
+                    総メンバー数
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <PiggyBank className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* メンバー検索・フィルター */}
+        <Card className="bg-white shadow-lg border border-green-100 rounded-2xl">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-2xl border-b border-green-100">
+            <CardTitle className="text-lg flex items-center text-green-800">
+              <Search className="w-5 h-5 mr-3 text-green-600" />
+              <Leaf className="w-4 h-4 mr-2 text-green-500" />
+              メンバー検索・フィルター
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label className="text-green-700 font-medium">メンバー検索</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-green-400" />
+                  <Input
+                    placeholder="名前・メールで検索"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 border-green-200 focus:border-green-400 focus:ring-green-400"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-green-700 font-medium flex items-center">
+                  <Shield className="w-4 h-4 mr-1 text-green-500" />
+                  役割・権限
+                </Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="border-green-200 focus:border-green-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">すべての役割</SelectItem>
+                    {USER_ROLES.map(role => (
+                      <SelectItem key={role.value} value={role.value}>
+                        <div className="flex items-center gap-2">
+                          <Sprout className="w-4 h-4 text-green-500" />
+                          {role.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-green-700 font-medium flex items-center">
+                  <Activity className="w-4 h-4 mr-1 text-green-500" />
+                  稼働状況
+                </Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="border-green-200 focus:border-green-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">すべての状況</SelectItem>
+                    <SelectItem value="active">
+                      <div className="flex items-center gap-2">
+                        <Sprout className="w-4 h-4 text-green-500" />
+                        稼働中
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="inactive">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-amber-500" />
+                        休止中
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="never_logged_in">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        未アクセス
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-green-700 font-medium flex items-center">
+                  <BarChart3 className="w-4 h-4 mr-1 text-green-500" />
+                  並び順
+                </Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="border-green-200 focus:border-green-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-green-500" />
+                        名前順
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="email">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-green-500" />
+                        メール順
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="role">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-green-500" />
+                        権限順
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="last_login">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-green-500" />
+                        最終アクセス順
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="created">
+                      <div className="flex items-center gap-2">
+                        <Sprout className="w-4 h-4 text-green-500" />
+                        参加日順
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* ユーザー一覧 */}
       {filteredAndSortedUsers.length === 0 ? (
@@ -824,20 +900,8 @@ export default function UsersPage() {
                     {/* ユーザー基本情報 */}
                     <div className="flex items-center gap-4">
                       <div className="relative">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200">
-                          {user.profile_image_url ? (
-                            <Image
-                              src={user.profile_image_url}
-                              alt={user.full_name || user.email}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-300">
-                              <Users className="w-6 h-6 text-gray-600" />
-                            </div>
-                          )}
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center">
+                          <Users className="w-6 h-6 text-gray-600" />
                         </div>
                         {!user.is_active && (
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
@@ -867,20 +931,6 @@ export default function UsersPage() {
                             {user.email}
                           </div>
                           
-                          {user.department && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-4 h-4" />
-                              {user.department}
-                              {user.position && ` • ${user.position}`}
-                            </div>
-                          )}
-                          
-                          {user.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-4 h-4" />
-                              {user.phone}
-                            </div>
-                          )}
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
@@ -1012,41 +1062,6 @@ export default function UsersPage() {
               </Select>
             </div>
             
-            <div className="space-y-2">
-              <Label>電話番号</Label>
-              <Input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>部署</Label>
-              <Select 
-                value={formData.department} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="部署を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEPARTMENTS.map(dept => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>役職</Label>
-              <Input
-                value={formData.position}
-                onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-              />
-            </div>
           </div>
           
           <div className="flex items-center gap-2 mt-4">
@@ -1084,20 +1099,8 @@ export default function UsersPage() {
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
-                  {selectedUser.profile_image_url ? (
-                    <Image
-                      src={selectedUser.profile_image_url}
-                      alt={selectedUser.full_name || selectedUser.email}
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-300">
-                      <Users className="w-4 h-4 text-gray-600" />
-                    </div>
-                  )}
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-gray-600" />
                 </div>
                 {selectedUser.full_name || selectedUser.email}
               </DialogTitle>
@@ -1128,24 +1131,6 @@ export default function UsersPage() {
                         {selectedUser.is_active ? 'アクティブ' : '非アクティブ'}
                       </Badge>
                     </div>
-                    {selectedUser.phone && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">電話:</span>
-                        <span>{selectedUser.phone}</span>
-                      </div>
-                    )}
-                    {selectedUser.department && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">部署:</span>
-                        <span>{selectedUser.department}</span>
-                      </div>
-                    )}
-                    {selectedUser.position && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">役職:</span>
-                        <span>{selectedUser.position}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">登録日:</span>
                       <span>{format(parseISO(selectedUser.created_at), 'yyyy/MM/dd', { locale: ja })}</span>
@@ -1242,6 +1227,7 @@ export default function UsersPage() {
           </DialogContent>
         </Dialog>
       )}
+      </div>
     </div>
   )
 }

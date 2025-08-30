@@ -8,7 +8,6 @@ import {
   Calendar,
   FileText,
   BarChart3,
-  Settings,
   Users,
   Camera
 } from 'lucide-react'
@@ -33,11 +32,6 @@ const navigation = [
     name: 'ユーザー管理',
     href: '/dashboard/users',
     icon: Users,
-  },
-  {
-    name: '設定',
-    href: '/dashboard/settings',
-    icon: Settings,
   },
 ]
 

@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { analyticsDataSync } from '@/lib/analytics-data-sync'
+import { accountingAnalyticsProcessor } from '@/lib/accounting-analytics-processor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   BarChart3,
@@ -27,10 +29,21 @@ import {
   Award,
   AlertTriangle,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Microscope,
+  Network,
+  CheckCircle,
+  Info,
+  FileText,
+  Brain
 } from 'lucide-react'
 import DataExportDialog from '@/components/data-export-dialog'
 import MonthlyCashflowChart from '@/components/charts/monthly-cashflow-chart'
+import MonthlyWorkHoursChart from '@/components/charts/monthly-workhours-chart'
+import SoilHealthROIChart from '@/components/charts/soil-health-roi-chart'
+import SoilDetailChart from '@/components/charts/soil-detail-chart'
+import FinancialPerformanceChart from '@/components/charts/financial-performance-chart'
+import WorkTypeAnalysisReport from '@/components/work-type-analysis-report'
 
 // チャートコンポーネント（シンプルなCSS実装）
 interface ChartData {
@@ -123,10 +136,17 @@ interface AnalyticsData {
     total_cost: number
     profit_margin: number
     total_harvest: number
+    total_work_hours: number
     avg_yield_per_sqm: number
     active_plots: number
     completed_harvests: number
     efficiency_score: number
+  }
+  dataQuality?: {
+    incomeSource: 'accounting' | 'estimated' | 'none'
+    expenseSource: 'accounting' | 'estimated' | 'none'
+    reliability: 'high' | 'medium' | 'low'
+    accountingCoverage?: number
   }
   harvest_analysis: ChartData[]
   cost_analysis: ChartData[]
@@ -174,6 +194,7 @@ export default function AnalyticsPage() {
       total_cost: 780000,
       profit_margin: 37.6,
       total_harvest: 2840,
+      total_work_hours: 456.5,
       avg_yield_per_sqm: 8.5,
       active_plots: 12,
       completed_harvests: 8,
@@ -452,9 +473,23 @@ export default function AnalyticsPage() {
         フィルター後野菜数: filteredVegetables.length
       })
 
-      // 作業レポートから分析データを生成
+      // 作業レポートから分析データを生成（直近12カ月データ）
       if (filteredWorkReports.length > 0 || filteredVegetables.length > 0) {
-        const analyticsFromReports = generateDetailedAnalyticsFromReports(filteredWorkReports, filteredVegetables)
+        // 直近12カ月のデータでフィルタリング
+        const twelveMonthsAgo = new Date()
+        twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+        const last12MonthsReports = filteredWorkReports.filter((report: any) => {
+          const reportDate = new Date(report.work_date)
+          return reportDate >= twelveMonthsAgo
+        })
+        
+        console.log('📅 直近12カ月データフィルタリング:', {
+          total_reports: filteredWorkReports.length,
+          last_12_months: last12MonthsReports.length,
+          period: `${twelveMonthsAgo.toLocaleDateString('ja-JP')} ~ ${new Date().toLocaleDateString('ja-JP')}`
+        })
+        
+        const analyticsFromReports = generateDetailedAnalyticsFromReports(last12MonthsReports, filteredVegetables)
         const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
         setData(mergedData)
       } else {
@@ -473,7 +508,7 @@ export default function AnalyticsPage() {
     }
   }
 
-  // 作業レポートから詳細分析データを生成
+  // 作業レポートから詳細分析データを生成（会計データ統合版）
   const generateDetailedAnalyticsFromReports = (reports: any[], vegetables: any[]) => {
     // 実際のデータのみを使用（サンプルデータは使用しない）
     if (!reports || reports.length === 0) {
@@ -486,10 +521,18 @@ export default function AnalyticsPage() {
         totalRevenue: 0,
         totalCost: 0,
         totalHarvest: 0,
+        totalWorkHours: 0,
         profitMargin: 0,
-        recentActivities: []
+        recentActivities: [],
+        dataQuality: {
+          incomeSource: 'none',
+          expenseSource: 'none',
+          reliability: 'low'
+        }
       }
     }
+
+    console.log('🔍 Analytics: 会計統合データ処理開始', { reportCount: reports.length })
 
     // 月別収穫量データ生成（年跨ぎ対応）
     const harvestByMonth = reports
@@ -502,24 +545,68 @@ export default function AnalyticsPage() {
         return acc
       }, {})
 
-    // 作業種別コスト分析データ生成
-    const costByType = reports
-      .filter(r => r.estimated_cost)
-      .reduce((acc: any, report) => {
-        const typeLabels: any = {
-          seeding: '種苗費',
-          planting: '定植費',
-          fertilizing: '肥料費',
-          watering: '灌水費',
-          weeding: '除草費',
-          pruning: '整枝費',
-          harvesting: '収穫費',
-          other: 'その他'
-        }
-        const label = typeLabels[report.work_type] || 'その他'
-        acc[label] = (acc[label] || 0) + report.estimated_cost
-        return acc
-      }, {})
+    // 会計データ統合を使用したコスト分析
+    const costByType: {[key: string]: number} = {}
+    let totalActualRevenue = 0
+    let totalActualCost = 0
+    let totalEstimatedRevenue = 0
+    let totalEstimatedCost = 0
+    let revenueFromAccounting = 0
+    let expenseFromAccounting = 0
+
+    reports.forEach(report => {
+      // 会計統合プロセッサーを使用してデータ取得
+      const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
+      const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
+      
+      // 収入データの集計
+      if (incomeData.source === 'accounting') {
+        totalActualRevenue += incomeData.amount
+        revenueFromAccounting += incomeData.amount
+      } else {
+        totalEstimatedRevenue += incomeData.amount
+      }
+
+      // 支出データの集計
+      if (costData.source === 'accounting') {
+        totalActualCost += costData.amount
+        expenseFromAccounting += costData.amount
+      } else {
+        totalEstimatedCost += costData.amount
+      }
+
+      // 作業種別コスト分類
+      const typeLabels: any = {
+        seeding: '種苗費',
+        planting: '定植費',
+        fertilizing: '肥料費',
+        watering: '灌水費',
+        weeding: '除草費',
+        pruning: '整枝費',
+        harvesting: '収穫費',
+        other: 'その他'
+      }
+      const label = typeLabels[report.work_type] || 'その他'
+      costByType[label] = (costByType[label] || 0) + costData.amount
+    })
+
+    // データ品質メトリクス
+    const dataQuality = {
+      incomeSource: revenueFromAccounting > totalEstimatedRevenue ? 'accounting' : 'estimated',
+      expenseSource: expenseFromAccounting > totalEstimatedCost ? 'accounting' : 'estimated',
+      reliability: revenueFromAccounting > 0 && expenseFromAccounting > 0 ? 'high' : 
+                   revenueFromAccounting > 0 || expenseFromAccounting > 0 ? 'medium' : 'low',
+      accountingCoverage: reports.length > 0 ? 
+        (reports.filter(r => r.work_report_accounting && r.work_report_accounting.length > 0).length / reports.length) * 100 : 0
+    }
+
+    console.log('💰 Analytics: 会計データ統合結果', {
+      totalActualRevenue,
+      totalActualCost,
+      totalEstimatedRevenue,
+      totalEstimatedCost,
+      dataQuality
+    })
 
     // 作業種別频度分析
     const workFrequency = reports.reduce((acc: any, report) => {
@@ -538,15 +625,20 @@ export default function AnalyticsPage() {
       return acc
     }, {})
 
-    // 野菜別パフォーマンス分析
+    // 野菜別パフォーマンス分析（会計データ統合）
     const vegetablePerformance = vegetables.map((veg: any) => {
       const vegReports = reports.filter(r => r.vegetable_id === veg.id)
-      const totalRevenue = vegReports
-        .filter(r => r.expected_revenue)
-        .reduce((sum, r) => sum + r.expected_revenue, 0)
-      const totalCost = vegReports
-        .filter(r => r.estimated_cost)
-        .reduce((sum, r) => sum + r.estimated_cost, 0)
+      
+      let totalRevenue = 0
+      let totalCost = 0
+      
+      vegReports.forEach(report => {
+        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
+        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
+        totalRevenue += incomeData.amount
+        totalCost += costData.amount
+      })
+
       const totalHarvest = vegReports
         .filter(r => r.harvest_amount)
         .reduce((sum, r) => sum + r.harvest_amount, 0)
@@ -560,35 +652,37 @@ export default function AnalyticsPage() {
       else if (roi < 50) status = 'poor'
       
       return {
-        name: veg.name.split('（')[0] || veg.name, // 名前だけを抽出
+        name: veg.name.split('（')[0] || veg.name,
         variety: veg.variety || veg.name.match(/（(.+?)）/)?.[1] || '',
-        plot_size: 100, // デフォルト値
+        plot_size: 100,
         harvest_amount: totalHarvest,
         revenue: totalRevenue,
         cost: totalCost,
         profit: profit,
-        yield_per_sqm: totalHarvest / 100, // 100㎡あたり
+        yield_per_sqm: totalHarvest / 100,
         roi: roi,
         status: status
       }
     })
 
-    // 売上・コスト・収穫総計
-    const totalRevenue = reports
-      .filter(r => r.expected_revenue)
-      .reduce((sum, report) => sum + report.expected_revenue, 0)
-
-    const totalCost = reports
-      .filter(r => r.estimated_cost)
-      .reduce((sum, report) => sum + report.estimated_cost, 0)
+    // 総計算（実績データを優先）
+    const totalRevenue = totalActualRevenue + totalEstimatedRevenue
+    const totalCost = totalActualCost + totalEstimatedCost
 
     const totalHarvest = reports
       .filter(r => r.harvest_amount)
       .reduce((sum, report) => sum + report.harvest_amount, 0)
 
-    // 最近のアクティビティ生成
+    // 総作業時間の計算（duration_hours または推定2時間）
+    const totalWorkHours = reports
+      .reduce((sum, report) => {
+        const hours = report.duration_hours || report.work_hours || 2
+        return sum + hours
+      }, 0)
+
+    // 最近のアクティビティ生成（会計データ情報付き）
     const recentActivities = reports
-      .slice(-5) // 最新5件
+      .slice(-5)
       .map((report, index) => {
         const vegetableName = vegetables.find(v => v.id === report.vegetable_id)?.name || '未知の野菜'
         const workTypeNames: any = {
@@ -602,16 +696,19 @@ export default function AnalyticsPage() {
         }
         const workTypeName = workTypeNames[report.work_type] || report.work_type
         
+        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
+        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
+        
         return {
           id: report.id || `act_${index}`,
           type: report.work_type === 'harvesting' ? 'harvest' as const : 'cost' as const,
           title: `${vegetableName}の${workTypeName}作業`,
-          description: report.work_notes || `${workTypeName}作業を実施しました`,
-          value: report.expected_revenue || report.estimated_cost || report.harvest_amount,
+          description: `${report.description || workTypeName + '作業を実施'}（${costData.badge}データ）`,
+          value: report.work_type === 'harvesting' ? incomeData.amount : costData.amount,
           timestamp: new Date(report.work_date).toISOString()
         }
       })
-      .reverse() // 最新順に並び替え
+      .reverse()
 
     return {
       harvestByMonth,
@@ -621,8 +718,10 @@ export default function AnalyticsPage() {
       totalRevenue,
       totalCost,
       totalHarvest,
+      totalWorkHours,
       profitMargin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
-      recentActivities
+      recentActivities,
+      dataQuality
     }
   }
 
@@ -664,6 +763,7 @@ export default function AnalyticsPage() {
       total_cost: Math.round(reportsData.totalCost || baseData.summary.total_cost),
       profit_margin: Math.round((reportsData.profitMargin || baseData.summary.profit_margin) * 10) / 10,
       total_harvest: Math.round((reportsData.totalHarvest || baseData.summary.total_harvest) * 10) / 10,
+      total_work_hours: Math.round((reportsData.totalWorkHours || 0) * 10) / 10, // 総作業時間を追加
       avg_yield_per_sqm: reportsData.totalHarvest 
         ? Math.round((reportsData.totalHarvest / 300) * 10) / 10 // 300㎡あたりの平均
         : baseData.summary.avg_yield_per_sqm,
@@ -675,6 +775,7 @@ export default function AnalyticsPage() {
     return {
       ...baseData,
       summary: updatedSummary,
+      dataQuality: reportsData.dataQuality || baseData.dataQuality,
       harvest_analysis: updatedHarvestAnalysis,
       cost_analysis: updatedCostAnalysis,
       vegetable_performance: reportsData.vegetablePerformance && reportsData.vegetablePerformance.length > 0
@@ -819,67 +920,187 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* サマリーカード */}
+      {/* 金融×農業デザインのKPIカード（直近12カ月）with データ品質インジケーター */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">売上高</p>
-                <p className="text-2xl font-bold">{formatCurrency(data.summary.total_revenue)}</p>
-                <p className="text-xs text-green-600 flex items-center mt-1">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-emerald-700 font-medium">総収入（直近12カ月）</p>
+                  {data.dataQuality?.incomeSource === 'accounting' && (
+                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
+                  )}
+                  {data.dataQuality?.incomeSource === 'estimated' && (
+                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
+                  )}
+                </div>
+                <p className="text-2xl font-bold text-emerald-900">{formatCurrency(data.summary.total_revenue)}</p>
+                <p className="text-xs text-emerald-600 flex items-center mt-2">
                   <TrendingUp className="w-3 h-3 mr-1" />
-                  前期比 +15.2%
+                  {data.dataQuality?.incomeSource === 'accounting' ? '会計連携済' : 'ハーベスト推定'}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-green-600" />
+              <div className="relative">
+                <DollarSign className="w-10 h-10 text-emerald-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">¥</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <Sprout className="w-20 h-20 text-green-800" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-red-50 to-orange-100 border-red-200">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">利益率</p>
-                <p className="text-2xl font-bold">{formatNumber(data.summary.profit_margin)}%</p>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  前期比 +2.3%
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-red-700 font-medium">総支出（直近12カ月）</p>
+                  {data.dataQuality?.expenseSource === 'accounting' && (
+                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
+                  )}
+                  {data.dataQuality?.expenseSource === 'estimated' && (
+                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
+                  )}
+                </div>
+                <p className="text-2xl font-bold text-red-900">{formatCurrency(data.summary.total_cost)}</p>
+                <p className="text-xs text-red-600 flex items-center mt-2">
+                  <TrendingDown className="w-3 h-3 mr-1" />
+                  {data.dataQuality?.expenseSource === 'accounting' ? '会計連携済' : '作業時間推定'}
                 </p>
               </div>
-              <Target className="w-8 h-8 text-blue-600" />
+              <div className="relative">
+                <DollarSign className="w-10 h-10 text-red-600 opacity-90 transform rotate-180" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">-</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <Target className="w-20 h-20 text-red-800" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-100 border-blue-200">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">総収穫量</p>
-                <p className="text-2xl font-bold">{formatNumber(data.summary.total_harvest, 0)}kg</p>
-                <p className="text-xs text-gray-600 mt-1">
+              <div className="relative z-10">
+                <p className="text-sm text-blue-700 font-medium mb-2">総収穫量（直近12カ月）</p>
+                <p className="text-2xl font-bold text-blue-900">{formatNumber(data.summary.total_harvest, 0)}kg</p>
+                <p className="text-xs text-blue-600 flex items-center mt-2">
+                  <Sprout className="w-3 h-3 mr-1" />
                   平均 {formatNumber(data.summary.avg_yield_per_sqm)}kg/㎡
                 </p>
               </div>
-              <Sprout className="w-8 h-8 text-green-600" />
+              <div className="relative">
+                <Sprout className="w-10 h-10 text-blue-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">kg</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <Award className="w-20 h-20 text-blue-800" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">効率スコア</p>
-                <p className="text-2xl font-bold">{data.summary.efficiency_score}</p>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  前期比 +4pts
+              <div className="relative z-10">
+                <p className="text-sm text-amber-700 font-medium mb-2">総作業時間（直近12カ月）</p>
+                <p className="text-2xl font-bold text-amber-900">{formatNumber(data.summary.total_work_hours, 1)}h</p>
+                <p className="text-xs text-amber-600 flex items-center mt-2">
+                  <Clock className="w-3 h-3 mr-1" />
+                  効率性重視
                 </p>
               </div>
-              <Zap className="w-8 h-8 text-yellow-600" />
+              <div className="relative">
+                <Clock className="w-10 h-10 text-amber-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">h</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <Activity className="w-20 h-20 text-amber-800" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 🌱 土壌健康度・ROIサマリーカード */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* 土壌健康度アラート */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-teal-100 border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-green-700 font-medium">🌱 土壌健康度アラート</p>
+                  <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">統合分析</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-green-900">健康度平均: 78.5点</span>
+                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div className="bg-green-500 h-2 rounded-full" style={{width: '78.5%'}}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 flex items-center mt-2">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    緊急対応: 2圃場 | 今月推奨改善: 4圃場
+                  </p>
+                </div>
+              </div>
+              <div className="relative">
+                <Sprout className="w-10 h-10 text-green-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">pH</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <Target className="w-20 h-20 text-green-800" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ROIサマリー */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-100 border-purple-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-purple-700 font-medium">💰 土壌投資ROIサマリー</p>
+                  <Badge className="text-xs bg-purple-500 text-white px-2 py-0.5">投資効果</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-purple-900">平均ROI: 127.3%</span>
+                    <TrendingUp className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <p className="text-xs text-purple-600 flex items-center mt-2">
+                    <Award className="w-3 h-3 mr-1" />
+                    最高ROI圃場: 圃場A (184%) | 投資推奨度: 高
+                  </p>
+                </div>
+              </div>
+              <div className="relative">
+                <DollarSign className="w-10 h-10 text-purple-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">%</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10">
+              <TrendingUp className="w-20 h-20 text-purple-800" />
             </div>
           </CardContent>
         </Card>
@@ -887,9 +1108,10 @@ export default function AnalyticsPage() {
 
       {/* メインコンテンツタブ */}
       <Tabs defaultValue="performance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="performance">パフォーマンス</TabsTrigger>
           <TabsTrigger value="worklog-cost">作業・コスト分析</TabsTrigger>
+          <TabsTrigger value="soil-detail">土壌詳細分析</TabsTrigger>
           <TabsTrigger value="harvest-revenue">収穫・収益分析</TabsTrigger>
           <TabsTrigger value="simulation">シミュレーション</TabsTrigger>
         </TabsList>
@@ -899,48 +1121,11 @@ export default function AnalyticsPage() {
           {/* 月次キャッシュフロー推移グラフ */}
           <MonthlyCashflowChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
           
-          {/* パフォーマンスサマリー */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-r from-green-50 to-green-100">
-              <CardContent className="p-4 text-center">
-                <Award className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                <div className="text-2xl font-bold text-green-700">
-                  {data.vegetable_performance.filter(v => v.status === 'excellent').length}
-                </div>
-                <div className="text-sm text-gray-600">優秀野菜</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-blue-50 to-blue-100">
-              <CardContent className="p-4 text-center">
-                <TrendingUp className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                <div className="text-2xl font-bold text-blue-700">
-                  {formatNumber(data.vegetable_performance.reduce((avg, v) => avg + v.roi, 0) / data.vegetable_performance.length)}%
-                </div>
-                <div className="text-sm text-gray-600">平均ROI</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-yellow-50 to-yellow-100">
-              <CardContent className="p-4 text-center">
-                <DollarSign className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
-                <div className="text-2xl font-bold text-yellow-700">
-                  {formatCurrency(data.vegetable_performance.reduce((sum, v) => sum + v.profit, 0))}
-                </div>
-                <div className="text-sm text-gray-600">総利益</div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-r from-purple-50 to-purple-100">
-              <CardContent className="p-4 text-center">
-                <Sprout className="w-8 h-8 mx-auto mb-2 text-purple-600" />
-                <div className="text-2xl font-bold text-purple-700">
-                  {formatNumber(data.vegetable_performance.reduce((sum, v) => sum + v.harvest_amount, 0), 0)}kg
-                </div>
-                <div className="text-sm text-gray-600">総収穫量</div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* 収支構造×効率性×成長分析チャート */}
+          <FinancialPerformanceChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          
+          {/* AI的洞察機能付き作業種類別統合レポート */}
+          <WorkTypeAnalysisReport companyId={companyId || ''} selectedVegetable={selectedVegetable} />
           
           {/* 最近のアクティビティ */}
           <Card>
@@ -1002,120 +1187,13 @@ export default function AnalyticsPage() {
 
         {/* 作業・コスト分析タブ */}
         <TabsContent value="worklog-cost" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 作業種別頻度 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5" />
-                  作業種別分析
-                </CardTitle>
-                <CardDescription>各作業の実行回数と頻度</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimpleBarChart 
-                  data={data.work_frequency && data.work_frequency.length > 0 ? data.work_frequency : []} 
-                  height={250} 
-                  title="作業回数（件）"
-                />
-              </CardContent>
-            </Card>
+          {/* AI予測作業時間分析チャート */}
+          <MonthlyWorkHoursChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          
+          {/* 土壌健康度×ROI統合分析チャート */}
+          <SoilHealthROIChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          
 
-            {/* コスト効率分析 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  作業コスト効率
-                </CardTitle>
-                <CardDescription>作業種類別のコスト効率比較</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                    <span className="text-gray-700">収穫作業</span>
-                    <div className="text-right">
-                      <div className="font-bold text-green-700">¥125/時間</div>
-                      <div className="text-xs text-gray-500">最高効率</div>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                    <span className="text-gray-700">施肥作業</span>
-                    <div className="text-right">
-                      <div className="font-bold text-blue-700">¥98/時間</div>
-                      <div className="text-xs text-gray-500">良好</div>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                    <span className="text-gray-700">除草作業</span>
-                    <div className="text-right">
-                      <div className="font-bold text-yellow-700">¥78/時間</div>
-                      <div className="text-xs text-gray-500">要改善</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 作業パターン分析 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                作業パターン分析
-              </CardTitle>
-              <CardDescription>月別・作業種類別の詳細データ</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">作業種類</th>
-                      <th className="text-right p-2">実行回数</th>
-                      <th className="text-right p-2">平均時間</th>
-                      <th className="text-right p-2">総コスト</th>
-                      <th className="text-right p-2">効率スコア</th>
-                      <th className="text-center p-2">傾向</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="p-2 font-medium">収穫作業</td>
-                      <td className="text-right p-2">52回</td>
-                      <td className="text-right p-2">2.5時間</td>
-                      <td className="text-right p-2">¥16,250</td>
-                      <td className="text-right p-2">92</td>
-                      <td className="text-center p-2">
-                        <Badge className="bg-green-100 text-green-700">↗ 向上</Badge>
-                      </td>
-                    </tr>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="p-2 font-medium">灌水作業</td>
-                      <td className="text-right p-2">89回</td>
-                      <td className="text-right p-2">1.2時間</td>
-                      <td className="text-right p-2">¥10,680</td>
-                      <td className="text-right p-2">85</td>
-                      <td className="text-center p-2">
-                        <Badge className="bg-blue-100 text-blue-700">→ 安定</Badge>
-                      </td>
-                    </tr>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="p-2 font-medium">施肥作業</td>
-                      <td className="text-right p-2">42回</td>
-                      <td className="text-right p-2">1.8時間</td>
-                      <td className="text-right p-2">¥7,560</td>
-                      <td className="text-right p-2">78</td>
-                      <td className="text-center p-2">
-                        <Badge className="bg-yellow-100 text-yellow-700">↘ 改善要</Badge>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* 収穫・収益分析タブ */}
@@ -1190,49 +1268,725 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
 
-        {/* シミュレーションタブ */}
+
+        {/* 🎯 将来予測シミュレーションタブ */}
         <TabsContent value="simulation" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                作業効率推移
-              </CardTitle>
-              <CardDescription>月次効率スコアと改善トレンド</CardDescription>
+          {/* メインシミュレーションパネル */}
+          <Card className="border-2 border-purple-100 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold">
+                      🎯 設備投資対応シミュレーション
+                    </CardTitle>
+                    <p className="text-green-100 text-sm">Investment Impact Simulation & Planning</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
+                  <div className="text-sm font-medium">統合予測システム</div>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <SimpleLineChart data={data.efficiency_trends} height={350} />
+            
+            <CardContent className="p-6">
+              {/* シナリオ選択パネル */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  📋 シナリオ設定
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { 
+                      id: 'baseline', 
+                      name: '現状維持', 
+                      desc: '現在の設備・運営を継続', 
+                      color: 'gray',
+                      icon: '📊',
+                      investment: 0,
+                      expectedROI: 0,
+                      risk: '低'
+                    },
+                    { 
+                      id: 'greenhouse', 
+                      name: '温室設備投資', 
+                      desc: '温室・環境制御システム導入', 
+                      color: 'green',
+                      icon: '🏠',
+                      investment: 2500000,
+                      expectedROI: 125,
+                      risk: '中'
+                    },
+                    { 
+                      id: 'automation', 
+                      name: '自動化投資', 
+                      desc: '灌水・施肥自動化システム', 
+                      color: 'blue',
+                      icon: '🤖',
+                      investment: 1800000,
+                      expectedROI: 145,
+                      risk: '中'
+                    },
+                    { 
+                      id: 'comprehensive', 
+                      name: '包括的投資', 
+                      desc: '温室+自動化+収穫機械', 
+                      color: 'purple',
+                      icon: '🚀',
+                      investment: 5200000,
+                      expectedROI: 168,
+                      risk: '高'
+                    }
+                  ].map((scenario) => (
+                    <div key={scenario.id} className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                      scenario.color === 'gray' ? 'border-gray-200 bg-gray-50 hover:border-gray-300' :
+                      scenario.color === 'green' ? 'border-green-200 bg-green-50 hover:border-green-300' :
+                      scenario.color === 'blue' ? 'border-blue-200 bg-blue-50 hover:border-blue-300' :
+                      'border-purple-200 bg-purple-50 hover:border-purple-300'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">{scenario.icon}</span>
+                        <h4 className="font-bold text-gray-800">{scenario.name}</h4>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">{scenario.desc}</p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">投資額:</span>
+                          <span className="font-medium">¥{scenario.investment.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">予想ROI:</span>
+                          <span className="font-medium text-green-600">{scenario.expectedROI}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">リスク:</span>
+                          <Badge className={`text-xs ${
+                            scenario.risk === '低' ? 'bg-green-100 text-green-700' :
+                            scenario.risk === '中' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {scenario.risk}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 期間設定 */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  ⏰ シミュレーション期間設定
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">開始年月</label>
+                    <Input type="month" defaultValue="2025-01" className="w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">シミュレーション期間</label>
+                    <Select defaultValue="3">
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1年間</SelectItem>
+                        <SelectItem value="3">3年間</SelectItem>
+                        <SelectItem value="5">5年間</SelectItem>
+                        <SelectItem value="10">10年間</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                      <TrendingUp className="w-4 h-4 mr-2" />
+                      シミュレーション実行
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 投資項目詳細設定 */}
+              <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                <h3 className="text-lg font-bold text-green-800 mb-3 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  💰 投資項目詳細設定
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* 設備投資 */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                      🏗️ 設備投資（CAPEX）
+                    </h4>
+                    {[
+                      { name: '温室建設', cost: 1500000, period: 1 },
+                      { name: '環境制御システム', cost: 800000, period: 1 },
+                      { name: '灌水自動化', cost: 600000, period: 1 },
+                      { name: '収穫機械', cost: 1200000, period: 2 }
+                    ].map((item, index) => (
+                      <div key={index} className="p-3 bg-white rounded border">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-800">{item.name}</span>
+                          <Switch />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div>投資額: ¥{item.cost.toLocaleString()}</div>
+                          <div>導入時期: {item.period}年目</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ランニングコスト */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                      ⚙️ ランニングコスト（OPEX）
+                    </h4>
+                    {[
+                      { name: '電力費', cost: 180000, unit: '年' },
+                      { name: '燃料費', cost: 120000, unit: '年' },
+                      { name: 'メンテナンス', cost: 200000, unit: '年' },
+                      { name: '保険料', cost: 80000, unit: '年' }
+                    ].map((item, index) => (
+                      <div key={index} className="p-3 bg-white rounded border">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-800">{item.name}</span>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div>年間: ¥{item.cost.toLocaleString()}</div>
+                          <div>単位: {item.unit}あたり</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 労働力投資 */}
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                      👥 労働力投資
+                    </h4>
+                    {[
+                      { name: '追加人員雇用', cost: 3600000, unit: '年' },
+                      { name: '技術研修', cost: 200000, unit: '回' },
+                      { name: '外注作業', cost: 800000, unit: '年' },
+                      { name: 'コンサル費用', cost: 600000, unit: '年' }
+                    ].map((item, index) => (
+                      <div key={index} className="p-3 bg-white rounded border">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-800">{item.name}</span>
+                          <Switch />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div>費用: ¥{item.cost.toLocaleString()}</div>
+                          <div>単位: {item.unit}あたり</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* シミュレーション結果ダッシュボード */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 財務予測チャート */}
             <Card>
-              <CardContent className="p-6 text-center">
-                <Zap className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-                <p className="text-3xl font-bold text-yellow-600">{data.summary.efficiency_score}</p>
-                <p className="text-gray-600">現在のスコア</p>
-                <Badge className="mt-2 bg-yellow-100 text-yellow-700">良好</Badge>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  📈 財務予測チャート
+                </CardTitle>
+                <CardDescription>投資シナリオ別の収益・コスト推移</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] flex items-center justify-center bg-gray-50 rounded border-2 border-dashed border-gray-300">
+                  <div className="text-center text-gray-500">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>シナリオ選択後にチャートが表示されます</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
+            {/* ROI比較分析 */}
             <Card>
-              <CardContent className="p-6 text-center">
-                <Clock className="w-12 h-12 mx-auto mb-4 text-blue-500" />
-                <p className="text-3xl font-bold text-blue-600">{data.summary.active_plots}</p>
-                <p className="text-gray-600">稼働中区画</p>
-                <Badge className="mt-2 bg-blue-100 text-blue-700">活発</Badge>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6 text-center">
-                <Users className="w-12 h-12 mx-auto mb-4 text-green-500" />
-                <p className="text-3xl font-bold text-green-600">92%</p>
-                <p className="text-gray-600">チーム効率</p>
-                <Badge className="mt-2 bg-green-100 text-green-700">優秀</Badge>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  💹 ROI比較分析
+                </CardTitle>
+                <CardDescription>投資収益率とリスク評価</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { scenario: '現状維持', roi: 0, risk: '低', investment: 0, payback: '-' },
+                    { scenario: '温室設備', roi: 125, risk: '中', investment: 2500000, payback: '2.8年' },
+                    { scenario: '自動化', roi: 145, risk: '中', investment: 1800000, payback: '2.1年' },
+                    { scenario: '包括投資', roi: 168, risk: '高', investment: 5200000, payback: '3.5年' }
+                  ].map((item, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded border">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-gray-800">{item.scenario}</span>
+                        <Badge className={`${
+                          item.roi > 150 ? 'bg-green-100 text-green-700' :
+                          item.roi > 100 ? 'bg-blue-100 text-blue-700' :
+                          item.roi > 0 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          ROI {item.roi}%
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                        <div>投資額: ¥{item.investment.toLocaleString()}</div>
+                        <div>回収期間: {item.payback}</div>
+                        <div>リスク: {item.risk}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* 詳細分析レポート */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                📊 詳細分析レポート
+              </CardTitle>
+              <CardDescription>投資効果の詳細分析と推奨事項</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* キャッシュフロー分析 */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                    💰 キャッシュフロー分析
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">初期投資:</span>
+                      <span className="font-medium text-red-600">-¥2,500,000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">年間収益増:</span>
+                      <span className="font-medium text-green-600">+¥1,200,000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">年間コスト増:</span>
+                      <span className="font-medium text-orange-600">-¥300,000</span>
+                    </div>
+                    <hr className="my-2" />
+                    <div className="flex justify-between font-bold">
+                      <span className="text-gray-800">正味現在価値:</span>
+                      <span className="text-green-700">+¥1,840,000</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* リスク要因分析 */}
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h4 className="font-bold text-yellow-800 mb-3 flex items-center gap-2">
+                    ⚠️ リスク要因分析
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {[
+                      { factor: '市場価格変動', impact: '中', probability: '高' },
+                      { factor: '技術陳腐化', impact: '高', probability: '低' },
+                      { factor: '気候変動', impact: '中', probability: '中' },
+                      { factor: '人材不足', impact: '中', probability: '中' }
+                    ].map((risk, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-gray-700">{risk.factor}</span>
+                        <div className="flex gap-1">
+                          <Badge className={`text-xs ${
+                            risk.impact === '高' ? 'bg-red-100 text-red-700' :
+                            risk.impact === '中' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            影響{risk.impact}
+                          </Badge>
+                          <Badge className={`text-xs ${
+                            risk.probability === '高' ? 'bg-red-100 text-red-700' :
+                            risk.probability === '中' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            確率{risk.probability}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 推奨事項 */}
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2">
+                    💡 推奨事項
+                  </h4>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-2 bg-white rounded border border-green-200">
+                      <div className="font-medium text-green-800 mb-1">🏆 最優先推奨</div>
+                      <div className="text-gray-700">自動化システムから段階的導入。ROI145%、回収期間2.1年</div>
+                    </div>
+                    <div className="p-2 bg-white rounded border border-blue-200">
+                      <div className="font-medium text-blue-800 mb-1">📋 次期検討</div>
+                      <div className="text-gray-700">温室設備は市場価格安定後に検討推奨</div>
+                    </div>
+                    <div className="p-2 bg-white rounded border border-yellow-200">
+                      <div className="font-medium text-yellow-800 mb-1">⏰ 長期計画</div>
+                      <div className="text-gray-700">包括的投資は3年後資金調達完了後に実行</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 🔬 土壌詳細分析タブ（フェーズ4） */}
+        <TabsContent value="soil-detail" className="space-y-6">
+          {/* 土壌成分マルチライン分析 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Microscope className="w-5 h-5" />
+                🔬 土壌成分詳細推移分析
+              </CardTitle>
+              <CardDescription>
+                全土壌成分の時系列変化を詳細分析。成分間の相関関係も確認できます。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+
+              {/* 土壌成分詳細グラフ */}
+              <div className="h-[600px] mb-6">
+                <SoilDetailChart companyId={companyId || ''} />
+              </div>
+
+              {/* 成分統計サマリー */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { name: 'pH平均値', value: '6.8', trend: '+0.2', status: '適正', color: 'green' },
+                  { name: 'EC平均値', value: '0.45 mS/cm', trend: '-0.05', status: '良好', color: 'blue' },
+                  { name: 'CEC平均値', value: '22.1 meq/100g', trend: '+1.3', status: '優秀', color: 'green' },
+                  { name: '塩基飽和度', value: '78%', trend: '+2%', status: '適正', color: 'green' }
+                ].map((stat, index) => (
+                  <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">{stat.name}</p>
+                    <p className="text-lg font-bold text-gray-900">{stat.value}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className={`text-xs px-2 py-1 rounded-full bg-${stat.color}-100 text-${stat.color}-700`}>
+                        {stat.status}
+                      </span>
+                      <span className="text-xs text-gray-500">{stat.trend}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* レーダーチャート + 相関分析 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 土壌健康度レーダーチャート */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  🎯 土壌健康度レーダー分析
+                </CardTitle>
+                <CardDescription>
+                  複数成分の総合バランスを視覚化
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64 flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 rounded-lg border">
+                  <div className="text-center">
+                    <div className="w-32 h-32 mx-auto mb-4 relative">
+                      {/* 簡易レーダーチャート表示 */}
+                      <svg viewBox="0 0 100 100" className="w-full h-full">
+                        {/* 外枠 */}
+                        <polygon 
+                          points="50,10 85,30 85,70 50,90 15,70 15,30" 
+                          fill="rgba(34, 197, 94, 0.1)" 
+                          stroke="rgba(34, 197, 94, 0.3)" 
+                          strokeWidth="1"
+                        />
+                        {/* 内枠 */}
+                        <polygon 
+                          points="50,25 70,35 70,65 50,75 30,65 30,35" 
+                          fill="rgba(59, 130, 246, 0.1)" 
+                          stroke="rgba(59, 130, 246, 0.3)" 
+                          strokeWidth="1"
+                        />
+                        {/* データライン */}
+                        <polygon 
+                          points="50,15 80,32 78,68 50,85 22,68 20,32" 
+                          fill="rgba(16, 185, 129, 0.2)" 
+                          stroke="#10b981" 
+                          strokeWidth="2"
+                        />
+                        {/* データポイント */}
+                        <circle cx="50" cy="15" r="2" fill="#10b981" />
+                        <circle cx="80" cy="32" r="2" fill="#10b981" />
+                        <circle cx="78" cy="68" r="2" fill="#10b981" />
+                        <circle cx="50" cy="85" r="2" fill="#10b981" />
+                        <circle cx="22" cy="68" r="2" fill="#10b981" />
+                        <circle cx="20" cy="32" r="2" fill="#10b981" />
+                      </svg>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">総合スコア</span>
+                        <span className="font-bold text-green-600">85/100</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="text-center">
+                          <div className="text-blue-600 font-semibold">pH</div>
+                          <div className="text-gray-500">92</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-green-600 font-semibold">EC</div>
+                          <div className="text-gray-500">78</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-orange-600 font-semibold">CEC</div>
+                          <div className="text-gray-500">88</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* レーダーチャート設定 */}
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold mb-2">📊 表示項目</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['pH値', 'EC値', 'CEC値', '塩基飽和度', '有機物', '窒素'].map((item, idx) => (
+                      <label key={idx} className="flex items-center gap-2 text-xs">
+                        <input type="checkbox" defaultChecked className="w-3 h-3" />
+                        {item}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 成分間相関分析 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Network className="w-5 h-5" />
+                  🔗 成分間相関分析
+                </CardTitle>
+                <CardDescription>
+                  土壌成分同士の関連性を分析
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* 相関マトリックス */}
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold mb-3">相関係数マトリックス</h4>
+                  <div className="grid grid-cols-4 gap-1 text-xs">
+                    <div className="p-2 bg-gray-100 text-center font-semibold">成分</div>
+                    <div className="p-2 bg-gray-100 text-center font-semibold">pH</div>
+                    <div className="p-2 bg-gray-100 text-center font-semibold">EC</div>
+                    <div className="p-2 bg-gray-100 text-center font-semibold">CEC</div>
+                    
+                    <div className="p-2 bg-gray-50 font-semibold">pH</div>
+                    <div className="p-2 bg-green-100 text-center">1.00</div>
+                    <div className="p-2 bg-yellow-100 text-center">0.42</div>
+                    <div className="p-2 bg-blue-100 text-center">-0.18</div>
+                    
+                    <div className="p-2 bg-gray-50 font-semibold">EC</div>
+                    <div className="p-2 bg-yellow-100 text-center">0.42</div>
+                    <div className="p-2 bg-green-100 text-center">1.00</div>
+                    <div className="p-2 bg-orange-100 text-center">0.68</div>
+                    
+                    <div className="p-2 bg-gray-50 font-semibold">CEC</div>
+                    <div className="p-2 bg-blue-100 text-center">-0.18</div>
+                    <div className="p-2 bg-orange-100 text-center">0.68</div>
+                    <div className="p-2 bg-green-100 text-center">1.00</div>
+                  </div>
+                </div>
+
+                {/* 相関分析結果 */}
+                <div className="space-y-3">
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5" />
+                      <div>
+                        <h5 className="text-sm font-semibold text-orange-700">強い正の相関</h5>
+                        <p className="text-xs text-orange-600 mt-1">
+                          EC値とCEC値 (r=0.68) - 肥沃度指標の連動性を確認
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-500 mt-0.5" />
+                      <div>
+                        <h5 className="text-sm font-semibold text-blue-700">中程度の正の相関</h5>
+                        <p className="text-xs text-blue-600 mt-1">
+                          pH値とEC値 (r=0.42) - 土壌反応と塩分濃度の関係
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
+                      <div>
+                        <h5 className="text-sm font-semibold text-green-700">分析完了</h5>
+                        <p className="text-xs text-green-600 mt-1">
+                          土壌成分バランスは良好です。継続モニタリングを推奨します。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 詳細レポート生成セクション */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                📋 プロフェッショナル土壌分析レポート
+              </CardTitle>
+              <CardDescription>
+                包括的な土壌診断レポートを自動生成。農業改善提案も含まれます。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* レポート生成オプション */}
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">📊 レポート内容選択</h4>
+                  <div className="space-y-2">
+                    {[
+                      { label: '土壌成分詳細分析', desc: '全成分の推移と評価', checked: true },
+                      { label: '作物適性診断', desc: '現在の土壌に最適な作物', checked: true },
+                      { label: '改良提案レポート', desc: '具体的な改善方法', checked: true },
+                      { label: '季節別管理計画', desc: '年間を通じた管理戦略', checked: false },
+                      { label: '費用対効果分析', desc: '改良投資の経済性', checked: false },
+                      { label: '他圃場比較分析', desc: 'ベンチマークとの比較', checked: false }
+                    ].map((option, idx) => (
+                      <label key={idx} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          defaultChecked={option.checked}
+                          className="w-4 h-4 text-blue-600 mt-1" 
+                        />
+                        <div>
+                          <div className="text-sm font-medium">{option.label}</div>
+                          <div className="text-xs text-gray-500">{option.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* レポートプレビュー */}
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">📋 生成レポートサンプル</h4>
+                  <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-4 rounded-lg border h-64 overflow-y-auto">
+                    <div className="text-xs space-y-3">
+                      <div className="border-b pb-2">
+                        <h5 className="font-bold text-blue-700">🌱 土壌健康度総合評価</h5>
+                        <p className="text-gray-600 mt-1">評価スコア: 85/100 (優良)</p>
+                      </div>
+                      
+                      <div className="border-b pb-2">
+                        <h5 className="font-bold text-green-700">📊 主要成分分析</h5>
+                        <ul className="text-gray-600 mt-1 space-y-1">
+                          <li>• pH値: 6.8 (適正範囲)</li>
+                          <li>• 電気伝導度: 0.45 mS/cm (良好)</li>
+                          <li>• CEC値: 22.1 meq/100g (優秀)</li>
+                          <li>• 塩基飽和度: 78% (適正)</li>
+                        </ul>
+                      </div>
+
+                      <div className="border-b pb-2">
+                        <h5 className="font-bold text-orange-700">⚠️ 注意事項</h5>
+                        <ul className="text-gray-600 mt-1 space-y-1">
+                          <li>• 有機物含量がやや低下傾向</li>
+                          <li>• リン酸の蓄積に注意が必要</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h5 className="font-bold text-purple-700">💡 改善提案</h5>
+                        <ul className="text-gray-600 mt-1 space-y-1">
+                          <li>• 堆肥投入時期の最適化</li>
+                          <li>• 緑肥作物の活用検討</li>
+                          <li>• 排水対策の強化</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* レポート生成ボタン */}
+                  <div className="flex gap-2 mt-4">
+                    <Button className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
+                      <FileText className="w-4 h-4 mr-2" />
+                      詳細レポート生成
+                    </Button>
+                    <Button variant="outline">
+                      <Download className="w-4 h-4 mr-2" />
+                      PDF出力
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI分析洞察 */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-700 mb-3">
+                  <Brain className="w-4 h-4" />
+                  🤖 AI土壌分析洞察
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="bg-white p-3 rounded border">
+                    <h5 className="font-semibold text-blue-700 mb-2">🎯 最優先改善項目</h5>
+                    <p className="text-gray-600">
+                      有機物含量の向上が土壌構造改善の鍵。堆肥投入量を20%増加することを推奨。
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <h5 className="font-semibold text-green-700 mb-2">📈 予測収量効果</h5>
+                    <p className="text-gray-600">
+                      提案された改善策により、来季の収量15-20%向上が期待されます。
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <h5 className="font-semibold text-orange-700 mb-2">💰 投資対効果</h5>
+                    <p className="text-gray-600">
+                      土壌改良投資額 ¥180,000で年間収益向上¥420,000を見込める。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
       </Tabs>
@@ -1272,6 +2026,104 @@ export default function AnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* データ品質レポート */}
+      {data.dataQuality && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              データ品質・信頼性レポート
+            </CardTitle>
+            <CardDescription>
+              会計データの統合状況と分析の信頼性を確認できます
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                <h4 className="font-medium text-green-800 mb-2">収入データソース</h4>
+                <div className="flex items-center gap-2">
+                  {data.dataQuality.incomeSource === 'accounting' ? (
+                    <>
+                      <Badge className="bg-green-500 text-white">会計実績</Badge>
+                      <p className="text-sm text-green-700">work_report_accounting テーブル</p>
+                    </>
+                  ) : (
+                    <>
+                      <Badge className="bg-yellow-500 text-white">推定値</Badge>
+                      <p className="text-sm text-yellow-700">収穫量 × 期待価格</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200">
+                <h4 className="font-medium text-red-800 mb-2">支出データソース</h4>
+                <div className="flex items-center gap-2">
+                  {data.dataQuality.expenseSource === 'accounting' ? (
+                    <>
+                      <Badge className="bg-green-500 text-white">会計実績</Badge>
+                      <p className="text-sm text-green-700">work_report_accounting テーブル</p>
+                    </>
+                  ) : (
+                    <>
+                      <Badge className="bg-yellow-500 text-white">推定値</Badge>
+                      <p className="text-sm text-yellow-700">作業時間 × 時給</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-800 mb-2">総合信頼性</h4>
+                <div className="flex items-center gap-2">
+                  {data.dataQuality.reliability === 'high' && (
+                    <>
+                      <Badge className="bg-green-500 text-white">高</Badge>
+                      <p className="text-sm text-green-700">会計データ連携済</p>
+                    </>
+                  )}
+                  {data.dataQuality.reliability === 'medium' && (
+                    <>
+                      <Badge className="bg-yellow-500 text-white">中</Badge>
+                      <p className="text-sm text-yellow-700">部分的に会計連携</p>
+                    </>
+                  )}
+                  {data.dataQuality.reliability === 'low' && (
+                    <>
+                      <Badge className="bg-red-500 text-white">低</Badge>
+                      <p className="text-sm text-red-700">推定値のみ</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {data.dataQuality.accountingCoverage !== undefined && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 className="font-medium text-gray-800 mb-2">📊 会計データカバレッジ</h4>
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                  <div 
+                    className={`h-3 rounded-full transition-all duration-500 ${
+                      data.dataQuality.accountingCoverage > 80 ? 'bg-green-500' : 
+                      data.dataQuality.accountingCoverage > 50 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${Math.min(100, data.dataQuality.accountingCoverage)}%` }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600">
+                  {Math.round(data.dataQuality.accountingCoverage)}% の作業記録に会計データが連携されています
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4 text-xs text-gray-500">
+              <p>💡 データ品質を向上させるには、作業記録作成時に会計項目も同時に記録してください</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

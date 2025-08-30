@@ -420,6 +420,168 @@ export interface Database {
           created_at?: string
         }
       }
+      harvest_records: {
+        Row: {
+          id: string
+          company_id: string
+          vegetable_id: string
+          harvest_date: string
+          harvest_quantity: number
+          harvest_unit: string
+          harvest_value?: number
+          plot_name?: string
+          notes?: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          vegetable_id: string
+          harvest_date: string
+          harvest_quantity: number
+          harvest_unit?: string
+          harvest_value?: number
+          plot_name?: string
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          vegetable_id?: string
+          harvest_date?: string
+          harvest_quantity?: number
+          harvest_unit?: string
+          harvest_value?: number
+          plot_name?: string
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      soil_records: {
+        Row: {
+          id: string
+          company_id: string
+          vegetable_id?: string
+          plot_name?: string
+          analysis_date: string
+          pH?: number
+          EC?: number
+          CEC?: number
+          phosphorus?: number
+          potassium?: number
+          nitrogen?: number
+          organic_matter?: number
+          calcium?: number
+          magnesium?: number
+          sulfur?: number
+          notes?: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          vegetable_id?: string
+          plot_name?: string
+          analysis_date: string
+          pH?: number
+          EC?: number
+          CEC?: number
+          phosphorus?: number
+          potassium?: number
+          nitrogen?: number
+          organic_matter?: number
+          calcium?: number
+          magnesium?: number
+          sulfur?: number
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          vegetable_id?: string
+          plot_name?: string
+          analysis_date?: string
+          pH?: number
+          EC?: number
+          CEC?: number
+          phosphorus?: number
+          potassium?: number
+          nitrogen?: number
+          organic_matter?: number
+          calcium?: number
+          magnesium?: number
+          sulfur?: number
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      weather_records: {
+        Row: {
+          id: string
+          company_id: string
+          farm_plot_id?: string
+          recorded_date: string
+          temperature: number
+          temperature_min: number
+          temperature_max: number
+          humidity: number
+          humidity_min: number
+          humidity_max: number
+          precipitation?: number
+          wind_speed?: number
+          weather_condition?: string
+          data_source: string
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          farm_plot_id?: string
+          recorded_date: string
+          temperature: number
+          temperature_min: number
+          temperature_max: number
+          humidity: number
+          humidity_min: number
+          humidity_max: number
+          precipitation?: number
+          wind_speed?: number
+          weather_condition?: string
+          data_source: string
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          farm_plot_id?: string
+          recorded_date?: string
+          temperature?: number
+          temperature_min?: number
+          temperature_max?: number
+          humidity?: number
+          humidity_min?: number
+          humidity_max?: number
+          precipitation?: number
+          wind_speed?: number
+          weather_condition?: string
+          data_source?: string
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -440,6 +602,9 @@ export interface Database {
 export type FarmPlot = Database['public']['Tables']['farm_plots']['Row']
 export type PlotCell = Database['public']['Tables']['plot_cells']['Row']
 export type VegetableCell = Database['public']['Tables']['vegetable_cells']['Row']
+export type WeatherRecord = Database['public']['Tables']['weather_records']['Row']
+export type HarvestRecord = Database['public']['Tables']['harvest_records']['Row']
+export type SoilRecord = Database['public']['Tables']['soil_records']['Row']
 
 // GeoJSON型定義
 export interface GeoJSONFeature {

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { AuthUser } from '@/types'
+import { AuthUser, AuthUserWithMembership } from '@/types'
 
 // 開発環境用の認証チェック
 function getDevUser(): AuthUser | null {
@@ -24,9 +24,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   
   if (user) {
     // Get user profile from database
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from('users')
-      .select('company_id, full_name')
+      .select('company_id, full_name, settings')
       .eq('id', user.id)
       .single()
 
@@ -37,6 +37,74 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         company_id: profile.company_id,
         role: 'user', // 1企業1アカウントモデルでは全員user
         full_name: profile.full_name,
+      }
+    } else if (error) {
+      // プロファイルが存在しない場合は、ユーザーの会社を動的に決定
+      let assignedCompanyId = null
+
+      // 1. メールドメインベースで会社を推定
+      const email = user.email!
+      const domain = email.split('@')[1]?.toLowerCase()
+
+      // ドメインベースのマッピング（実際のビジネス要件に応じて設定）
+      const domainToCompanyMapping: Record<string, string> = {
+        'test-company.com': 'a1111111-1111-1111-1111-111111111111',
+        'company.com': '98486022-f937-4022-86a5-b1e6d7011071',
+        'gmail.com': '4cb3e254-9d73-4d67-b9ae-433bf249fe38', // Gmailユーザーは株式会社Octomizeに割り当て
+        'test.farm': '98466022-f937-4022-86a5-b1e6d7011071'
+      }
+
+      assignedCompanyId = domainToCompanyMapping[domain] || null
+
+      // 2. ドメインマッピングで見つからない場合は、データが最も多い会社に割り当て
+      if (!assignedCompanyId) {
+        const { data: companyWithData } = await supabase
+          .from('growing_tasks')
+          .select('company_id, count(*)')
+          .not('company_id', 'is', null)
+          .order('count', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (companyWithData) {
+          assignedCompanyId = companyWithData.company_id
+        } else {
+          // 最終フォールバック: 株式会社Octomize（実際にデータがある会社）
+          assignedCompanyId = '4cb3e254-9d73-4d67-b9ae-433bf249fe38'
+        }
+      }
+
+      // 3. 決定した会社でユーザーを作成
+      const { data: newProfile, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          company_id: assignedCompanyId,
+          email: user.email!,
+          full_name: user.user_metadata?.full_name || user.email!,
+          is_active: true,
+          settings: { role: 'operator' }
+        })
+        .select('company_id, full_name')
+        .single()
+
+      if (newProfile) {
+        return {
+          id: user.id,
+          email: user.email!,
+          company_id: newProfile.company_id,
+          role: 'user',
+          full_name: newProfile.full_name,
+        }
+      }
+      
+      // それでも失敗した場合は、決定した会社IDで返す
+      return {
+        id: user.id,
+        email: user.email!,
+        company_id: assignedCompanyId,
+        role: 'user',
+        full_name: user.user_metadata?.full_name || user.email!,
       }
     }
   }
@@ -86,6 +154,116 @@ export async function requireRole(allowedRoles: AuthUser['role'][]): Promise<Aut
   }
   
   return user
+}
+
+// メンバーシップ情報を含むユーザー取得（新機能）
+export async function getCurrentUserWithMembership(): Promise<AuthUserWithMembership | null> {
+  const user = await getCurrentUser()
+  
+  if (!user) {
+    return null
+  }
+  
+  const supabase = await createClient()
+  
+  // メンバーシップ情報を取得
+  const { data: membership, error } = await supabase
+    .from('company_memberships')
+    .select(`
+      id,
+      role,
+      status,
+      phone,
+      department,
+      position,
+      created_at,
+      companies(
+        name,
+        company_code,
+        plan_type,
+        max_users
+      ),
+      stats:member_activity_stats(
+        total_logins,
+        last_login_at,
+        reports_created,
+        photos_uploaded,
+        vegetables_managed,
+        last_activity_at
+      )
+    `)
+    .eq('user_id', user.id)
+    .eq('company_id', user.company_id)
+    .eq('status', 'active')
+    .maybeSingle()
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error('メンバーシップ取得エラー:', error)
+  }
+  
+  const userWithMembership: AuthUserWithMembership = {
+    ...user,
+    membership: membership ? {
+      id: membership.id,
+      role: membership.role,
+      status: membership.status,
+      phone: membership.phone,
+      department: membership.department,
+      position: membership.position,
+      joined_at: membership.created_at,
+      company: membership.companies,
+      stats: membership.stats?.[0]
+    } : undefined
+  }
+  
+  return userWithMembership
+}
+
+// メンバーシップベースの権限チェック（新機能）
+export async function requireMembershipRole(allowedRoles: ("admin" | "manager" | "operator")[]): Promise<AuthUserWithMembership> {
+  const user = await getCurrentUserWithMembership()
+  
+  if (!user) {
+    redirect('/login')
+  }
+  
+  // メンバーシップが存在しない場合は、既存システムの権限を使用
+  if (!user.membership) {
+    // 既存ユーザーの場合は通す（後方互換性）
+    return user
+  }
+  
+  if (!allowedRoles.includes(user.membership.role)) {
+    redirect('/dashboard') // 権限不足時はダッシュボードにリダイレクト
+  }
+  
+  return user
+}
+
+// 既存ユーザーをメンバーシップシステムに移行する関数
+export async function migrateToMembership(userId: string, companyId: string, email: string, fullName?: string): Promise<string | null> {
+  const supabase = await createClient()
+  
+  try {
+    const { data: membershipId, error } = await supabase
+      .rpc('create_membership_for_existing_user', {
+        p_company_id: companyId,
+        p_user_id: userId,
+        p_email: email,
+        p_full_name: fullName,
+        p_role: 'admin' // 既存ユーザーは管理者として移行
+      })
+    
+    if (error) {
+      console.error('メンバーシップ移行エラー:', error)
+      return null
+    }
+    
+    return membershipId
+  } catch (error) {
+    console.error('メンバーシップ移行中エラー:', error)
+    return null
+  }
 }
 
 export async function signOut() {

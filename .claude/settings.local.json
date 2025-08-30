@@ -9,7 +9,19 @@
       "Bash(node:*)",
       "Bash(rm:*)",
       "WebFetch(domain:localhost)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(set BACKUP_DIR=C:workbackup-20250826_152000)",
+      "Bash(npm run lint:*)",
+      "Bash(powershell:*)",
+      "Bash(set BACKUP_DIR=C:workbackup-20250828_152000)",
+      "Bash(set BACKUP_DIR=C:workbackup-20250828_152500)",
+      "Bash(robocopy:*)",
+      "Bash(dir:*)",
+      "Bash(taskkill:*)",
+      "Bash(psql:*)",
+      "Bash(set BACKUP_DIR=C:workbackup-20250830_154500)",
+      "Bash(BACKUP_DIR=\"C:\\work\\backup-20250830_154000\")"
     ],
     "deny": [],
     "additionalDirectories": [

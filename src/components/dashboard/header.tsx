@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { AuthUser } from '@/types'
-import { Bell, User, LogOut, Settings, ChevronDown } from 'lucide-react'
+import { Bell, User, LogOut, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import NotificationCenter from '@/components/notification-center'
 
@@ -115,16 +115,6 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
               </div>
               
               <div className="py-1">
-                <button
-                  onClick={() => {
-                    setIsUserMenuOpen(false)
-                    router.push('/dashboard/settings')
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span>アカウント設定</span>
-                </button>
                 <button
                   onClick={() => {
                     setIsUserMenuOpen(false)

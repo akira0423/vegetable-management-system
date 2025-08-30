@@ -621,20 +621,24 @@ export function GanttChart({
     return (
       <Card className={className}>
         {/* ヘッダーとフィルターは常に表示 */}
-        <CardHeader className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white rounded-t-lg">
+        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
           <div className="space-y-4">
             {/* タイトル行 */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
                   <BarChart3 className="w-6 h-6" />
                 </div>
                 <div>
                   <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
-                  <p className="text-sm text-blue-100 mt-1 opacity-90">
+                  <p className="text-green-100 text-sm">
                     階層表示・フィルタリング・期間設定を統合管理
                   </p>
                 </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
+                <div className="text-sm font-medium text-white">Gantt Chart System</div>
               </div>
               
               <div className="flex items-center gap-2 text-sm">
@@ -738,20 +742,24 @@ export function GanttChart({
   return (
     <Card className={className}>
         {/* 改善されたヘッダーデザイン */}
-        <CardHeader className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white rounded-t-lg">
+        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
           <div className="space-y-4">
             {/* タイトル行 */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
                   <BarChart3 className="w-6 h-6" />
                 </div>
                 <div>
                   <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
-                  <p className="text-sm text-blue-100 mt-1 opacity-90">
+                  <p className="text-green-100 text-sm">
                     階層表示・フィルタリング・期間設定を統合管理
                   </p>
                 </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
+                <div className="text-sm font-medium text-white">Gantt Chart System</div>
               </div>
               
               <div className="flex items-center gap-2 text-sm">

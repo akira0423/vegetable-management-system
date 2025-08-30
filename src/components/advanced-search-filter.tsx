@@ -416,17 +416,23 @@ export function AdvancedSearchFilter({
     <Card className="mb-6 shadow-lg border-0 bg-gradient-to-br from-white via-blue-50/30 to-green-50/30">
       <CardContent className="p-0">
         {/* ヘッダー部分 */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-4 rounded-t-lg">
-          <div className="flex items-center justify-between text-white">
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-4 rounded-t-lg">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                <Search className="w-5 h-5" />
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Search className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">🔍 AI支援統合検索システム</h3>
-                <p className="text-sm text-blue-100 opacity-90">自然言語で検索・高度フィルタリング機能</p>
+                <h3 className="text-xl font-bold text-white">🔍 AI支援統合検索システム</h3>
+                <p className="text-green-100 text-sm">自然言語で検索・高度フィルタリング機能</p>
               </div>
             </div>
+            <div className="text-right">
+              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
+              <div className="text-sm font-medium text-white">AI Search System</div>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-end">
             <Button 
               onClick={handleReset} 
               variant="ghost" 
