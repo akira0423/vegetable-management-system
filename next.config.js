@@ -12,29 +12,8 @@ const nextConfig = {
     // workerThreads: false,
     // esmExternals: false
   },
-  // 開発時のワーカープロセス設定
-  webpack: (config, { dev, isServer }) => {
-    if (dev && !isServer) {
-      // 開発時のJestワーカーを無効化
-      config.optimization = {
-        ...config.optimization,
-        minimize: false,
-      }
-    }
-    
-    // Supabase警告を抑制
-    config.module.rules.push({
-      test: /\.js$/,
-      include: /node_modules\/@supabase/,
-      use: {
-        loader: 'babel-loader',
-        options: {
-          presets: ['@babel/preset-env'],
-          plugins: []
-        }
-      }
-    })
-    
+  // 開発時のワーカープロセス設定  
+  webpack: (config) => {
     // WebSocket警告を抑制
     config.resolve.fallback = {
       ...config.resolve.fallback,
