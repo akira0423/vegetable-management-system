@@ -3,7 +3,8 @@
 -- ====================================================================
 
 -- 1. growing_tasksテーブルのRLSを一時的に無効化
-ALTER TABLE growing_tasks DISABLE ROW LEVEL SECURITY;
+-- ⚠️ 本番環境では絶対に有効化しないでください！重大なセキュリティリスクです！
+-- ALTER TABLE growing_tasks DISABLE ROW LEVEL SECURITY;
 
 -- 2. 確認用ログ
 DO $$ 

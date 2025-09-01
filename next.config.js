@@ -48,7 +48,9 @@ const nextConfig = {
   // 画像最適化設定
   images: {
     domains: [
-      ...(process.env.NEXT_PUBLIC_SUPABASE_URL 
+      // Supabaseドメインを動的に追加（有効なURLの場合のみ）
+      ...(process.env.NEXT_PUBLIC_SUPABASE_URL && 
+          process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://') 
         ? [new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname] 
         : []
       ),

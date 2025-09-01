@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ 招待作成成功:', invitation.id)
 
-    // TODO: ここで招待メールを送信
+    // NOTE: 将来の機能 - 招待メール自動送信（現在は手動対応）
     // await sendInvitationEmail(invitation)
 
     return NextResponse.json({

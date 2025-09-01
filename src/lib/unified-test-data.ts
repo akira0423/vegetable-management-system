@@ -487,7 +487,7 @@ export const calculateUnifiedStats = () => {
     const vegReports = workReports.filter(r => r.vegetable_id === vegetable.id)
     
     // 会計データからコスト計算（会計記録がない場合は0）
-    const totalCost = 0 // TODO: 会計データベースから取得
+    const totalCost = 0 // NOTE: 実装時は会計データベースから取得
     
     const totalRevenue = vegReports
       .filter(r => r.expected_revenue)

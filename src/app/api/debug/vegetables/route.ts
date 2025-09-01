@@ -3,8 +3,16 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// ⚠️ デバッグエンドポイント - 本番環境では無効化
 // GET /api/debug/vegetables - 野菜レコードのデバッグ情報取得
 export async function GET() {
+  // 本番環境ではデバッグエンドポイントを無効化
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Debug endpoints are disabled in production environment' },
+      { status: 403 }
+    )
+  }
   try {
     console.log('🔍 野菜レコードのデバッグ調査を開始...')
 

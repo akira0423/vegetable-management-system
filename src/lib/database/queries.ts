@@ -33,7 +33,9 @@ export async function getDashboardStats(companyId: string) {
       ]
     }
   } catch (error) {
-    console.error("Dashboard stats error:", error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Dashboard stats error:", error)
+    }
     return {
       totalVegetables: 0,
       activeTasks: 0,
@@ -95,7 +97,9 @@ export async function getUpcomingTasks(companyId: string, limit: number = 5) {
       }
     ]
   } catch (error) {
-    console.error("Upcoming tasks error:", error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Upcoming tasks error:", error)
+    }
     return []
   }
 }

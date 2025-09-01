@@ -109,9 +109,11 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Database error:', error)
+      }
       return NextResponse.json(
-        { error: 'Database error', details: error },
+        { error: 'Database error occurred' },
         { status: 500 }
       )
     }
@@ -126,7 +128,9 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API error:', error)
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -142,7 +146,9 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json()
     } catch (jsonError) {
-      console.error('JSON parse error:', jsonError)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('JSON parse error:', jsonError)
+      }
       return NextResponse.json(
         { error: 'Invalid JSON in request body' },
         { status: 400 }
@@ -224,9 +230,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Database error:', error)
+      }
       return NextResponse.json(
-        { error: 'Database error', details: error },
+        { error: 'Database error occurred' },
         { status: 500 }
       )
     }
@@ -238,10 +246,12 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('POST API error:', error)
-    console.error('Error stack:', error.stack)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('POST API error:', error)
+      console.error('Error stack:', error.stack)
+    }
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }
@@ -266,7 +276,9 @@ export async function DELETE(request: NextRequest) {
         .eq('id', id)
 
       if (error) {
-        console.error('Database error:', error)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Database error:', error)
+        }
         return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
       }
 
@@ -282,7 +294,9 @@ export async function DELETE(request: NextRequest) {
         .eq('id', id)
 
       if (error) {
-        console.error('Database error:', error)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Database error:', error)
+        }
         return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
       }
 

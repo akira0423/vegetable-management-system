@@ -29,22 +29,22 @@ export async function createClient() {
   )
 }
 
-// Service role client（RLS制限をバイパス）
+// ⚠️ Service role client - 本番環境では管理機能のみに制限してください
+// 通常のユーザー操作では createClient() を使用してください
 export async function createServiceClient() {
+  // 本番環境では Service Role の使用を制限
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Service role client is restricted in production environment. Use authenticated client instead.')
+  }
+  
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error('❌ Missing Supabase environment variables:', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!serviceRoleKey
-    })
     throw new Error('Missing Supabase configuration for service client')
   }
-
-  console.log('🔧 Creating service client with service role key')
   
-  // Simple service role client without cookies
+  // Simple service role client without cookies (開発環境のみ)
   const { createClient } = await import('@supabase/supabase-js')
   
   const client = createClient<Database>(
@@ -57,23 +57,16 @@ export async function createServiceClient() {
       }
     }
   )
-
-  console.log('✅ Service client created successfully')
-  
-  // サービスクライアントの接続テスト
-  try {
-    const { data, error } = await client.from('companies').select('id').limit(1)
-    if (error) {
-      console.error('❌ Service client connection test failed:', error)
-    } else {
-      console.log('✅ Service client connection test passed')
-    }
-  } catch (testError) {
-    console.error('❌ Service client test error:', testError)
-  }
   
   return client
 }
 
-// エイリアス関数 - 既存コードとの互換性のため
-export const createServerSupabaseClient = createServiceClient
+// 本番環境で安全に使用できる認証済みクライアント
+export async function createAuthenticatedClient() {
+  return await createClient()
+}
+
+// エイリアス関数 - 本番環境では認証済みクライアントを使用
+export const createServerSupabaseClient = process.env.NODE_ENV === 'production' 
+  ? createAuthenticatedClient
+  : createServiceClient

@@ -14,10 +14,14 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    console.log('🔍 野菜API - リクエストパラメータ:', { companyId, search, status, plotName, limit, offset })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 野菜API - リクエストパラメータ:', { companyId, search, status, plotName, limit, offset })
+    }
 
     if (!companyId) {
-      console.log('❌ 野菜API - company_id が指定されていません')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ 野菜API - company_id が指定されていません')
+      }
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
@@ -65,28 +69,36 @@ export async function GET(request: NextRequest) {
       query = query.ilike('plot_name', `%${plotName}%`)
     }
 
-    console.log('🔍 野菜API - SQLクエリ実行中...')
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 野菜API - SQLクエリ実行中...')
+    }
     const { data: vegetables, error } = await query
 
-    console.log('🔍 野菜API - クエリ結果:', { vegetablesCount: vegetables?.length || 0, error: error?.message })
-    console.log('🔍 野菜API - 取得された野菜データ:', vegetables?.map(v => ({ id: v.id, name: v.name, company_id: v.company_id })) || [])
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 野菜API - クエリ結果:', { vegetablesCount: vegetables?.length || 0, error: error?.message })
+      console.log('🔍 野菜API - 取得された野菜データ:', vegetables?.map(v => ({ id: v.id, name: v.name, company_id: v.company_id })) || [])
+    }
 
     if (error) {
-      console.error('❌ 野菜API - Database error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ 野菜API - Database error:', error)
+      }
       return NextResponse.json({ error: 'Failed to fetch vegetables' }, { status: 500 })
     }
 
     // ソフトデリートフィルタによりアクティブな野菜のみ取得済み
     const activeVegetables = vegetables || []
-    console.log('🔍 野菜API - アクティブな野菜数:', activeVegetables.length)
-    
-    // 面積データの詳細ログ
-    console.log('🗺️ vegetables API - 面積データ詳細:', activeVegetables.map(v => ({
-      id: v.id,
-      name: v.name,
-      area_size: v.area_size,
-      面積データソース: v.area_size ? `area_size (${v.area_size}㎡)` : '面積データなし'
-    })))
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 野菜API - アクティブな野菜数:', activeVegetables.length)
+      
+      // 面積データの詳細ログ
+      console.log('🗺️ vegetables API - 面積データ詳細:', activeVegetables.map(v => ({
+        id: v.id,
+        name: v.name,
+        area_size: v.area_size,
+        面積データソース: v.area_size ? `area_size (${v.area_size}㎡)` : '面積データなし'
+      })))
+    }
 
     // 各野菜の統計情報を取得
     const vegetablesWithStats = await Promise.all(
@@ -173,7 +185,9 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API error:', error)
+    }
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -213,7 +227,9 @@ export async function POST(request: NextRequest) {
 
     // プロフェッショナル＆実用的な最終解決策：外部キー制約回避
     // 開発環境では外部キー制約を無視してNULL値で動作
-    console.log('🔧 開発環境モード：外部キー制約を回避してcreated_byをNULLに設定')
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 開発環境モード：外部キー制約を回避してcreated_byをNULLに設定')
+    }
     const validCreatedBy = null // 外部キー制約を完全回避
     const safeCompanyId = company_id || 'a1111111-1111-1111-1111-111111111111'
 
@@ -269,11 +285,15 @@ export async function POST(request: NextRequest) {
     let vegetable, error
     
     // まず、created_byを指定して登録を試行
-    console.log('🌱 野菜登録を開始:', { name, variety_name, plot_name })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🌱 野菜登録を開始:', { name, variety_name, plot_name })
+    }
     
     // リクエストボディから農地エリア情報を取得
     const { farm_area_data, ...otherFields } = body
-    console.log('🗺️ 農地エリア情報:', farm_area_data)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🗺️ 農地エリア情報:', farm_area_data)
+    }
     
     // 位置情報の処理
     let spatialData = null
@@ -338,7 +358,9 @@ export async function POST(request: NextRequest) {
     
     // 外部キー制約エラーが発生した場合、created_byをNULLにして再試行
     if (error && error.code === '23503' && error.message.includes('created_by_fkey')) {
-      console.log('⚠️ 外部キー制約エラーを検出。created_by=NULLで再試行...')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ 外部キー制約エラーを検出。created_by=NULLで再試行...')
+      }
       
       const retryData = {
         ...insertData,
@@ -367,17 +389,17 @@ export async function POST(request: NextRequest) {
       vegetable = retryResult.data
       error = retryResult.error
       
-      if (!error) {
+      if (!error && process.env.NODE_ENV === 'development') {
         console.log('✅ 再試行で野菜登録に成功しました')
       }
     }
 
     if (error) {
-      console.error('Database error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Database error:', error)
+      }
       return NextResponse.json({ 
-        error: 'Failed to create vegetable',
-        details: error.message,
-        code: error.code 
+        error: 'Failed to create vegetable'
       }, { status: 500 })
     }
 
@@ -396,7 +418,9 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API error:', error)
+    }
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -510,7 +534,9 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Database error:', error)
+      }
       return NextResponse.json({ error: 'Failed to update vegetable' }, { status: 500 })
     }
 
@@ -521,7 +547,9 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API error:', error)
+    }
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -541,7 +569,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Vegetable ID is required' }, { status: 400 })
     }
 
-    console.log('🗑️ 野菜削除開始:', id)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🗑️ 野菜削除開始:', id)
+    }
 
     // シンプルなハード削除（新しいスキーマに対応）
     const { error } = await supabase
@@ -550,14 +580,17 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     if (error) {
-      console.error('Delete error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Delete error:', error)
+      }
       return NextResponse.json({ 
-        error: 'Failed to delete vegetable',
-        details: error.message 
+        error: 'Failed to delete vegetable'
       }, { status: 500 })
     }
 
-    console.log('✅ 野菜削除完了:', id)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ 野菜削除完了:', id)
+    }
 
     return NextResponse.json({
       success: true,
@@ -565,11 +598,12 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Professional deletion API error:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Professional deletion API error:', error)
+    }
     return NextResponse.json(
       { 
-        error: 'システムエラーが発生しました',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'システムエラーが発生しました'
       }, 
       { status: 500 }
     )

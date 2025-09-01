@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+// ⚠️ デバッグエンドポイント - 本番環境では無効化
 export async function GET() {
+  // 本番環境ではデバッグエンドポイントを無効化
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Debug endpoints are disabled in production environment' },
+      { status: 403 }
+    )
+  }
   try {
     const supabase = await createServiceClient()
     

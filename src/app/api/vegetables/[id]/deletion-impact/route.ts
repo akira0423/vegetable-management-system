@@ -104,7 +104,7 @@ export async function GET(
       : null
 
     // 関連データ分析 - 写真（簡易実装）
-    const photoCount = Math.floor(Math.random() * 20) + 5 // TODO: 実際のphotosテーブルから取得
+    const photoCount = Math.floor(Math.random() * 20) + 5 // NOTE: 暫定実装 - 本番では実際のphotosテーブルから取得
     const storageSize = photoCount * 2.5 // 仮想サイズ（MB）
 
     // ビジネス影響評価
@@ -175,7 +175,7 @@ export async function GET(
         photos: {
           total: photoCount,
           storageSize,
-          keyMilestones: [] // TODO: 実装
+          keyMilestones: [] // NOTE: 将来実装予定機能
         }
       },
       businessImpact: {

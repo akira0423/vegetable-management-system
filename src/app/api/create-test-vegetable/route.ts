@@ -2,8 +2,16 @@
 
 import { NextResponse } from 'next/server'
 
+// ⚠️ テスト用エンドポイント - 本番環境では無効化
 // POST /api/create-test-vegetable - テスト用野菜レコード作成
 export async function POST() {
+  // 本番環境ではテスト用エンドポイントを無効化
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Test endpoints are disabled in production environment' },
+      { status: 403 }
+    )
+  }
   try {
     console.log('🌱 テスト用野菜レコードを作成します...')
     

@@ -7,7 +7,8 @@
 --
 
 -- 開発・テスト時のみ使用：operation_logsのRLSを一時的に無効化
-ALTER TABLE operation_logs DISABLE ROW LEVEL SECURITY;
+-- ⚠️ 本番環境では絶対に有効化しないでください！重大なセキュリティリスクです！
+-- ALTER TABLE operation_logs DISABLE ROW LEVEL SECURITY;
 
 -- 代替案：テスト環境用の寛容なポリシーを追加
 -- ALTER TABLE operation_logs ENABLE ROW LEVEL SECURITY;
