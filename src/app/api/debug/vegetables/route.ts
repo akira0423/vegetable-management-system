@@ -1,7 +1,6 @@
 'use server'
 
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 
 // ⚠️ デバッグエンドポイント - 本番環境では無効化
 // GET /api/debug/vegetables - 野菜レコードのデバッグ情報取得
@@ -13,6 +12,9 @@ export async function GET() {
       { status: 403 }
     )
   }
+  
+  // 開発環境でのみSupabaseをインポート
+  const { supabase } = await import('@/lib/supabase')
   try {
     console.log('🔍 野菜レコードのデバッグ調査を開始...')
 

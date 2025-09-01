@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 
 // ⚠️ デバッグエンドポイント - 本番環境では無効化
 export async function GET() {
@@ -10,6 +9,9 @@ export async function GET() {
       { status: 403 }
     )
   }
+  
+  // 開発環境でのみSupabaseクライアントをインポート
+  const { createServiceClient } = await import('@/lib/supabase/server')
   try {
     const supabase = await createServiceClient()
     
