@@ -12,107 +12,9 @@
   "lang": "ja",
   "dir": "ltr",
   
-  "icons": [
-    {
-      "src": "/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-96x96.png", 
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-128x128.png",
-      "sizes": "128x128", 
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
+  "icons": [],
   
-  "shortcuts": [
-    {
-      "name": "作業記録",
-      "short_name": "作業記録",
-      "description": "農作業記録の追加",
-      "url": "/dashboard/gantt",
-      "icons": [
-        {
-          "src": "/shortcut-work.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "農薬記録", 
-      "short_name": "農薬記録",
-      "description": "農薬散布記録の追加",
-      "url": "/dashboard/pesticides",
-      "icons": [
-        {
-          "src": "/shortcut-pesticide.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "天気確認",
-      "short_name": "天気",
-      "description": "天気予報と農作業適性",
-      "url": "/dashboard/weather",
-      "icons": [
-        {
-          "src": "/shortcut-weather.png", 
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "JA帳票",
-      "short_name": "JA帳票",
-      "description": "JA出荷用記録帳票",
-      "url": "/dashboard/ja-reports",
-      "icons": [
-        {
-          "src": "/shortcut-report.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
+  "shortcuts": [],
   
   "categories": [
     "agriculture",
@@ -122,29 +24,7 @@
     "utilities"
   ],
   
-  "screenshots": [
-    {
-      "src": "/screenshot-mobile-1.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "農作業ガントチャート画面"
-    },
-    {
-      "src": "/screenshot-mobile-2.png", 
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "農薬使用記録画面"
-    },
-    {
-      "src": "/screenshot-desktop-1.png",
-      "sizes": "1280x720",
-      "type": "image/png", 
-      "form_factor": "wide",
-      "label": "経営分析ダッシュボード"
-    }
-  ],
+  "screenshots": [],
   
   "related_applications": [
     {
