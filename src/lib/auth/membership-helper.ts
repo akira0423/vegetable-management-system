@@ -1,6 +1,6 @@
 /**
- * ユーザーメンバーシップ管理ヘルパー
- * 認証されたユーザーの企業メンバーシップを自動管理
+ * ユーザー企業アクセス管理ヘルパー
+ * 既存のusers.company_idアーキテクチャを活用
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -12,97 +12,94 @@ export interface MembershipResult {
 }
 
 /**
- * ユーザーのメンバーシップを取得または作成
+ * ユーザーの企業アクセス権を確認
+ * 既存のusers.company_idアーキテクチャを使用
  */
 export async function ensureUserMembership(
   userId: string, 
   companyId: string
 ): Promise<MembershipResult> {
   try {
-    console.log('🔍 メンバーシップ確認開始:', { userId, companyId })
+    console.log('🔍 企業アクセス権確認開始:', { userId, companyId })
     
     const supabase = await createClient()
 
-    // 既存のメンバーシップを確認
-    const { data: existingMembership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('id, role, status')
-      .eq('user_id', userId)
-      .eq('company_id', companyId)
+    // ユーザーの企業関連付けを確認
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, company_id, is_active')
+      .eq('id', userId)
       .single()
 
-    console.log('📊 既存メンバーシップ検索結果:', { 
-      data: existingMembership, 
-      error: membershipError?.message 
-    })
+    console.log('📊 ユーザー情報:', { user, error: userError?.message })
 
-    // メンバーシップが存在し、アクティブな場合
-    if (existingMembership && !membershipError) {
-      console.log('✅ 既存メンバーシップを発見:', existingMembership)
-      
-      if (existingMembership.status === 'active') {
-        return {
-          success: true,
-          membership: existingMembership
-        }
-      }
-      
-      console.log('🔄 非アクティブメンバーシップを有効化中...')
-      
-      // 非アクティブな場合はアクティブにする
-      const { data: updatedMembership, error: updateError } = await supabase
-        .from('company_memberships')
-        .update({ status: 'active' })
-        .eq('id', existingMembership.id)
-        .select('id, role, status')
-        .single()
-
-      if (updateError) {
-        console.error('❌ メンバーシップ有効化エラー:', updateError)
-        return {
-          success: false,
-          error: `Failed to activate membership: ${updateError.message}`
-        }
-      }
-
-      console.log('✅ メンバーシップ有効化完了:', updatedMembership)
-      return {
-        success: true,
-        membership: updatedMembership
-      }
-    }
-
-    console.log('🆕 新しいメンバーシップを作成中...')
-    
-    // メンバーシップが存在しない場合は作成
-    const { data: newMembership, error: createError } = await supabase
-      .from('company_memberships')
-      .insert({
-        user_id: userId,
-        company_id: companyId,
-        role: 'member', // デフォルトロール
-        status: 'active',
-        created_at: new Date().toISOString()
-      })
-      .select('id, role, status')
-      .single()
-
-    if (createError) {
-      console.error('❌ メンバーシップ作成エラー:', createError)
+    if (userError || !user) {
       return {
         success: false,
-        error: `Failed to create membership: ${createError.message}`
+        error: 'User not found'
       }
     }
 
-    console.log('✅ 新規メンバーシップ作成完了:', newMembership)
+    // ユーザーがアクティブでない場合
+    if (!user.is_active) {
+      return {
+        success: false,
+        error: 'User account is inactive'
+      }
+    }
+
+    // ユーザーが既に企業に関連付けられている場合
+    if (user.company_id === companyId) {
+      console.log('✅ ユーザーは既に企業に関連付けられています')
+      return {
+        success: true,
+        membership: {
+          user_id: userId,
+          company_id: companyId,
+          role: 'member',
+          status: 'active'
+        }
+      }
+    }
+
+    // ユーザーが企業に関連付けられていない場合、自動で関連付け
+    if (!user.company_id) {
+      console.log('🔄 ユーザーを企業に関連付け中...')
+      
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ company_id: companyId })
+        .eq('id', userId)
+
+      if (updateError) {
+        console.error('❌ ユーザー企業関連付けエラー:', updateError)
+        return {
+          success: false,
+          error: `Failed to associate user with company: ${updateError.message}`
+        }
+      }
+
+      console.log('✅ ユーザー企業関連付け完了')
+      return {
+        success: true,
+        membership: {
+          user_id: userId,
+          company_id: companyId,
+          role: 'member',
+          status: 'active'
+        }
+      }
+    }
+
+    // ユーザーが異なる企業に関連付けられている場合
+    console.log('⚠️ ユーザーは異なる企業に関連付けられています:', user.company_id)
     return {
-      success: true,
-      membership: newMembership
+      success: false,
+      error: `User belongs to different company: ${user.company_id}`
     }
 
   } catch (error) {
-    console.error('💥 メンバーシップ確認で予期しないエラー:', error)
+    console.error('💥 企業アクセス権確認で予期しないエラー:', error)
     return {
       success: false,
       error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`

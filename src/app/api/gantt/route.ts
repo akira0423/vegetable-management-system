@@ -26,42 +26,23 @@ export async function GET(request: NextRequest) {
     // API リクエストパラメータの基本ログ
     console.log('📋 GET /api/gantt:', { company_id: companyId, filters: { vegetableId, status, startDate, endDate } })
 
-    // Company IDが指定されていない場合は自動解決
+    // Company IDが指定されていない場合はエラー
     if (!companyId) {
-      console.log('🏢 Company IDが未指定 - 自動解決を開始')
-      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
-      const resolveResult = await resolveUserCompany(user.id)
-      
-      if (!resolveResult.success) {
-        return NextResponse.json(
-          { error: 'Failed to resolve user company' },
-          { status: 403 }
-        )
-      }
-      
-      companyId = resolveResult.companyId!
-      console.log('✅ Company ID自動解決完了:', companyId)
+      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // ユーザーが指定された企業にアクセス権限を持っているか確認
-    const { checkAndEnsureMembership } = await import('@/lib/auth/membership-helper')
-    const membershipResult = await checkAndEnsureMembership(user.id, companyId)
+    // ユーザーの企業アクセス権を確認
+    const { ensureUserMembership } = await import('@/lib/auth/membership-helper')
+    const membershipResult = await ensureUserMembership(user.id, companyId)
 
     if (!membershipResult.success) {
-      // メンバーシップが失敗した場合、企業を自動解決してリトライ
-      console.log('🔄 メンバーシップ確認失敗 - 企業自動解決をリトライ')
-      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
-      const resolveResult = await resolveUserCompany(user.id)
-      
-      if (!resolveResult.success) {
-        return NextResponse.json(
-          { error: 'Access denied to this company data' },
-          { status: 403 }
-        )
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ API - 企業アクセスエラー:', membershipResult.error)
       }
-      
-      companyId = resolveResult.companyId!
-      console.log('✅ 企業自動解決による復旧完了:', companyId)
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // アクティブなタスクのみ取得するかどうか
