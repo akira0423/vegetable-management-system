@@ -127,6 +127,24 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     return () => window.removeEventListener('resize', checkTouchDevice)
   }, [])
 
+  // キーボードショートカット（Ctrl+B または Cmd+B）
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault()
+        toggleSidebar()
+      }
+      // ESCキーでサイドバーを閉じる
+      if (e.key === 'Escape' && showSidebar) {
+        e.preventDefault()
+        setShowSidebar(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showSidebar, toggleSidebar])
+
   // スワイプジェスチャーでサイドバー操作
   useSwipeGesture(mapContainerRef, {
     onSwipeRight: () => {
@@ -143,14 +161,15 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     velocity: 0.5  // より高い速度を要求
   })
 
-  // サイドバー表示状態をセッションストレージから復元＋レスポンシブ対応
+  // サイドバー表示状態をセッションストレージから復元（全画面対応）
   useEffect(() => {
     const savedState = sessionStorage.getItem('farmMapSidebarVisible')
     
-    if (savedState !== null && !screenSize.isMobile) {
+    if (savedState !== null) {
+      // 保存された状態を復元
       setShowSidebar(JSON.parse(savedState))
     } else {
-      // モバイルでは初期状態で非表示
+      // 初期状態: モバイルは非表示、PCは表示
       setShowSidebar(!screenSize.isMobile)
     }
   }, [])
@@ -976,16 +995,17 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                   <button
                     onClick={toggleSidebar}
                     className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white/80 hover:bg-white border border-gray-200 rounded-lg transition-all duration-200 hover:shadow-md"
+                    title={`操作パネル切り替え (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+B)`}
                   >
                     {showSidebar ? (
                       <>
                         <EyeOff className="w-4 h-4" />
-                        非表示
+                        操作パネルを閉じる
                       </>
                     ) : (
                       <>
                         <Eye className="w-4 h-4" />
-                        基本操作ガイド・栽培野菜一覧
+                        操作パネルを開く
                       </>
                     )}
                   </button>
@@ -1036,10 +1056,10 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
       </div>
 
       <div className="flex-1 flex relative">
-        {/* サイドバーオーバーレイ（モバイル用） */}
+        {/* サイドバーオーバーレイ（全画面対応） */}
         {showSidebar && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-10"
             onClick={toggleSidebar}
           />
         )}
@@ -1047,7 +1067,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         {/* プロフェッショナル農地管理サイドバー */}
         <div className={`w-80 sm:w-80 md:w-80 lg:w-96 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/60 transition-all duration-300 ease-in-out ${
           showSidebar ? 'translate-x-0' : '-translate-x-full'
-        } ${showSidebar ? 'relative md:relative' : 'absolute'} z-10 h-full shadow-lg flex flex-col max-h-screen hover:shadow-xl`}>
+        } fixed z-20 h-full shadow-lg flex flex-col max-h-screen hover:shadow-xl`}>
           
           {/* サイドバーヘッダー */}
           <div className="bg-gradient-to-r from-green-600 to-green-700 p-4 text-white">
@@ -1611,7 +1631,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         {/* メイン地図エリア */}
         <div 
           ref={mapContainerRef}
-          className={`${showSidebar ? 'flex-1' : 'w-full'} relative transition-all duration-300 ease-in-out`}>
+          className="w-full relative transition-all duration-300 ease-in-out">
           
           <ProfessionalFarmEditor
             ref={mapEditorRef}
