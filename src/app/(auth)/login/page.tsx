@@ -23,18 +23,42 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // 環境変数をデバッグログに出力（本番環境では削除予定）
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔐 Login attempt:', {
+          hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          email: email
+        })
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。')
+        console.error('🚫 Login error:', error.message, error.status)
+        
+        // より詳細なエラーメッセージを提供
+        if (error.message.includes('Invalid login credentials')) {
+          setError('メールアドレスまたはパスワードが正しくありません。')
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('メールアドレスの確認が完了していません。確認メールをチェックしてください。')
+        } else if (error.message.includes('Too many requests')) {
+          setError('ログイン試行回数が上限に達しました。しばらく経ってから再試行してください。')
+        } else {
+          setError(`ログインエラー: ${error.message}`)
+        }
         return
       }
 
-      router.push('/dashboard/gantt')
+      if (data?.user) {
+        console.log('✅ Login successful:', data.user.email)
+        router.push('/dashboard/gantt')
+      }
     } catch (err) {
+      console.error('💥 Unexpected login error:', err)
       setError('システムエラーが発生しました。しばらく経ってから再試行してください。')
     } finally {
       setLoading(false)
