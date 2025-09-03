@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('company_id')
+    let companyId = searchParams.get('company_id')
     const vegetableId = searchParams.get('vegetable_id')
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
@@ -25,8 +25,21 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    // Company IDが指定されていない場合は自動解決
     if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+      console.log('🏢 Company IDが未指定 - 自動解決を開始')
+      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
+      const resolveResult = await resolveUserCompany(user.id)
+      
+      if (!resolveResult.success) {
+        return NextResponse.json(
+          { error: 'Failed to resolve user company' },
+          { status: 403 }
+        )
+      }
+      
+      companyId = resolveResult.companyId!
+      console.log('✅ Company ID自動解決完了:', companyId)
     }
 
     // ユーザーが指定された企業にアクセス権限を持っているか確認
@@ -34,13 +47,20 @@ export async function GET(request: NextRequest) {
     const membershipResult = await checkAndEnsureMembership(user.id, companyId)
 
     if (!membershipResult.success) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+      // メンバーシップが失敗した場合、企業を自動解決してリトライ
+      console.log('🔄 メンバーシップ確認失敗 - 企業自動解決をリトライ')
+      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
+      const resolveResult = await resolveUserCompany(user.id)
+      
+      if (!resolveResult.success) {
+        return NextResponse.json(
+          { error: 'Access denied to this company data' },
+          { status: 403 }
+        )
       }
-      return NextResponse.json(
-        { error: 'Access denied to this company data' },
-        { status: 403 }
-      )
+      
+      companyId = resolveResult.companyId!
+      console.log('✅ 企業自動解決による復旧完了:', companyId)
     }
 
     // アクティブな記録のみ取得するかどうか

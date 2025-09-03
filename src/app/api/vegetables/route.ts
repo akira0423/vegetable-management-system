@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('company_id')
+    let companyId = searchParams.get('company_id')
     const search = searchParams.get('search')
     const status = searchParams.get('status')
     const plotName = searchParams.get('plot_name')
@@ -28,11 +28,22 @@ export async function GET(request: NextRequest) {
       console.log('🔍 野菜API - リクエストパラメータ:', { companyId, search, status, plotName, limit, offset })
     }
 
+    // Company IDが指定されていない場合、または指定されたIDでメンバーシップが見つからない場合は、
+    // ユーザーの企業を自動解決
     if (!companyId) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ 野菜API - company_id が指定されていません')
+      console.log('🏢 Company IDが未指定 - 自動解決を開始')
+      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
+      const resolveResult = await resolveUserCompany(user.id)
+      
+      if (!resolveResult.success) {
+        return NextResponse.json(
+          { error: 'Failed to resolve user company' },
+          { status: 403 }
+        )
       }
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+      
+      companyId = resolveResult.companyId!
+      console.log('✅ Company ID自動解決完了:', companyId)
     }
 
     // ユーザーのメンバーシップを確認・自動作成
@@ -40,13 +51,21 @@ export async function GET(request: NextRequest) {
     const membershipResult = await checkAndEnsureMembership(user.id, companyId)
 
     if (!membershipResult.success) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ 野菜API - メンバーシップエラー:', membershipResult.error)
+      // メンバーシップが失敗した場合、企業を自動解決してリトライ
+      console.log('🔄 メンバーシップ確認失敗 - 企業自動解決をリトライ')
+      const { resolveUserCompany } = await import('@/lib/auth/company-resolver')
+      const resolveResult = await resolveUserCompany(user.id)
+      
+      if (!resolveResult.success) {
+        return NextResponse.json(
+          { error: 'Access denied to this company data' },
+          { status: 403 }
+        )
       }
-      return NextResponse.json(
-        { error: 'Access denied to this company data' },
-        { status: 403 }
-      )
+      
+      // 解決された企業IDを使用
+      companyId = resolveResult.companyId!
+      console.log('✅ 企業自動解決による復旧完了:', companyId)
     }
 
     // ベースクエリ（アーカイブ済みデータを除外）
