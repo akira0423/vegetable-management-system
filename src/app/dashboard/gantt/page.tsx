@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -128,6 +129,9 @@ export default function GanttPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  
+  // Supabaseクライアントの初期化
+  const supabase = createClient()
   
   // フィルター状態
   const [selectedVegetable, setSelectedVegetable] = useState<string>('all')
