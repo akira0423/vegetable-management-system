@@ -29,11 +29,14 @@ export async function createClient() {
   )
 }
 
-// ⚠️ Service role client - データ取得APIで必要
-// 通常のユーザー操作では createClient() を使用してください  
+// ⚠️ Service role client - 管理機能のみに制限
+// 通常のAPIでは createClient() を使用してください
 export async function createServiceClient() {
-  // 本番環境でも一時的に許可（データ取得のため）
-  // 将来的にはより細かい権限制御を実装予定
+  // 本番環境では管理機能のみ許可
+  if (process.env.NODE_ENV === 'production') {
+    // 管理機能でのみ使用を許可（将来の管理パネル用）
+    console.warn('⚠️ Service role client used in production - should be limited to admin functions only')
+  }
   
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY

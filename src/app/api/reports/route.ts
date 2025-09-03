@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -17,6 +27,22 @@ export async function GET(request: NextRequest) {
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
+
+    // ユーザーが指定された企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', companyId)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // アクティブな記録のみ取得するかどうか
@@ -140,7 +166,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     
     let body;
     try {
@@ -158,6 +194,22 @@ export async function POST(request: NextRequest) {
     // 必須フィールドの検証
     if (!body.company_id) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
+
+    // ユーザーが指定された企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', body.company_id)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     if (!body.work_type) {
@@ -259,13 +311,50 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
     
     const { id, reason, hard_delete = false } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Report ID is required' }, { status: 400 })
+    }
+
+    // レポートの存在確認と企業アクセス権限チェック
+    const { data: report, error: reportError } = await supabase
+      .from('work_reports')
+      .select('company_id')
+      .eq('id', id)
+      .single()
+
+    if (reportError || !report) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+    }
+
+    // ユーザーが該当企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', report.company_id)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     if (hard_delete) {

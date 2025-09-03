@@ -3,7 +3,17 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServiceClient() // Service clientに変更
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -23,6 +33,22 @@ export async function GET(request: NextRequest) {
         console.log('❌ 野菜API - company_id が指定されていません')
       }
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
+
+    // ユーザーが指定された企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', companyId)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // ベースクエリ（アーカイブ済みデータを除外）

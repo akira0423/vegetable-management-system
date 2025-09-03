@@ -3,7 +3,17 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -18,6 +28,22 @@ export async function GET(request: NextRequest) {
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
+
+    // ユーザーが指定された企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', companyId)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // アクティブなタスクのみ取得するかどうか
@@ -181,7 +207,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
     
     const {
@@ -214,7 +250,7 @@ export async function POST(request: NextRequest) {
     // task_typeのデフォルト値を設定（null制約対応）
     const validTaskType = task_type || 'other'
 
-    // vegetable_idからcompany_idを取得（作業記録と同じパターン）
+    // vegetable_idからcompany_idを取得し、アクセス権限を確認
     const { data: vegetableData, error: vegetableError } = await supabase
       .from('vegetables')
       .select('company_id')
@@ -226,6 +262,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Invalid vegetable_id or vegetable not found' 
       }, { status: 400 })
+    }
+
+    // ユーザーが該当企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', vegetableData.company_id)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // 統一されたアーキテクチャでタスクを作成（work_reportsと同じ堅牢性）
@@ -314,7 +366,17 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
     
     const {
@@ -331,6 +393,33 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    }
+
+    // タスクの存在確認と企業アクセス権限チェック
+    const { data: existingTask, error: taskError } = await supabase
+      .from('growing_tasks')
+      .select('company_id')
+      .eq('id', id)
+      .single()
+
+    if (taskError || !existingTask) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    // ユーザーが該当企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', existingTask.company_id)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
     }
 
     // タスクを更新
@@ -406,7 +495,18 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     console.log('🗑️ DELETE API 開始')
-    const supabase = await createServiceClient()
+    // 認証済みクライアントを使用（セキュリティ強化）
+    const supabase = await createClient()
+    
+    // ユーザー認証確認
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
     const body = await request.json()
     
     const { id, reason, hard_delete = false } = body
@@ -416,17 +516,35 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
-    // ハード削除実行（work_reportsと同じ方式）
-    console.log('🗑️ ハード削除実行中...')
-    
-    // 削除前の状態確認
-    const { data: beforeDelete, error: beforeError } = await supabase
+    // タスクの存在確認と企業アクセス権限チェック
+    const { data: taskToDelete, error: taskFetchError } = await supabase
       .from('growing_tasks')
-      .select('id, name')
+      .select('company_id, name')
       .eq('id', id)
       .single()
-    
-    console.log('🔍 削除前のタスク確認:', beforeDelete, 'エラー:', beforeError)
+
+    if (taskFetchError || !taskToDelete) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    // ユーザーが該当企業にアクセス権限を持っているか確認
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_memberships')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .eq('company_id', taskToDelete.company_id)
+      .eq('status', 'active')
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'Access denied to this company data' },
+        { status: 403 }
+      )
+    }
+
+    // ハード削除実行（work_reportsと同じ方式）
+    console.log('🗑️ ハード削除実行中...')
     
     const { error } = await supabase
       .from('growing_tasks')
@@ -439,15 +557,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     console.log('✅ タスクをハード削除しました:', id)
-    
-    // 削除後の状態確認
-    const { data: afterDelete, error: afterError } = await supabase
-      .from('growing_tasks')
-      .select('id, name')
-      .eq('id', id)
-      .single()
-    
-    console.log('🔍 削除後のタスク確認:', afterDelete, 'エラー:', afterError)
 
     return NextResponse.json({
       success: true,
