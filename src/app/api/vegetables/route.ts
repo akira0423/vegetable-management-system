@@ -35,16 +35,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // ユーザーが指定された企業にアクセス権限を持っているか確認
-    const { data: membership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('id, role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .eq('status', 'active')
-      .single()
+    // ユーザーのメンバーシップを確認・自動作成
+    const { checkAndEnsureMembership } = await import('@/lib/auth/membership-helper')
+    const membershipResult = await checkAndEnsureMembership(user.id, companyId)
 
-    if (membershipError || !membership) {
+    if (!membershipResult.success) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ 野菜API - メンバーシップエラー:', membershipResult.error)
+      }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
         { status: 403 }

@@ -30,15 +30,13 @@ export async function GET(request: NextRequest) {
     }
 
     // ユーザーが指定された企業にアクセス権限を持っているか確認
-    const { data: membership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('id, role')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .eq('status', 'active')
-      .single()
+    const { checkAndEnsureMembership } = await import('@/lib/auth/membership-helper')
+    const membershipResult = await checkAndEnsureMembership(user.id, companyId)
 
-    if (membershipError || !membership) {
+    if (!membershipResult.success) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+      }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
         { status: 403 }
@@ -197,15 +195,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ユーザーが指定された企業にアクセス権限を持っているか確認
-    const { data: membership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('id, role')
-      .eq('user_id', user.id)
-      .eq('company_id', body.company_id)
-      .eq('status', 'active')
-      .single()
+    const { checkAndEnsureMembership } = await import('@/lib/auth/membership-helper')
+    const membershipResult = await checkAndEnsureMembership(user.id, body.company_id)
 
-    if (membershipError || !membership) {
+    if (!membershipResult.success) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+      }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
         { status: 403 }
@@ -342,15 +338,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // ユーザーが該当企業にアクセス権限を持っているか確認
-    const { data: membership, error: membershipError } = await supabase
-      .from('company_memberships')
-      .select('id, role')
-      .eq('user_id', user.id)
-      .eq('company_id', report.company_id)
-      .eq('status', 'active')
-      .single()
+    const { checkAndEnsureMembership } = await import('@/lib/auth/membership-helper')
+    const membershipResult = await checkAndEnsureMembership(user.id, report.company_id)
 
-    if (membershipError || !membership) {
+    if (!membershipResult.success) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+      }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
         { status: 403 }
