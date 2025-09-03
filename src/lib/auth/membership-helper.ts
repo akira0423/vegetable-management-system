@@ -21,6 +21,7 @@ export async function ensureUserMembership(
 ): Promise<MembershipResult> {
   try {
     console.log('🔍 企業アクセス権確認開始:', { userId, companyId })
+    console.log('🌍 実行環境:', process.env.NODE_ENV)
     
     const supabase = await createClient()
 
@@ -31,12 +32,22 @@ export async function ensureUserMembership(
       .eq('id', userId)
       .single()
 
-    console.log('📊 ユーザー情報:', { user, error: userError?.message })
+    console.log('📊 ユーザー情報:', { 
+      user, 
+      error: userError?.message,
+      userError: userError,
+      timestamp: new Date().toISOString()
+    })
 
     if (userError || !user) {
+      console.log('❌ ユーザー検索失敗:', { 
+        userError: userError?.message,
+        userId,
+        timestamp: new Date().toISOString()
+      })
       return {
         success: false,
-        error: 'User not found'
+        error: `User not found: ${userError?.message || 'No user data'}`
       }
     }
 
@@ -50,7 +61,11 @@ export async function ensureUserMembership(
 
     // ユーザーが既に企業に関連付けられている場合
     if (user.company_id === companyId) {
-      console.log('✅ ユーザーは既に企業に関連付けられています')
+      console.log('✅ ユーザーは既に企業に関連付けられています', {
+        userCompanyId: user.company_id,
+        requestedCompanyId: companyId,
+        match: user.company_id === companyId
+      })
       return {
         success: true,
         membership: {
@@ -92,10 +107,14 @@ export async function ensureUserMembership(
     }
 
     // ユーザーが異なる企業に関連付けられている場合
-    console.log('⚠️ ユーザーは異なる企業に関連付けられています:', user.company_id)
+    console.log('⚠️ ユーザーは異なる企業に関連付けられています:', {
+      userCompanyId: user.company_id,
+      requestedCompanyId: companyId,
+      userId: userId
+    })
     return {
       success: false,
-      error: `User belongs to different company: ${user.company_id}`
+      error: `User belongs to different company: ${user.company_id} (requested: ${companyId})`
     }
 
   } catch (error) {
