@@ -33,25 +33,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // 本番環境デバッグ用ログ
-    console.error('VEGETABLES API DEBUG - Request details:', {
-      userId: user.id,
-      companyId: companyId,
-      userEmail: user.email,
-      timestamp: new Date().toISOString()
-    })
-
     // ユーザーの企業アクセス権を確認
     const { ensureUserMembership } = await import('@/lib/auth/membership-helper')
     const membershipResult = await ensureUserMembership(user.id, companyId)
 
     if (!membershipResult.success) {
-      console.error('VEGETABLES API DEBUG - Membership check failed:', {
-        userId: user.id,
-        companyId: companyId,
-        error: membershipResult.error,
-        timestamp: new Date().toISOString()
-      })
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ 野菜API - 企業アクセスエラー:', membershipResult.error)
+      }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
         { status: 403 }

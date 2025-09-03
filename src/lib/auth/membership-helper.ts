@@ -21,12 +21,6 @@ export async function ensureUserMembership(
 ): Promise<MembershipResult> {
   try {
     console.log('🔍 企業アクセス権確認開始:', { userId, companyId })
-    console.log('🌍 実行環境:', process.env.NODE_ENV)
-    
-    // 本番環境でもログを確実に出力
-    if (process.env.NODE_ENV === 'production') {
-      console.error('PRODUCTION DEBUG - ensureUserMembership called:', { userId, companyId, timestamp: new Date().toISOString() })
-    }
     
     const supabase = await createClient()
 
@@ -37,22 +31,7 @@ export async function ensureUserMembership(
       .eq('id', userId)
       .single()
 
-    console.log('📊 ユーザー情報:', { 
-      user, 
-      error: userError?.message,
-      userError: userError,
-      timestamp: new Date().toISOString()
-    })
-    
-    // 本番環境でもログを確実に出力
-    if (process.env.NODE_ENV === 'production') {
-      console.error('PRODUCTION DEBUG - User query result:', { 
-        success: !userError && !!user,
-        user: user,
-        error: userError?.message,
-        timestamp: new Date().toISOString()
-      })
-    }
+    console.log('📊 ユーザー情報:', { user, error: userError?.message })
 
     if (userError || !user) {
       console.log('❌ ユーザー検索失敗:', { 
