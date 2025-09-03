@@ -23,6 +23,11 @@ export async function ensureUserMembership(
     console.log('🔍 企業アクセス権確認開始:', { userId, companyId })
     console.log('🌍 実行環境:', process.env.NODE_ENV)
     
+    // 本番環境でもログを確実に出力
+    if (process.env.NODE_ENV === 'production') {
+      console.error('PRODUCTION DEBUG - ensureUserMembership called:', { userId, companyId, timestamp: new Date().toISOString() })
+    }
+    
     const supabase = await createClient()
 
     // ユーザーの企業関連付けを確認
@@ -38,6 +43,16 @@ export async function ensureUserMembership(
       userError: userError,
       timestamp: new Date().toISOString()
     })
+    
+    // 本番環境でもログを確実に出力
+    if (process.env.NODE_ENV === 'production') {
+      console.error('PRODUCTION DEBUG - User query result:', { 
+        success: !userError && !!user,
+        user: user,
+        error: userError?.message,
+        timestamp: new Date().toISOString()
+      })
+    }
 
     if (userError || !user) {
       console.log('❌ ユーザー検索失敗:', { 
