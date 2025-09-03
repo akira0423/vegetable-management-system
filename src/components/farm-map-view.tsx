@@ -1022,9 +1022,9 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         )}
         
         {/* プロフェッショナル農地管理サイドバー */}
-        <div className={`w-80 sm:w-80 md:w-80 lg:w-96 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/60 transition-transform duration-300 ease-in-out ${
+        <div className={`w-80 sm:w-80 md:w-80 lg:w-96 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/60 transition-all duration-300 ease-in-out ${
           showSidebar ? 'translate-x-0' : '-translate-x-full'
-        } ${showSidebar ? 'relative md:relative' : 'absolute'} z-10 h-full shadow-lg flex flex-col max-h-screen`}>
+        } ${showSidebar ? 'relative md:relative' : 'absolute'} z-10 h-full shadow-lg flex flex-col max-h-screen hover:shadow-xl`}>
           
           {/* サイドバーヘッダー */}
           <div className="bg-gradient-to-r from-green-600 to-green-700 p-4 text-white">
@@ -1038,6 +1038,14 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                   <p className="text-xs text-green-100 opacity-90">Farm Management Hub</p>
                 </div>
               </div>
+              {/* サイドバー内クローズボタン */}
+              <button
+                onClick={toggleSidebar}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors duration-200 group"
+                title="サイドバーを閉じる"
+              >
+                <ChevronLeft className="w-4 h-4 text-white/80 group-hover:text-white transition-colors" />
+              </button>
             </div>
           </div>
 
@@ -1593,6 +1601,21 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
             initialZoom={16}
             height="100%"
           />
+
+          {/* サイドバー開閉フローティングボタン */}
+          {!showSidebar && (
+            <div className="absolute top-4 left-4 z-50">
+              <Button
+                onClick={toggleSidebar}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white shadow-lg border-0"
+                title="サイドバーを開く"
+              >
+                <Menu className="w-4 h-4 mr-1" />
+                操作パネル
+              </Button>
+            </div>
+          )}
 
           {/* 🆕 モバイル専用：ポリゴンクリアボタン */}
           {isTouchDevice && visiblePolygons.size > 0 && (
