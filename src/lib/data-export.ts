@@ -5,6 +5,8 @@
  * CSV・Excel形式での農業データエクスポート
  */
 
+import { createClient } from '@/lib/supabase/client'
+
 interface ExportOptions {
   format: 'csv' | 'excel'
   dateRange?: {
@@ -65,7 +67,17 @@ class DataExportManager {
       console.log('🚀 野菜データエクスポート開始:', options.format)
       
       const companyId = 'a1111111-1111-1111-1111-111111111111'
-      const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=1000`)
+      
+      // JWTトークンを含めたリクエスト
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       
       if (!response.ok) {
         throw new Error('野菜データの取得に失敗しました')
@@ -383,7 +395,17 @@ class DataExportManager {
    */
   private async fetchVegetables(): Promise<VegetableExportData[]> {
     const companyId = 'a1111111-1111-1111-1111-111111111111'
-    const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=1000`)
+    
+    // JWTトークンを含めたリクエスト
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=1000`, {
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    })
     
     if (!response.ok) {
       throw new Error('野菜データの取得に失敗しました')

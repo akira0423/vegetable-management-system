@@ -655,10 +655,17 @@ export default function GanttPage() {
       console.log('🔍 fetchData - 野菜API呼び出し準備 company_id:', companyId)
       console.log('🔍 fetchData - 野菜API URL:', `/api/vegetables?company_id=${companyId}`)
       
+      // JWTトークンを取得
+      const { data: { session } } = await supabase.auth.getSession()
+      const authHeaders = {
+        'Authorization': `Bearer ${session?.access_token}`,
+        'Content-Type': 'application/json'
+      }
+
       const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
-        fetch(`/api/gantt?${params.toString()}`),
-        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`),
-        fetch(`/api/vegetables?company_id=${companyId}`) // 最新の野菜データを直接取得
+        fetch(`/api/gantt?${params.toString()}`, { headers: authHeaders }),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`, { headers: authHeaders }),
+        fetch(`/api/vegetables?company_id=${companyId}`, { headers: authHeaders }) // 最新の野菜データを直接取得
       ])
 
       const ganttResult = await ganttResponse.json()

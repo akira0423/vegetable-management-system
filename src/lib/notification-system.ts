@@ -5,6 +5,8 @@
  * タスク期限・収穫時期・重要アラートの管理
  */
 
+import { createClient } from '@/lib/supabase/client'
+
 interface NotificationData {
   id: string
   type: 'task_deadline' | 'harvest_alert' | 'weather_warning' | 'work_reminder' | 'system_alert'
@@ -159,7 +161,16 @@ class NotificationManager {
         }
       }
       
-      const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
+      // JWTトークンを含めたリクエスト
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=100`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       
       if (response.ok) {
         const result = await response.json()
