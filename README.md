@@ -1,8 +1,26 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 環境変数の設定
+
+**⚠️ セキュリティ重要事項**
+
+1. `.env.local`ファイルを作成し、実際の値を設定してください：
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. `.env.local`に以下の値を設定：
+   - `NEXT_PUBLIC_SUPABASE_URL`: SupabaseプロジェクトのURL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase匿名キー
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabaseサービスロールキー
+
+3. **絶対に`.env.local`をGitにコミットしないでください**（`.gitignore`で除外済み）
+
+4. Vercel本番環境では、ダッシュボードの Environment Variables で設定してください
+
 ## Getting Started
 
-First, run the development server:
+環境変数設定後、開発サーバーを起動：
 
 ```bash
 npm run dev
