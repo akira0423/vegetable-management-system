@@ -47,7 +47,7 @@ interface ResponsiveSidebarProps {
   className?: string
 }
 
-export default function ResponsiveSidebar({ className = '' }: ResponsiveSidebarProps) {
+export default function ResponsiveSidebar({ className = '' }: ResponsiveSidebarProps = {}) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)

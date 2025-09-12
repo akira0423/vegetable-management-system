@@ -23,9 +23,7 @@
       "Bash(set BACKUP_DIR=C:workbackup-20250830_154500)",
       "Bash(BACKUP_DIR=\"C:\\work\\backup-20250830_154000\")",
       "Bash(npm run build:*)",
-      "Bash(git commit:*)",
-      "Bash(git revert:*)",
-      "Bash(npm run dev:*)"
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "additionalDirectories": [
