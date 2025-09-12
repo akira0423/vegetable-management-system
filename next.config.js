@@ -12,14 +12,39 @@ const nextConfig = {
     // workerThreads: false,
     // esmExternals: false
   },
-  // 開発時のワーカープロセス設定  
-  webpack: (config) => {
+  // Webpack設定：地図ライブラリの最適化問題を解決
+  webpack: (config, { isServer }) => {
     // WebSocket警告を抑制
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
+    }
+
+    // 地図ライブラリの最適化を無効化（ReferenceErrorを防ぐ）
+    if (!isServer) {
+      config.externals = config.externals || []
+      
+      // MapLibre GLとMapbox GL Drawを外部依存として扱う
+      config.externals.push({
+        'maplibre-gl': 'maplibregl',
+        '@mapbox/mapbox-gl-draw': 'MapboxDraw'
+      })
+      
+      // 最適化設定を調整
+      config.optimization = config.optimization || {}
+      config.optimization.splitChunks = config.optimization.splitChunks || {}
+      config.optimization.splitChunks.cacheGroups = {
+        ...config.optimization.splitChunks.cacheGroups,
+        maplibre: {
+          name: 'maplibre',
+          test: /[\\/]node_modules[\\/](maplibre-gl|@mapbox\/mapbox-gl-draw)[\\/]/,
+          priority: 10,
+          chunks: 'all',
+          enforce: true
+        }
+      }
     }
     
     return config

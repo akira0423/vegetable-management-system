@@ -1,33 +1,22 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react'
-// 地図ライブラリを動的にインポート（SSR対応）
-let maplibregl: any = null
-let MapboxDraw: any = null
-
-// ライブラリの動的読み込み
-const loadMapLibraries = async () => {
-  if (typeof window === 'undefined') return { maplibregl: null, MapboxDraw: null }
+// グローバルオブジェクトから地図ライブラリを使用（CDN経由）
+const getMapLibraries = () => {
+  if (typeof window === 'undefined') {
+    return { maplibregl: null, MapboxDraw: null }
+  }
   
-  if (!maplibregl || !MapboxDraw) {
-    try {
-      // MapLibre GL JSの動的インポート
-      const maplibreModule = await import('maplibre-gl')
-      maplibregl = maplibreModule.default
-      
-      // MapboxDrawの動的インポート  
-      const mapboxDrawModule = await import('@mapbox/mapbox-gl-draw')
-      MapboxDraw = mapboxDrawModule.default
-      
-      // CSSの動的読み込み
-      await import('maplibre-gl/dist/maplibre-gl.css')
-      await import('@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css')
-      
-      return { maplibregl, MapboxDraw }
-    } catch (error) {
-      console.error('地図ライブラリの読み込みに失敗:', error)
-      throw error
-    }
+  // CDN経由で読み込まれたグローバルオブジェクトを使用
+  const maplibregl = (window as any).maplibregl
+  const MapboxDraw = (window as any).MapboxDraw
+  
+  if (!maplibregl) {
+    throw new Error('MapLibre GL JSがCDN経由で読み込まれていません')
+  }
+  
+  if (!MapboxDraw) {
+    throw new Error('Mapbox GL DrawがCDN経由で読み込まれていません')
   }
   
   return { maplibregl, MapboxDraw }
@@ -160,13 +149,30 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
 
     const initializeMap = async () => {
       try {
-        // 地図ライブラリの動的読み込み
-        const libraries = await loadMapLibraries()
-        if (!libraries.maplibregl || !libraries.MapboxDraw) {
-          throw new Error('地図ライブラリの読み込みに失敗しました')
+        // CDN経由のライブラリが読み込まれるまで待機
+        let retryCount = 0
+        const maxRetries = 50 // 5秒間待機
+        
+        while (retryCount < maxRetries) {
+          try {
+            const libraries = getMapLibraries()
+            if (libraries.maplibregl && libraries.MapboxDraw) {
+              // ローカル変数として使用
+              const MapLibreGL = libraries.maplibregl
+              const MapboxDrawLib = libraries.MapboxDraw
+              break
+            }
+          } catch (error) {
+            retryCount++
+            if (retryCount >= maxRetries) {
+              throw new Error('地図ライブラリの読み込みタイムアウト')
+            }
+            await new Promise(resolve => setTimeout(resolve, 100))
+            continue
+          }
         }
-
-        // ローカル変数として使用
+        
+        const libraries = getMapLibraries()
         const MapLibreGL = libraries.maplibregl
         const MapboxDrawLib = libraries.MapboxDraw
 

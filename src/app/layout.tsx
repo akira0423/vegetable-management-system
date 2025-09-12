@@ -114,6 +114,12 @@ export default function RootLayout({
         {/* Prevent zoom on input focus (mobile) */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         
+        {/* 地図ライブラリ CDN（JavaScript初期化エラー解決） */}
+        <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+        <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.css" />
+        <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+        <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
+
         {/* Preconnect for performance */}
         <link rel="preconnect" href="https://www.jma.go.jp" />
         <link rel="dns-prefetch" href="https://www.jma.go.jp" />
