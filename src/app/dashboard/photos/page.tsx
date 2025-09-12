@@ -717,8 +717,9 @@ export default function PhotosPage() {
         <div className="bg-white p-6 border-t border-green-200">
           <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-3">
             {WORK_TYPE_CATEGORIES.map(workCategory => {
-              const usage = storageInfo?.category_usage[workCategory.id]
-              const limitGB = STORAGE_LIMITS[workCategory.id as keyof typeof STORAGE_LIMITS]?.monthly_gb || 1
+              const usage = storageInfo?.category_usage?.[workCategory.id]
+              const storageLimit = STORAGE_LIMITS[workCategory.id as keyof typeof STORAGE_LIMITS]
+              const limitGB = storageLimit?.monthly_gb || 1
               const usageGB = usage ? usage.bytes / (1024 * 1024 * 1024) : 0
               const percentage = usage ? Math.min((usageGB / limitGB) * 100, 100) : 0
               
@@ -746,7 +747,7 @@ export default function PhotosPage() {
                     <Progress value={percentage} className="h-2" />
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>{usageGB.toFixed(1)}GB</span>
-                      <span>{STORAGE_LIMITS[workCategory.id as keyof typeof STORAGE_LIMITS]?.unlimited ? '無制限' : `${limitGB}GB`}</span>
+                      <span>{storageLimit?.unlimited ? '無制限' : `${limitGB}GB`}</span>
                     </div>
                     <div className="text-xs text-gray-500">
                       保存期間: {Math.floor(workCategory.retention_days / 365)}年{(workCategory.retention_days % 365) ? `${Math.floor((workCategory.retention_days % 365) / 30)}ヶ月` : ''}

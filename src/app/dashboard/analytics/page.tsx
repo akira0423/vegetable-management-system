@@ -186,125 +186,14 @@ export default function AnalyticsPage() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  
+  // サンプル野菜機能の状態
+  const [selectedSampleVegetable, setSelectedSampleVegetable] = useState<string>('')
+  const [sampleVegetables, setSampleVegetables] = useState<Array<{id: string, name: string, display_name: string, sample_category: string}>>([])
+  const [displayMode, setDisplayMode] = useState<'user' | 'sample' | 'comparison'>('user')
+  const [sampleData, setSampleData] = useState<AnalyticsData | null>(null)
+  const [sampleLoading, setSampleLoading] = useState(false)
 
-  // サンプルデータ
-  const sampleData: AnalyticsData = {
-    summary: {
-      total_revenue: 1250000,
-      total_cost: 780000,
-      profit_margin: 37.6,
-      total_harvest: 2840,
-      total_work_hours: 456.5,
-      avg_yield_per_sqm: 8.5,
-      active_plots: 12,
-      completed_harvests: 8,
-      efficiency_score: 87
-    },
-    harvest_analysis: [
-      { label: '6月', value: 320, color: 'bg-green-500' },
-      { label: '7月', value: 480, color: 'bg-green-600' },
-      { label: '8月', value: 650, color: 'bg-green-700' },
-      { label: '9月', value: 590, color: 'bg-green-600' },
-      { label: '10月', value: 420, color: 'bg-green-500' },
-      { label: '11月', value: 380, color: 'bg-green-400' }
-    ],
-    cost_analysis: [
-      { label: '種苗費', value: 180000, color: 'bg-blue-500' },
-      { label: '肥料費', value: 220000, color: 'bg-blue-600' },
-      { label: '農薬費', value: 95000, color: 'bg-blue-400' },
-      { label: '人件費', value: 285000, color: 'bg-blue-700' }
-    ],
-    efficiency_trends: [
-      { label: '6月', value: 78 },
-      { label: '7月', value: 82 },
-      { label: '8月', value: 85 },
-      { label: '9月', value: 87 },
-      { label: '10月', value: 89 },
-      { label: '11月', value: 87 }
-    ],
-    seasonal_performance: [
-      { label: '春', value: 2.1, color: 'bg-pink-500' },
-      { label: '夏', value: 3.8, color: 'bg-red-500' },
-      { label: '秋', value: 3.2, color: 'bg-orange-500' },
-      { label: '冬', value: 1.9, color: 'bg-blue-500' }
-    ],
-    vegetable_performance: [
-      {
-        name: 'トマト',
-        variety: '桃太郎',
-        plot_size: 100,
-        harvest_amount: 850,
-        revenue: 425000,
-        cost: 180000,
-        profit: 245000,
-        yield_per_sqm: 8.5,
-        roi: 136.1,
-        status: 'excellent'
-      },
-      {
-        name: 'レタス',
-        variety: 'グリーンリーフ',
-        plot_size: 50,
-        harvest_amount: 320,
-        revenue: 192000,
-        cost: 85000,
-        profit: 107000,
-        yield_per_sqm: 6.4,
-        roi: 125.9,
-        status: 'excellent'
-      },
-      {
-        name: 'キュウリ',
-        variety: '夏すずみ',
-        plot_size: 80,
-        harvest_amount: 640,
-        revenue: 256000,
-        cost: 125000,
-        profit: 131000,
-        yield_per_sqm: 8.0,
-        roi: 104.8,
-        status: 'good'
-      },
-      {
-        name: 'ナス',
-        variety: '千両',
-        plot_size: 60,
-        harvest_amount: 380,
-        revenue: 190000,
-        cost: 110000,
-        profit: 80000,
-        yield_per_sqm: 6.3,
-        roi: 72.7,
-        status: 'average'
-      }
-    ],
-    recent_activities: [
-      {
-        id: '1',
-        type: 'harvest',
-        title: 'トマト大豊作',
-        description: 'A区画-1のトマト（桃太郎）が予想を20%上回る収穫量',
-        value: 850,
-        timestamp: '2024-08-09T10:00:00Z'
-      },
-      {
-        id: '2',
-        type: 'efficiency',
-        title: '作業効率向上',
-        description: '前月比で作業効率が5%改善しました',
-        value: 87,
-        timestamp: '2024-08-08T15:30:00Z'
-      },
-      {
-        id: '3',
-        type: 'cost',
-        title: 'コスト削減達成',
-        description: '肥料費を前月比12%削減できました',
-        value: 220000,
-        timestamp: '2024-08-07T09:15:00Z'
-      }
-    ]
-  }
 
   // 認証情報の取得
   useEffect(() => {
@@ -396,6 +285,27 @@ export default function AnalyticsPage() {
     
     return () => clearInterval(interval)
   }, [autoRefresh, companyId, selectedVegetable, selectedPlot])
+
+  // サンプル野菜一覧の初期取得
+  useEffect(() => {
+    fetchSampleVegetables()
+  }, [])
+
+  // サンプル野菜選択時の処理
+  useEffect(() => {
+    if (selectedSampleVegetable) {
+      fetchSampleAnalytics(selectedSampleVegetable)
+      // サンプル野菜選択時は表示モードを自動調整
+      if (displayMode === 'user') {
+        setDisplayMode('sample')
+      }
+    } else {
+      setSampleData(null)
+      if (displayMode === 'sample') {
+        setDisplayMode('user')
+      }
+    }
+  }, [selectedSampleVegetable])
 
   const fetchAnalyticsData = async () => {
     if (!companyId) {
@@ -490,8 +400,7 @@ export default function AnalyticsPage() {
         })
         
         const analyticsFromReports = generateDetailedAnalyticsFromReports(last12MonthsReports, filteredVegetables)
-        const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
-        setData(mergedData)
+        setData(analyticsFromReports)
       } else {
         // データがない場合は null を設定（空状態表示用）
         setData(null)
@@ -508,26 +417,91 @@ export default function AnalyticsPage() {
     }
   }
 
+  // サンプル野菜一覧を取得
+  const fetchSampleVegetables = async () => {
+    try {
+      console.log('🌱 Sample vegetables: データ取得開始')
+      const response = await fetch('/api/sample-vegetables')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setSampleVegetables(result.data || [])
+        console.log(`✅ Sample vegetables: ${result.data?.length || 0}件取得成功`)
+      } else {
+        console.error('❌ Sample vegetables: ', result.error)
+      }
+    } catch (error) {
+      console.error('❌ Sample vegetables fetch error:', error)
+    }
+  }
+
+  // サンプル分析データを取得
+  const fetchSampleAnalytics = async (sampleVegetableId: string) => {
+    if (!sampleVegetableId || sampleVegetableId.trim() === '' || sampleVegetableId === 'none') {
+      console.log('⚠️ Sample analytics: 無効なID', sampleVegetableId)
+      return
+    }
+    
+    try {
+      setSampleLoading(true)
+      console.log('📊 Sample analytics: データ取得開始', sampleVegetableId)
+      
+      const response = await fetch(`/api/sample-analytics?sample_vegetable_id=${encodeURIComponent(sampleVegetableId)}`)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Sample analytics API error:', response.status, errorText)
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setSampleData(result.analytics)
+        console.log('✅ Sample analytics: データ取得成功', result.vegetable?.display_name)
+      } else {
+        console.error('❌ Sample analytics: ', result.error)
+        setSampleData(null)
+      }
+    } catch (error) {
+      console.error('❌ Sample analytics fetch error:', error)
+      setSampleData(null)
+    } finally {
+      setSampleLoading(false)
+    }
+  }
+
   // 作業レポートから詳細分析データを生成（会計データ統合版）
   const generateDetailedAnalyticsFromReports = (reports: any[], vegetables: any[]) => {
     // 実際のデータのみを使用（サンプルデータは使用しない）
     if (!reports || reports.length === 0) {
-      // データがない場合は空の分析結果を返す
+      // データがない場合は完全なAnalyticsDataインターフェース準拠の空オブジェクトを返す
       return {
-        harvestByMonth: {},
-        costByType: {},
-        workFrequency: {},
-        vegetablePerformance: [],
-        totalRevenue: 0,
-        totalCost: 0,
-        totalHarvest: 0,
-        totalWorkHours: 0,
-        profitMargin: 0,
-        recentActivities: [],
+        summary: {
+          total_revenue: 0,
+          total_cost: 0,
+          profit_margin: 0,
+          total_harvest: 0,
+          total_work_hours: 0,
+          avg_yield_per_sqm: 0,
+          active_plots: vegetables.length,
+          completed_harvests: 0,
+          efficiency_score: 0
+        },
+        harvest_analysis: [],
+        cost_analysis: [],
+        work_frequency: [],
+        vegetable_performance: [],
+        recent_activities: [],
         dataQuality: {
-          incomeSource: 'none',
-          expenseSource: 'none',
-          reliability: 'low'
+          incomeSource: 'none' as const,
+          expenseSource: 'none' as const,
+          reliability: 'low' as const
         }
       }
     }
@@ -710,17 +684,41 @@ export default function AnalyticsPage() {
       })
       .reverse()
 
+    // 完全なAnalyticsDataインターフェースに準拠したオブジェクトを返す
+    const finalTotalRevenue = totalActualRevenue + totalEstimatedRevenue
+    const finalTotalCost = totalActualCost + totalEstimatedCost
+    const avgYield = vegetables.length > 0 ? totalHarvest / vegetables.reduce((sum, v) => sum + (v.area_size || 0), 0) : 0
+
     return {
-      harvestByMonth,
-      costByType,
-      workFrequency,
-      vegetablePerformance,
-      totalRevenue,
-      totalCost,
-      totalHarvest,
-      totalWorkHours,
-      profitMargin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
-      recentActivities,
+      summary: {
+        total_revenue: Math.round(finalTotalRevenue),
+        total_cost: Math.round(finalTotalCost),
+        profit_margin: finalTotalRevenue > 0 ? 
+          Math.round(((finalTotalRevenue - finalTotalCost) / finalTotalRevenue) * 100 * 10) / 10 : 0,
+        total_harvest: Math.round(totalHarvest * 10) / 10,
+        total_work_hours: totalWorkHours,
+        avg_yield_per_sqm: Math.round(avgYield * 100) / 100,
+        active_plots: vegetables.length,
+        completed_harvests: reports.filter(r => r.work_type === 'harvesting' && r.harvest_amount > 0).length,
+        efficiency_score: Math.min(100, Math.round((totalHarvest / Math.max(totalWorkHours, 1)) * 10))
+      },
+      harvest_analysis: Object.entries(harvestByMonth).map(([month, amount]) => ({
+        label: month,
+        value: Math.round((amount as number) * 10) / 10,
+        color: 'bg-green-600'
+      })),
+      cost_analysis: Object.entries(costByType).map(([type, amount]) => ({
+        label: type,
+        value: Math.round(amount as number),
+        color: 'bg-blue-600'
+      })),
+      work_frequency: Object.entries(workFrequency).map(([type, count]) => ({
+        label: type,
+        value: count as number,
+        color: 'bg-yellow-600'
+      })),
+      vegetable_performance: vegetablePerformance,
+      recent_activities: recentActivities,
       dataQuality
     }
   }
@@ -804,6 +802,29 @@ export default function AnalyticsPage() {
     }).format(num)
   }
 
+  // サンプル野菜のアイコン取得
+  const getSampleVegetableIcon = (category: string) => {
+    switch (category) {
+      case 'potato': return '🥔'
+      case 'onion': return '🧅'
+      case 'carrot': return '🥕'
+      default: return '🌱'
+    }
+  }
+
+  // 表示用データを決定
+  const getDisplayData = () => {
+    if (displayMode === 'sample' && sampleData) {
+      return sampleData
+    } else if (displayMode === 'user' && data) {
+      return data
+    } else if (displayMode === 'comparison' && data && sampleData) {
+      // 比較表示の場合は実データを基準とし、サンプルデータを参考として表示
+      return data
+    }
+    return data // フォールバック
+  }
+
   const getPerformanceColor = (status: string) => {
     const colors = {
       excellent: 'bg-green-100 text-green-700 border-green-200',
@@ -876,49 +897,101 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">レポート・分析</h1>
           <p className="text-gray-600">栽培データを分析して経営を最適化しましょう</p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="野菜を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              {vegetableOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-500">
-              最終更新: {lastUpdated.toLocaleTimeString('ja-JP')}
+        {/* 更新ボタン */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={autoRefresh ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            自動更新
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAnalyticsData}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            手動更新
+          </Button>
+        </div>
+      </div>
+
+      {/* フィルター・選択セクション */}
+      <div className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* 実際の野菜選択 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">🌱 栽培中の野菜</label>
+            <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="野菜を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {vegetableOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* サンプル野菜選択 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">📊 模範野菜データ</label>
+            <Select value={selectedSampleVegetable} onValueChange={setSelectedSampleVegetable}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="模範データを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">模範データなし</SelectItem>
+                {sampleVegetables.map((sample) => (
+                  <SelectItem key={sample.id} value={sample.id}>
+                    {getSampleVegetableIcon(sample.sample_category)} {sample.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 表示モード選択 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">📈 表示モード</label>
+            <Select value={displayMode} onValueChange={(value: 'user' | 'sample' | 'comparison') => setDisplayMode(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">実データのみ</SelectItem>
+                <SelectItem value="sample" disabled={!selectedSampleVegetable}>模範データのみ</SelectItem>
+                <SelectItem value="comparison" disabled={!selectedSampleVegetable || !data}>比較表示</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* ステータス表示 */}
+          <div className="flex flex-col justify-end">
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>最終更新: {lastUpdated.toLocaleTimeString('ja-JP')}</div>
+              {selectedSampleVegetable && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                  <span>模範データ表示中</span>
+                </div>
+              )}
             </div>
-            <Button
-              variant={autoRefresh ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAutoRefresh(!autoRefresh)}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
-              自動更新
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchAnalyticsData}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              手動更新
-            </Button>
           </div>
         </div>
       </div>
+
 
       {/* 金融×農業デザインのKPIカード（直近12カ月）with データ品質インジケーター */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1108,11 +1181,10 @@ export default function AnalyticsPage() {
 
       {/* メインコンテンツタブ */}
       <Tabs defaultValue="performance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="performance">パフォーマンス</TabsTrigger>
           <TabsTrigger value="worklog-cost">作業・コスト分析</TabsTrigger>
           <TabsTrigger value="soil-detail">土壌詳細分析</TabsTrigger>
-          <TabsTrigger value="harvest-revenue">収穫・収益分析</TabsTrigger>
           <TabsTrigger value="simulation">シミュレーション</TabsTrigger>
         </TabsList>
 
@@ -1196,77 +1268,6 @@ export default function AnalyticsPage() {
 
         </TabsContent>
 
-        {/* 収穫・収益分析タブ */}
-        <TabsContent value="harvest-revenue" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>月別収穫量詳細</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SimpleBarChart data={data.harvest_analysis} height={300} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>コスト内訳</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SimpleBarChart data={data.cost_analysis} height={300} />
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>収益サマリー</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                <span className="text-gray-700">売上高</span>
-                <span className="font-bold text-green-700">{formatCurrency(data.summary.total_revenue)}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-red-50 rounded">
-                <span className="text-gray-700">総コスト</span>
-                <span className="font-bold text-red-700">{formatCurrency(data.summary.total_cost)}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                <span className="text-gray-700">利益</span>
-                <span className="font-bold text-blue-700">{formatCurrency(data.summary.total_revenue - data.summary.total_cost)}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                <span className="text-gray-700">利益率</span>
-                <span className="font-bold text-yellow-700">{formatNumber(data.summary.profit_margin)}%</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>収穫統計サマリー</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <Sprout className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                  <p className="text-2xl font-bold text-green-700">{formatNumber(data.summary.total_harvest, 0)}kg</p>
-                  <p className="text-sm text-gray-600">総収穫量</p>
-                </div>
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                  <p className="text-2xl font-bold text-blue-700">{formatNumber(data.summary.avg_yield_per_sqm)}kg/㎡</p>
-                  <p className="text-sm text-gray-600">平均収量</p>
-                </div>
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <Award className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
-                  <p className="text-2xl font-bold text-yellow-700">{data.summary.completed_harvests}</p>
-                  <p className="text-sm text-gray-600">完了収穫</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
 
         {/* 🎯 将来予測シミュレーションタブ */}
@@ -1865,128 +1866,6 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* 詳細レポート生成セクション */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                📋 プロフェッショナル土壌分析レポート
-              </CardTitle>
-              <CardDescription>
-                包括的な土壌診断レポートを自動生成。農業改善提案も含まれます。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* レポート生成オプション */}
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">📊 レポート内容選択</h4>
-                  <div className="space-y-2">
-                    {[
-                      { label: '土壌成分詳細分析', desc: '全成分の推移と評価', checked: true },
-                      { label: '作物適性診断', desc: '現在の土壌に最適な作物', checked: true },
-                      { label: '改良提案レポート', desc: '具体的な改善方法', checked: true },
-                      { label: '季節別管理計画', desc: '年間を通じた管理戦略', checked: false },
-                      { label: '費用対効果分析', desc: '改良投資の経済性', checked: false },
-                      { label: '他圃場比較分析', desc: 'ベンチマークとの比較', checked: false }
-                    ].map((option, idx) => (
-                      <label key={idx} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          defaultChecked={option.checked}
-                          className="w-4 h-4 text-blue-600 mt-1" 
-                        />
-                        <div>
-                          <div className="text-sm font-medium">{option.label}</div>
-                          <div className="text-xs text-gray-500">{option.desc}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* レポートプレビュー */}
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">📋 生成レポートサンプル</h4>
-                  <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-4 rounded-lg border h-64 overflow-y-auto">
-                    <div className="text-xs space-y-3">
-                      <div className="border-b pb-2">
-                        <h5 className="font-bold text-blue-700">🌱 土壌健康度総合評価</h5>
-                        <p className="text-gray-600 mt-1">評価スコア: 85/100 (優良)</p>
-                      </div>
-                      
-                      <div className="border-b pb-2">
-                        <h5 className="font-bold text-green-700">📊 主要成分分析</h5>
-                        <ul className="text-gray-600 mt-1 space-y-1">
-                          <li>• pH値: 6.8 (適正範囲)</li>
-                          <li>• 電気伝導度: 0.45 mS/cm (良好)</li>
-                          <li>• CEC値: 22.1 meq/100g (優秀)</li>
-                          <li>• 塩基飽和度: 78% (適正)</li>
-                        </ul>
-                      </div>
-
-                      <div className="border-b pb-2">
-                        <h5 className="font-bold text-orange-700">⚠️ 注意事項</h5>
-                        <ul className="text-gray-600 mt-1 space-y-1">
-                          <li>• 有機物含量がやや低下傾向</li>
-                          <li>• リン酸の蓄積に注意が必要</li>
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h5 className="font-bold text-purple-700">💡 改善提案</h5>
-                        <ul className="text-gray-600 mt-1 space-y-1">
-                          <li>• 堆肥投入時期の最適化</li>
-                          <li>• 緑肥作物の活用検討</li>
-                          <li>• 排水対策の強化</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* レポート生成ボタン */}
-                  <div className="flex gap-2 mt-4">
-                    <Button className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
-                      <FileText className="w-4 h-4 mr-2" />
-                      詳細レポート生成
-                    </Button>
-                    <Button variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      PDF出力
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI分析洞察 */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-                <h4 className="flex items-center gap-2 text-sm font-semibold text-purple-700 mb-3">
-                  <Brain className="w-4 h-4" />
-                  🤖 AI土壌分析洞察
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div className="bg-white p-3 rounded border">
-                    <h5 className="font-semibold text-blue-700 mb-2">🎯 最優先改善項目</h5>
-                    <p className="text-gray-600">
-                      有機物含量の向上が土壌構造改善の鍵。堆肥投入量を20%増加することを推奨。
-                    </p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <h5 className="font-semibold text-green-700 mb-2">📈 予測収量効果</h5>
-                    <p className="text-gray-600">
-                      提案された改善策により、来季の収量15-20%向上が期待されます。
-                    </p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <h5 className="font-semibold text-orange-700 mb-2">💰 投資対効果</h5>
-                    <p className="text-gray-600">
-                      土壌改良投資額 ¥180,000で年間収益向上¥420,000を見込める。
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
       </Tabs>
