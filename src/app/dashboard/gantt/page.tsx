@@ -18,21 +18,7 @@ import {
   DialogHeader, 
   DialogTitle 
 } from '@/components/ui/dialog'
-import dynamic from 'next/dynamic'
-
-// ガントチャートを動的インポートしてSSRを無効化（JST計算の初期化エラー対策）
-const GanttChart = dynamic(() => import('@/components/charts/gantt-chart').then(mod => ({ default: mod.GanttChart })), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-96 flex items-center justify-center bg-gray-50 rounded-lg">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-600 font-medium">ガントチャートを読み込み中...</p>
-        <p className="text-xs text-gray-500">JST計算処理を実行中</p>
-      </div>
-    </div>
-  )
-})
+import { GanttChart } from '@/components/charts/gantt-chart'
 import NewTaskForm from '@/components/forms/NewTaskForm'
 // サンプルデータのインポートを削除
 // import { unifiedTestData } from '@/lib/unified-test-data'
