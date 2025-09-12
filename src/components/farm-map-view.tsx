@@ -165,14 +165,20 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
   useEffect(() => {
     const savedState = sessionStorage.getItem('farmMapSidebarVisible')
     
+    // デバッグ用ログ（一時的）
+    console.log('🔄 サイドバー初期化:', { savedState, isMobile: screenSize.isMobile })
+    
     if (savedState !== null) {
       // 保存された状態を復元
       setShowSidebar(JSON.parse(savedState))
+      console.log('📦 セッション復元:', JSON.parse(savedState))
     } else {
       // 初期状態: モバイルは非表示、PCは表示
-      setShowSidebar(!screenSize.isMobile)
+      const initialState = !screenSize.isMobile
+      setShowSidebar(initialState)
+      console.log('🆕 初期状態設定:', initialState)
     }
-  }, [])
+  }, [screenSize.isMobile])
 
   // サイドバー切り替えハンドラー
   const toggleSidebar = useCallback(() => {
