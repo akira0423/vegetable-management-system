@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useScreenSize } from '@/hooks/useScreenSize'
+import { useSwipeGesture } from '@/hooks/useSwipeGesture'
+import { useLongPress } from '@/hooks/useLongPress'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -90,6 +93,11 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
   
   const router = useRouter()
   const { notifyVegetableChange, onDataChange } = useRealtimeSync()
+  const screenSize = useScreenSize()
+  
+  // タッチジェスチャー用のrefs
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const vegetableItemRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   
   const mapEditorRef = useRef<{ 
     flyToLocation: (lng: number, lat: number, zoom?: number) => void; 
@@ -119,16 +127,31 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     return () => window.removeEventListener('resize', checkTouchDevice)
   }, [])
 
+  // スワイプジェスチャーでサイドバー操作
+  useSwipeGesture(mapContainerRef, {
+    onSwipeRight: () => {
+      if (screenSize.isMobile && !showSidebar) {
+        setShowSidebar(true)
+      }
+    },
+    onSwipeLeft: () => {
+      if (screenSize.isMobile && showSidebar) {
+        setShowSidebar(false)
+      }
+    },
+    threshold: 80, // より大きなスワイプ距離を要求
+    velocity: 0.5  // より高い速度を要求
+  })
+
   // サイドバー表示状態をセッションストレージから復元＋レスポンシブ対応
   useEffect(() => {
     const savedState = sessionStorage.getItem('farmMapSidebarVisible')
-    const isMobile = window.innerWidth < 768
     
-    if (savedState !== null && !isMobile) {
+    if (savedState !== null && !screenSize.isMobile) {
       setShowSidebar(JSON.parse(savedState))
     } else {
       // モバイルでは初期状態で非表示
-      setShowSidebar(!isMobile)
+      setShowSidebar(!screenSize.isMobile)
     }
   }, [])
 
@@ -1062,7 +1085,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                   </div>
                   <CardTitle className="text-base font-semibold text-gray-800">操作ガイド</CardTitle>
                 </div>
-                <CardDescription className="text-xs text-gray-600">
+                <CardDescription className="text-sm text-gray-600">
                   効率的な農地管理のための基本操作
                 </CardDescription>
               </CardHeader>
@@ -1074,7 +1097,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                   </h4>
                   <div className="space-y-3">
                     {/* 地図移動 */}
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-3 text-sm">
                       <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
                         <MapPin className="w-3 h-3 text-blue-600" />
                       </div>
@@ -1085,7 +1108,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                     </div>
                     
                     {/* 農地描画（3ステップ） */}
-                    <div className="flex items-start gap-3 text-xs">
+                    <div className="flex items-start gap-3 text-sm">
                       <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center">
                         <Save className="w-3 h-3 text-green-600" />
                       </div>
@@ -1130,25 +1153,25 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                         <h3 className="font-bold text-sm text-green-800">
                           {currentPlot.name}
                         </h3>
-                        <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 text-xs px-2 py-0.5">
+                        <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 text-sm px-2 py-0.5">
                           登録完了
                         </Badge>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-green-700 font-medium">面積</span>
+                          <span className="text-sm text-green-700 font-medium">面積</span>
                           <span className="text-sm font-bold text-green-800">
                             {(currentPlot.area / 10000).toFixed(2)} ha
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-green-700 font-medium">平方メートル</span>
-                          <span className="text-xs text-green-700">
+                          <span className="text-sm text-green-700 font-medium">平方メートル</span>
+                          <span className="text-sm text-green-700">
                             {currentPlot.area.toLocaleString()} ㎡
                           </span>
                         </div>
                       </div>
-                      <p className="text-xs text-green-600 mt-3 italic">
+                      <p className="text-sm text-green-600 mt-3 italic">
                         {currentPlot.description || '描画した農地エリア'}
                       </p>
                     </div>
@@ -1176,20 +1199,20 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                           <span className="text-2xl font-bold text-blue-800">{selectedCells.length}</span>
                           <span className="text-sm text-blue-700 font-medium">セル選択中</span>
                         </div>
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 text-xs px-2 py-0.5">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 text-sm px-2 py-0.5">
                           アクティブ
                         </Badge>
                       </div>
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-blue-700 font-medium">総面積</span>
+                          <span className="text-sm text-blue-700 font-medium">総面積</span>
                           <span className="text-sm font-bold text-blue-800">
                             {(selectedCells.length * 25 / 10000).toFixed(3)} ha
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-blue-700 font-medium">平方メートル</span>
-                          <span className="text-xs text-blue-700">
+                          <span className="text-sm text-blue-700 font-medium">平方メートル</span>
+                          <span className="text-sm text-blue-700">
                             {(selectedCells.length * 25).toLocaleString()} ㎡
                           </span>
                         </div>
@@ -1216,7 +1239,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                     <Sprout className="w-3 h-3 text-green-600" />
                   </div>
                   <CardTitle className="text-base font-semibold text-gray-800">登録野菜一覧</CardTitle>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs px-2 py-0.5">
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-sm px-2 py-0.5">
                     {registeredVegetables.length}件
                   </Badge>
                 </div>
@@ -1332,7 +1355,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                         maxHeight: (() => {
                           if (registeredVegetables.length <= 3) return 'auto'; // 3件以下は全表示
                           // レスポンシブ対応: モバイル3件, タブレット4件, デスクトップ5件
-                          const maxVisible = window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5;
+                          const maxVisible = screenSize.maxVisibleItems;
                           return registeredVegetables.length <= maxVisible ? 'auto' : `${maxVisible * 140}px`;
                         })(),
                         minHeight: registeredVegetables.length > 0 ? '140px' : 'auto'
@@ -1341,7 +1364,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                       {/* 上部フェード効果とスクロールヒント（レスポンシブ） */}
                       {(() => {
                         const maxVisible = typeof window !== 'undefined' ? 
-                          (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                          (screenSize.maxVisibleItems) : 5;
                         return registeredVegetables.length > maxVisible;
                       })() && (
                         <div className="sticky top-0 z-20 bg-gradient-to-b from-white via-green-50/80 to-transparent p-2 mx-1 rounded-lg">
@@ -1495,7 +1518,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                     {/* スクロール終端インジケーター（レスポンシブ表示制限超過時のみ） */}
                     {(() => {
                       const maxVisible = typeof window !== 'undefined' ? 
-                        (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                        (screenSize.maxVisibleItems) : 5;
                       return registeredVegetables.length > maxVisible;
                     })() && (
                       <div className="text-center py-3 mt-2">
@@ -1514,7 +1537,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                             <span className="text-gray-600 font-medium">
                               {(() => {
                                 const maxVisible = typeof window !== 'undefined' ? 
-                                  (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                                  (screenSize.maxVisibleItems) : 5;
                                 return registeredVegetables.length <= maxVisible 
                                   ? `全 ${registeredVegetables.length} 件表示` 
                                   : `${maxVisible}件表示中 / 全 ${registeredVegetables.length} 件`;
@@ -1523,7 +1546,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                           </div>
                           {(() => {
                             const maxVisible = typeof window !== 'undefined' ? 
-                              (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                              (screenSize.maxVisibleItems) : 5;
                             return registeredVegetables.length > maxVisible;
                           })() && (
                             <div className="flex items-center gap-1 ml-2">
@@ -1532,7 +1555,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                                   className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300"
                                   style={{ 
                                     width: `${Math.min(100, ((typeof window !== 'undefined' ? 
-                                      (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5) / registeredVegetables.length) * 100)}%` 
+                                      (screenSize.maxVisibleItems) : 5) / registeredVegetables.length) * 100)}%` 
                                   }}
                                 ></div>
                               </div>
@@ -1541,7 +1564,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
                         </div>
                         {(() => {
                           const maxVisible = typeof window !== 'undefined' ? 
-                            (window.innerWidth < 768 ? 3 : window.innerWidth < 1024 ? 4 : 5) : 5;
+                            (screenSize.maxVisibleItems) : 5;
                           return registeredVegetables.length > maxVisible;
                         })() && (
                           <div className="flex items-center gap-1 text-green-600">
@@ -1586,7 +1609,9 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         </div>
 
         {/* メイン地図エリア */}
-        <div className={`${showSidebar ? 'flex-1' : 'w-full'} relative transition-all duration-300 ease-in-out`}>
+        <div 
+          ref={mapContainerRef}
+          className={`${showSidebar ? 'flex-1' : 'w-full'} relative transition-all duration-300 ease-in-out`}>
           
           <ProfessionalFarmEditor
             ref={mapEditorRef}
@@ -1633,7 +1658,7 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
 
           {/* ポリゴン編集モード制御パネル */}
           {isPolygonEditMode && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-white/95 backdrop-blur-md shadow-2xl border border-gray-200 rounded-xl p-4 min-w-[400px]">
+            <div className="absolute top-4 left-4 right-4 md:left-1/2 md:right-auto md:transform md:-translate-x-1/2 z-50 bg-white/95 backdrop-blur-md shadow-2xl border border-gray-200 rounded-xl p-4 md:min-w-[400px] max-w-[500px] md:max-w-none">
               <div className="text-center">
                 <div className="flex items-center justify-center mb-3">
                   <Edit3 className="w-6 h-6 text-blue-600 mr-2" />
