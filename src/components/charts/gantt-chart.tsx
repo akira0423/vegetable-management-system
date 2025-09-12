@@ -257,25 +257,95 @@ export function GanttChart({
     return result
   }, [vegetableGroups, refreshTrigger])
 
-  // 簡素化された日付処理関数
-  const parseDate = (dateString: string): Date => {
-    return startOfDay(new Date(dateString))
+  // 日本時間（JST: UTC+9）表示用の日付変換関数
+  const parseToJST = (dateString: string): Date | null => {
+    if (!dateString) return null
+    
+    try {
+      // UTC日付文字列を日本時間に変換
+      // データベースのUTC日付（例：2025-08-25）を日本時間として表示
+      const utcDate = parseISO(`${dateString}T00:00:00Z`) // UTC として明示的に解析
+      
+      // 無効な日付をチェック
+      if (isNaN(utcDate.getTime())) {
+        console.warn('無効な日付形式:', dateString)
+        return null
+      }
+      
+      // UTC日付をJST（UTC+9時間）に変換
+      const jstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000))
+      
+      // その日の00:00:00に正規化して返す
+      return startOfDay(jstDate)
+      
+    } catch (error) {
+      console.error('JST日付変換エラー:', dateString, error)
+      return null
+    }
+  }
+  
+  // JST基準の今日の日付を取得する関数
+  const getJSTToday = (): Date => {
+    const now = new Date()
+    const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+    return startOfDay(jstNow)
+  }
+  
+  // 統一された日付解析関数（JST表示対応版）
+  const parseWithFallback = (dateString: string): Date | null => {
+    // JST日付解析を使用
+    const result = parseToJST(dateString)
+    if (result) return result
+    
+    // フォールバック: 標準のdate-fns処理
+    try {
+      console.warn('標準日付解析でフォールバック:', dateString)
+      return startOfDay(parseISO(dateString))
+    } catch (error) {
+      console.error('日付解析完全失敗:', dateString, error)
+      return null
+    }
   }
 
   const chartData = useMemo(() => {
     if (hierarchicalTasks.length === 0) return null
 
-    // 簡素化されたJST計算（ログ出力を削除）
-    const today = new Date()
-    const jstToday = startOfDay(new Date(today.getTime() + (9 * 60 * 60 * 1000)))
+    // タスクの日付範囲をJSTで統一的に計算
+    const taskDates = hierarchicalTasks
+      .filter(task => !task.isVegetableHeader)
+      .flatMap(task => {
+        const startDate = parseWithFallback(task.start)
+        const endDate = parseWithFallback(task.end)
+        
+        if (!startDate || !endDate) {
+          console.warn('タスク日付解析失敗:', { task: task.name, start: task.start, end: task.end })
+          return []
+        }
+        
+        return [startDate, endDate]
+      })
+
+    // チャート範囲をJST基準で統一的に計算
+    const chartStart = startDate ? parseToJST(startDate) : (taskDates.length > 0 ? startOfDay(new Date(Math.min(...taskDates.map(d => d.getTime())))) : getJSTToday())
+    const chartEnd = endDate ? parseToJST(endDate) : (taskDates.length > 0 ? startOfDay(new Date(Math.max(...taskDates.map(d => d.getTime())))) : addDays(getJSTToday(), 30))
     
-    // デフォルト日付範囲を設定
-    const defaultStart = startDate ? new Date(startDate) : jstToday
-    const defaultEnd = endDate ? new Date(endDate) : addDays(jstToday, 30)
+    if (!chartStart || !chartEnd) {
+      console.error('チャート日付範囲の解析に失敗:', { startDate, endDate })
+      return null
+    }
     
-    const chartStart = startOfDay(defaultStart)
-    const chartEnd = startOfDay(defaultEnd)
-    const totalDays = Math.max(1, differenceInDays(chartEnd, chartStart) + 1)
+    const totalDays = differenceInDays(chartEnd, chartStart) + 1
+    
+    console.log('🔍 JST基準チャート日付範囲:', {
+      入力開始日: startDate,
+      入力終了日: endDate,
+      JST開始日: chartStart.toISOString(),
+      JST終了日: chartEnd.toISOString(),
+      JST開始日表示: format(chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+      JST終了日表示: format(chartEnd, 'yyyy-MM-dd (E)', { locale: ja }),
+      タスク数: taskDates.length / 2,
+      総日数: totalDays
+    })
     
     // 表示モードに応じてスケールを調整
     let dayWidth: number
@@ -296,12 +366,21 @@ export function GanttChart({
       dateFormat = 'MM/dd'
     }
 
-    // 簡素化された日付ヘッダー生成（ログ出力を削除）
+    // Generate hierarchical date headers
+    const dateHeaders = []
     const yearMonthHeaders = []
     const dayHeaders = []
     const weekdayHeaders = []
     
     let lastYearMonth = null
+    
+    console.log('🔍 JST日付ヘッダー生成開始:', {
+      JSTチャート開始: chartStart.toISOString(),
+      JSTチャート開始表示: format(chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+      総日数: totalDays,
+      dayWidth,
+      step
+    })
 
     for (let i = 0; i < totalDays; i++) {
       const date = addDays(chartStart, i)
@@ -310,6 +389,16 @@ export function GanttChart({
       const currentYearMonth = `${currentYear}-${currentMonth}`
       const dayOfWeek = getDay(date)
       const isHoliday = isWeekend(date)
+      
+      if (i < 5) {
+        console.log(`🗺 JST日付ヘッダー ${i}:`, {
+          JST日付: date.toISOString(),
+          JST日付表示: format(date, 'yyyy-MM-dd (E)', { locale: ja }),
+          曜日コード: dayOfWeek,
+          休日フラグ: isHoliday,
+          チャート開始日からの日数: i
+        })
+      }
       
       // 日ヘッダーは毎日追加
       dayHeaders.push({
@@ -366,63 +455,126 @@ export function GanttChart({
       }
     })
 
-    // 簡素化されたタスク処理（複雑なJST計算を削除）
+    // Process hierarchical tasks - filter only tasks within the display range
     const processedTasks = hierarchicalTasks
+      .filter(task => {
+        const taskStart = parseWithFallback(task.start)
+        const taskEnd = parseWithFallback(task.end)
+        if (!taskStart || !taskEnd) return false
+        // Show task if it overlaps with the chart range
+        return taskStart <= chartEnd && taskEnd >= chartStart
+      })
       .map(task => {
-        // 単純な日付処理
-        const taskStart = new Date(task.start)
-        const taskEnd = new Date(task.end)
+        const taskStart = parseWithFallback(task.start)
+        const taskEnd = parseWithFallback(task.end)
         
-        const startOffset = Math.max(0, differenceInDays(taskStart, chartStart))
-        const taskDuration = Math.max(1, differenceInDays(taskEnd, taskStart) + 1)
+        if (!taskStart || !taskEnd) {
+          console.warn('タスク日付がnull:', task)
+          return null
+        }
         
-        const left = startOffset * dayWidth
-        const width = Math.max(40, taskDuration * dayWidth)
+        const startOffset = differenceInDays(taskStart, chartStart)
+        const taskDuration = differenceInDays(taskEnd, taskStart) + 1
+        
+        // 🎯 プロット位置を2日右にずらして表示調整
+        const DISPLAY_OFFSET_DAYS = 2
+        const adjustedStartOffset = startOffset + DISPLAY_OFFSET_DAYS
+        
+        // Adjust left position and width for tasks that start before or end after the chart range
+        const adjustedLeft = Math.max(0, adjustedStartOffset * dayWidth)
+        const adjustedWidth = taskDuration * dayWidth
+        
+        // Calculate clipped width based on chart boundaries
+        let clippedWidth = adjustedWidth
+        let clippedLeft = adjustedLeft
+        
+        // If task starts before chart, adjust left and width
+        if (adjustedStartOffset < 0) {
+          clippedLeft = 0
+          clippedWidth = adjustedWidth + (adjustedStartOffset * dayWidth)
+        }
+        
+        // If task extends beyond chart, clip the width
+        const taskEndOffset = adjustedStartOffset + taskDuration - 1
+        if (taskEndOffset >= totalDays) {
+          const excessDays = taskEndOffset - totalDays + 1
+          clippedWidth = clippedWidth - (excessDays * dayWidth)
+        }
+        
+        // Ensure minimum width for visibility
+        clippedWidth = Math.max(20, clippedWidth)
         
         return {
           ...task,
           startOffset,
           taskDuration,
-          left,
-          width,
+          left: clippedLeft,
+          width: clippedWidth,
           color: task.color || '#3b82f6',
-          formattedStart: format(taskStart, 'MM/dd', { locale: ja }),
-          formattedEnd: format(taskEnd, 'MM/dd', { locale: ja })
+          formattedStart: format(taskStart, 'yyyy/MM/dd', { locale: ja }),
+          formattedEnd: format(taskEnd, 'yyyy/MM/dd', { locale: ja })
         }
       })
+      .filter(task => task !== null) // nullになったタスクを除外
 
-    // 簡素化された作業レポート処理
+    // 作業レポートデータの処理
     const processedReports = workReports
-      .filter(report => report && report.work_date)
+      .filter(report => {
+        // work_dateが存在し、有効な日付形式かをチェック
+        if (!report.work_date) return false
+        const reportDate = parseWithFallback(report.work_date)
+        if (!reportDate) {
+          console.warn('無効な作業日付をスキップ:', report.work_date)
+          return false
+        }
+        return reportDate >= chartStart && reportDate <= chartEnd
+      })
       .map(report => {
-        const reportDate = new Date(report.work_date)
-        const dateOffset = Math.max(0, differenceInDays(reportDate, chartStart))
-        const position = dateOffset * dayWidth
-        
-        // 作業種類設定
-        const workTypeConfig = {
-          seeding: { color: '#10b981', icon: '🌱', label: '播種' },
-          planting: { color: '#3b82f6', icon: '🌿', label: '定植' },
-          fertilizing: { color: '#8b5cf6', icon: '🧪', label: '施肥' },
-          watering: { color: '#06b6d4', icon: '💧', label: '灌水' },
-          weeding: { color: '#eab308', icon: '🌾', label: '除草' },
-          pruning: { color: '#f97316', icon: '✂️', label: '整枝' },
-          harvesting: { color: '#ef4444', icon: '🍅', label: '収穫' },
-          other: { color: '#6b7280', icon: '⚡', label: 'その他' }
+        const reportDate = parseWithFallback(report.work_date)
+        if (!reportDate) {
+          console.warn('作業レポート日付解析失敗:', report.work_date)
+          return null
         }
         
-        return {
-          ...report,
-          position,
-          config: workTypeConfig[report.work_type] || workTypeConfig.other,
-          details: {
-            cost: 0,
-            harvest: report.harvest_amount,
-            revenue: report.expected_revenue,
-            notes: report.work_notes
+        try {
+          const dateOffset = differenceInDays(reportDate, chartStart)
+          // 🎯 作業報告プロット位置も2日右にずらして表示調整
+          const REPORT_DISPLAY_OFFSET_DAYS = 2
+          const adjustedDateOffset = dateOffset + REPORT_DISPLAY_OFFSET_DAYS
+          const position = adjustedDateOffset * dayWidth
+          
+          // 作業種類に応じた色とアイコン
+          const workTypeConfig = {
+            seeding: { color: '#10b981', icon: '🌱', label: '播種' },
+            planting: { color: '#3b82f6', icon: '🌿', label: '定植' },
+            fertilizing: { color: '#8b5cf6', icon: '🧪', label: '施肥' },
+            watering: { color: '#06b6d4', icon: '💧', label: '灌水' },
+            weeding: { color: '#eab308', icon: '🌾', label: '除草' },
+            pruning: { color: '#f97316', icon: '✂️', label: '整枝' },
+            harvesting: { color: '#ef4444', icon: '🍅', label: '収穫' },
+            other: { color: '#6b7280', icon: '⚡', label: 'その他' }
           }
+          
+          const config = workTypeConfig[report.work_type] || workTypeConfig.other
+          
+          return {
+            ...report,
+            position,
+            config,
+            // ツールチップ用の詳細データ
+            details: {
+              cost: 0, // 会計データベースから取得
+              harvest: report.harvest_amount,
+              revenue: report.expected_revenue,
+              notes: report.work_notes
+            }
+          }
+        } catch (error) {
+          console.warn('作業レポート処理エラー:', report, error)
+          return null
         }
       })
+      .filter(report => report !== null) // nullになったレポートを除外
 
     return {
       chartStart,
@@ -1105,7 +1257,7 @@ export function GanttChart({
                       </div>
                       {/* Date label */}
                       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs bg-white border border-gray-200 rounded px-1 py-0.5 shadow-sm whitespace-nowrap pointer-events-none">
-                        {format(new Date(report.work_date), 'MM/dd')}
+                        {format(parseWithFallback(report.work_date) || new Date(), 'MM/dd', { locale: ja })}
                       </div>
                     </div>
                   </WorkReportPopover>
@@ -1113,14 +1265,36 @@ export function GanttChart({
               )
             })}
 
-              {/* Today line - 簡素化版 */}
+              {/* Today line */}
               {(() => {
-                const today = new Date()
-                const todayOffset = differenceInDays(today, chartData.chartStart)
+                // 今日の日付をJST基準で処理
+                const todayJST = getJSTToday()
                 
-                if (todayOffset >= 0 && todayOffset <= chartData.totalDays) {
-                  const todayPosition = FIXED_COLUMNS_WIDTH + (todayOffset * dayWidth)
-                  const headerHeight = viewUnit === 'day' ? 84 : 68
+                // チャート開始日と同じJST処理で統一
+                const chartStartDate = chartData.chartStart
+                
+                const todayOffset = differenceInDays(todayJST, chartStartDate)
+                // 🎯 今日線も2日右にずらして表示調整
+                const TODAY_DISPLAY_OFFSET_DAYS = 2
+                const adjustedTodayOffset = todayOffset + TODAY_DISPLAY_OFFSET_DAYS
+                
+                console.log('🔍 JST今日線の位置計算:', {
+                  現在時刻UTC: new Date().toISOString(),
+                  現在時刻JST: format(todayJST, 'yyyy-MM-dd (E) HH:mm:ss', { locale: ja }),
+                  JST今日: todayJST.toISOString(),
+                  JST今日表示: format(todayJST, 'yyyy-MM-dd (E)', { locale: ja }),
+                  JSTチャート開始: chartData.chartStart.toISOString(),
+                  JSTチャート開始表示: format(chartData.chartStart, 'yyyy-MM-dd (E)', { locale: ja }),
+                  日数差: todayOffset,
+                  調整後日数差: adjustedTodayOffset,
+                  総日数: chartData.totalDays,
+                  計算確認: `${format(todayJST, 'yyyy-MM-dd')} - ${format(chartStartDate, 'yyyy-MM-dd')} = ${todayOffset} days (調整後: ${adjustedTodayOffset})`
+                })
+                
+                // 今日が表示範囲内にある場合のみ表示
+                if (adjustedTodayOffset >= 0 && adjustedTodayOffset <= chartData.totalDays) {
+                  const todayPosition = FIXED_COLUMNS_WIDTH + (adjustedTodayOffset * dayWidth)
+                  const headerHeight = viewUnit === 'day' ? 84 : 68 // ヘッダーの高さ調整（年月8px + 日7px + 曜日5px = 20px、曜日なし時15px）
                   
                   return (
                     <div
@@ -1131,7 +1305,7 @@ export function GanttChart({
                       }}
                     >
                       <div className="absolute -top-2 -left-8 bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap font-medium">
-                        今日 {format(today, 'MM/dd')}
+                        今日 {format(todayJST, 'MM/dd', { locale: ja })}
                       </div>
                     </div>
                   )
