@@ -74,64 +74,6 @@ interface PlotPolygon {
 }
 
 export default function FarmMapView({ onClose }: FarmMapViewProps) {
-  // 🚨 緊急修正: 地図機能を一時的に無効化してエラーを回避
-  return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* ヘッダー */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-green-700 rounded-xl flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">農地マップ</h1>
-              <p className="text-sm text-gray-600">栽培野菜計画登録</p>
-            </div>
-          </div>
-          <Button
-            onClick={onClose}
-            variant="outline"
-            size="sm"
-            className="hover:bg-gray-100"
-          >
-            <X className="w-4 h-4 mr-2" />
-            閉じる
-          </Button>
-        </div>
-      </div>
-
-      {/* メインコンテンツ */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center max-w-md">
-          <div className="w-24 h-24 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
-            <MapPin className="w-12 h-12 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">地図機能 準備中</h2>
-          <p className="text-gray-600 mb-6">
-            地図上での栽培野菜計画登録機能は現在準備中です。<br />
-            しばらくお待ちください。
-          </p>
-          <div className="space-y-3 text-sm text-gray-500">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span>農地区画設定</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full" />
-              <span>栽培計画マッピング</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full" />
-              <span>作業エリア管理</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  // 以下、元のコードは一時的にコメントアウト
   const [selectedCells, setSelectedCells] = useState<MeshCell[]>([])
   const [currentPlot, setCurrentPlot] = useState<PlotPolygon | null>(null)
   const [showStats, setShowStats] = useState(true)
