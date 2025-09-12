@@ -22,7 +22,7 @@ const nextConfig = {
       tls: false,
     }
 
-    // 地図・チャートライブラリの最適化を無効化（ReferenceErrorを防ぐ）
+    // 地図ライブラリの最適化を無効化（ReferenceErrorを防ぐ）
     if (!isServer) {
       config.externals = config.externals || []
       
@@ -43,28 +43,8 @@ const nextConfig = {
           priority: 10,
           chunks: 'all',
           enforce: true
-        },
-        // 📊 date-fns最適化無効化（JST計算の初期化エラー対策）
-        datefns: {
-          name: 'date-fns',
-          test: /[\\/]node_modules[\\/]date-fns[\\/]/,
-          priority: 15,
-          chunks: 'all',
-          enforce: true
-        },
-        // 📈 Chart.js系ライブラリの最適化調整
-        charts: {
-          name: 'charts',
-          test: /[\\/]node_modules[\\/](chart\.js|react-chartjs-2|chartjs-adapter-date-fns)[\\/]/,
-          priority: 12,
-          chunks: 'all',
-          enforce: true
         }
       }
-      
-      // 🔧 より安全な最適化設定
-      config.optimization.usedExports = false
-      config.optimization.mangleExports = false
     }
     
     return config
