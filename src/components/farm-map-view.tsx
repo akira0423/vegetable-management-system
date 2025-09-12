@@ -15,7 +15,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import ProfessionalFarmEditor from './professional-farm-editor'
+import dynamic from 'next/dynamic'
+
+// MapLibre GL JSを動的インポートしてSSRを無効化
+const ProfessionalFarmEditor = dynamic(() => import('./professional-farm-editor'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-600 font-medium">地図を読み込み中...</p>
+      </div>
+    </div>
+  )
+})
 import { 
   X, 
   MapPin,
@@ -72,6 +85,10 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
   const [showNewVegetableModal, setShowNewVegetableModal] = useState(false) // 新規栽培情報入力モーダル
   const [newAreaData, setNewAreaData] = useState<any>(null) // 新規エリアデータ
   const [showSidebar, setShowSidebar] = useState(true)
+  
+  // エラー状態管理
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [isMapLoading, setIsMapLoading] = useState(true)
   
   // 複数削除機能用の状態
   const [deleteMode, setDeleteMode] = useState(false)
@@ -1639,19 +1656,48 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
           ref={mapContainerRef}
           className="w-full relative transition-all duration-300 ease-in-out">
           
-          <ProfessionalFarmEditor
-            ref={mapEditorRef}
-            onCellsSelected={handleCellsSelected}
-            onAreaSaved={handleAreaSaved}
-            onMapRightClick={handleMapRightClick}
-            onPolygonDoubleClick={handlePolygonDoubleClick}
-            visiblePolygons={visiblePolygons}
-            polygonColors={polygonColors}
-            isTouchDevice={isTouchDevice}
-            initialCenter={[139.6917, 35.6895]}
-            initialZoom={16}
-            height="100%"
-          />
+          {/* 地図エラー表示 */}
+          {mapError && (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+              <div className="text-center p-8">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">地図の読み込みに失敗しました</h3>
+                <p className="text-gray-600 mb-4">{mapError}</p>
+                <Button
+                  onClick={() => {
+                    setMapError(null)
+                    setIsMapLoading(true)
+                    // 地図の再読み込みを試行
+                    window.location.reload()
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  再読み込み
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 地図コンポーネント */}
+          {!mapError && (
+            <ProfessionalFarmEditor
+              ref={mapEditorRef}
+              onCellsSelected={handleCellsSelected}
+              onAreaSaved={handleAreaSaved}
+              onMapRightClick={handleMapRightClick}
+              onPolygonDoubleClick={handlePolygonDoubleClick}
+              visiblePolygons={visiblePolygons}
+              polygonColors={polygonColors}
+              isTouchDevice={isTouchDevice}
+              initialCenter={[139.6917, 35.6895]}
+              initialZoom={16}
+              height="100%"
+              onMapError={(error) => setMapError(error)}
+              onMapLoaded={() => setIsMapLoading(false)}
+            />
+          )}
 
           {/* サイドバー開閉フローティングボタン */}
           {!showSidebar && (
