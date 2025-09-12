@@ -1,10 +1,37 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react'
-import maplibregl from 'maplibre-gl'
-import MapboxDraw from '@mapbox/mapbox-gl-draw'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
+// 地図ライブラリを動的にインポート（SSR対応）
+let maplibregl: any = null
+let MapboxDraw: any = null
+
+// ライブラリの動的読み込み
+const loadMapLibraries = async () => {
+  if (typeof window === 'undefined') return { maplibregl: null, MapboxDraw: null }
+  
+  if (!maplibregl || !MapboxDraw) {
+    try {
+      // MapLibre GL JSの動的インポート
+      const maplibreModule = await import('maplibre-gl')
+      maplibregl = maplibreModule.default
+      
+      // MapboxDrawの動的インポート  
+      const mapboxDrawModule = await import('@mapbox/mapbox-gl-draw')
+      MapboxDraw = mapboxDrawModule.default
+      
+      // CSSの動的読み込み
+      await import('maplibre-gl/dist/maplibre-gl.css')
+      await import('@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css')
+      
+      return { maplibregl, MapboxDraw }
+    } catch (error) {
+      console.error('地図ライブラリの読み込みに失敗:', error)
+      throw error
+    }
+  }
+  
+  return { maplibregl, MapboxDraw }
+}
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -133,6 +160,16 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
 
     const initializeMap = async () => {
       try {
+        // 地図ライブラリの動的読み込み
+        const libraries = await loadMapLibraries()
+        if (!libraries.maplibregl || !libraries.MapboxDraw) {
+          throw new Error('地図ライブラリの読み込みに失敗しました')
+        }
+
+        // ローカル変数として使用
+        const MapLibreGL = libraries.maplibregl
+        const MapboxDrawLib = libraries.MapboxDraw
+
         // 地図スタイルを取得
         const getMapStyle = (styleType: 'standard' | 'pale' | 'photo') => {
           const styles = {
@@ -157,16 +194,11 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
 
         const currentStyle = getMapStyle(mapStyle)
 
-        // MapLibre GL JSライブラリが利用可能かチェック
-        if (!maplibregl) {
-          throw new Error('MapLibre GL JSライブラリが読み込まれていません')
-        }
-
         // コンポーネントがアンマウントされていないかチェック
         if (!isMounted || !mapContainer.current) return
 
         // MapLibre GL JS初期化
-        map.current = new maplibregl.Map({
+        map.current = new MapLibreGL.Map({
       container: mapContainer.current,
       style: {
         version: 8,
@@ -361,11 +393,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     })
 
         // Mapbox Draw初期化（MapLibre GL JSと互換性確保）
-        if (!MapboxDraw) {
-          throw new Error('Mapbox GL Drawライブラリが読み込まれていません')
-        }
-
-        draw.current = new MapboxDraw({
+        draw.current = new MapboxDrawLib({
           displayControlsDefault: false,
           controls: {},
           styles: [
