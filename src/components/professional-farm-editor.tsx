@@ -59,9 +59,6 @@ interface ProfessionalFarmEditorProps {
   visiblePolygons?: Set<string>
   polygonColors?: Map<string, string>
   isTouchDevice?: boolean
-  // エラーハンドリング
-  onMapError?: (error: string) => void
-  onMapLoaded?: () => void
 }
 
 interface ProfessionalFarmEditorRef {
@@ -91,10 +88,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   onPolygonDoubleClick,
   visiblePolygons = new Set(),
   polygonColors = new Map(),
-  isTouchDevice = false,
-  // エラーハンドリング
-  onMapError,
-  onMapLoaded
+  isTouchDevice = false
 }, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -124,49 +118,36 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   const vegetableLayersRef = useRef<Map<string, string>>(new Map()) // vegetableId -> layerId
   const isHandlingCreateRef = useRef(false)
   
-  // 地図初期化 - SSR対応とエラーハンドリング強化
+  // 地図初期化
   useEffect(() => {
-    // ブラウザ環境チェック
-    if (typeof window === 'undefined' || !mapContainer.current || map.current) return
+    if (!mapContainer.current || map.current) return
 
-    let isMounted = true
-
-    const initializeMap = async () => {
-      try {
-        // 地図スタイルを取得
-        const getMapStyle = (styleType: 'standard' | 'pale' | 'photo') => {
-          const styles = {
-            standard: {
-              source: 'gsi-standard',
-              tiles: ['https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'],
-              attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 標準地図</a>'
-            },
-            pale: {
-              source: 'gsi-pale',
-              tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],
-              attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 淡色地図</a>'
-            },
-            photo: {
-              source: 'gsi-photo',
-              tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
-              attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 航空写真</a>'
-            }
-          }
-          return styles[styleType]
+    // 地図スタイルを取得
+    const getMapStyle = (styleType: 'standard' | 'pale' | 'photo') => {
+      const styles = {
+        standard: {
+          source: 'gsi-standard',
+          tiles: ['https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'],
+          attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 標準地図</a>'
+        },
+        pale: {
+          source: 'gsi-pale',
+          tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],
+          attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 淡色地図</a>'
+        },
+        photo: {
+          source: 'gsi-photo',
+          tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+          attribution: '<a href="https://www.gsi.go.jp/" target="_blank">国土地理院 航空写真</a>'
         }
+      }
+      return styles[styleType]
+    }
 
-        const currentStyle = getMapStyle(mapStyle)
+    const currentStyle = getMapStyle(mapStyle)
 
-        // MapLibre GL JSライブラリが利用可能かチェック
-        if (!maplibregl) {
-          throw new Error('MapLibre GL JSライブラリが読み込まれていません')
-        }
-
-        // コンポーネントがアンマウントされていないかチェック
-        if (!isMounted || !mapContainer.current) return
-
-        // MapLibre GL JS初期化
-        map.current = new maplibregl.Map({
+    // MapLibre GL JS初期化
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: {
         version: 8,
@@ -360,79 +341,31 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       ]
     })
 
-        // Mapbox Draw初期化（MapLibre GL JSと互換性確保）
-        if (!MapboxDraw) {
-          throw new Error('Mapbox GL Drawライブラリが読み込まれていません')
-        }
+    map.current.addControl(draw.current, 'top-left')
 
-        draw.current = new MapboxDraw({
-          displayControlsDefault: false,
-          controls: {},
-          styles: [
-            // 既存のスタイル設定をそのまま維持
-            {
-              id: 'gl-draw-polygon-fill-inactive',
-              type: 'fill',
-              filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
-              paint: {
-                'fill-color': '#22c55e',
-                'fill-opacity': 0.25
-              }
-            }
-            // 他のスタイル設定は省略（既存と同じ）
-          ]
-        })
-
-        if (!isMounted) return
-
-        map.current.addControl(draw.current, 'top-left')
-
-        // マップ読み込み完了イベント
-        map.current.on('load', () => {
-          if (!isMounted) return
-          setIsMapLoaded(true)
-          
-          // 親コンポーネントに読み込み完了を通知
-          onMapLoaded?.()
-          
-          // メッシュレイヤー追加
-          if (map.current) {
-            addMeshLayers()
-          }
-        })
-
-        // エラーイベントの監視
-        map.current.on('error', (error) => {
-          console.error('MapLibre GL JSエラー:', error)
-          onMapError?.('地図の表示中にエラーが発生しました')
-        })
-
-        // 描画イベント
-        map.current.on('draw.create', handleDrawCreate)
-        map.current.on('draw.update', handleDrawUpdate)
-        map.current.on('draw.delete', handleDrawDelete)
-        map.current.on('click', handleMapClick)
-        map.current.on('contextmenu', handleRightClick)
-        map.current.on('dblclick', handleMapDoubleClick)
-
-      } catch (error) {
-        console.error('地図の初期化に失敗しました:', error)
-        const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました'
-        onMapError?.(errorMessage)
+    // マップ読み込み完了イベント
+    map.current.on('load', () => {
+      setIsMapLoaded(true)
+      
+      // メッシュレイヤー追加
+      if (map.current) {
+        addMeshLayers()
       }
-    }
+    })
 
-    // 初期化を実行
-    initializeMap()
+    // 描画イベント
+    map.current.on('draw.create', handleDrawCreate)
+    map.current.on('draw.update', handleDrawUpdate)
+    map.current.on('draw.delete', handleDrawDelete)
+    map.current.on('click', handleMapClick)
+    map.current.on('contextmenu', handleRightClick)
+    map.current.on('dblclick', handleMapDoubleClick)
+    
 
     return () => {
-      isMounted = false
       if (map.current) {
         map.current.remove()
         map.current = null
-      }
-      if (draw.current) {
-        draw.current = null
       }
     }
   }, [])
