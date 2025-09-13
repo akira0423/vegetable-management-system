@@ -502,14 +502,12 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         Object.keys(WORK_TYPE_COLORS).forEach(workType => {
           const typeReports = monthReports.filter((r: any) => r.work_type === workType)
           
-          // duration_hours × worker_count で総作業時間を計算
+          // work_duration(分) または duration_hours(時) × worker_count で総作業時間を計算
           const totalHours = typeReports.reduce((sum: number, r: any) => {
-            // duration_hoursとworker_countがある場合は掛け算
-            if (r.duration_hours && r.worker_count) {
-              return sum + (r.duration_hours * r.worker_count)
-            }
-            // worker_countがない場合はduration_hoursをそのまま使用
-            return sum + (r.duration_hours || 0)
+            // work_duration（分）を優先、なければduration_hoursを使用
+            const minutes = r.work_duration || (r.duration_hours ? r.duration_hours * 60 : 0)
+            const workers = r.worker_count || 1
+            return sum + (minutes * workers) / 60 // 時間単位に変換
           }, 0)
           const totalRevenue = typeReports.reduce((sum: number, r: any) => {
             if (workType === 'harvesting') {
@@ -545,9 +543,12 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
               id: r.id,
               work_type: r.work_type,
               work_date: r.work_date,
-              // duration_hours × worker_count
-              duration_hours: (r.duration_hours && r.worker_count) ? 
-                (r.duration_hours * r.worker_count) : (r.duration_hours || 0),
+              // work_duration(分) または duration_hours(時) × worker_count
+              duration_hours: (() => {
+                const minutes = r.work_duration || (r.duration_hours ? r.duration_hours * 60 : 0)
+                const workers = r.worker_count || 1
+                return (minutes * workers) / 60 // 時間単位に変換
+              })(),
               revenue_generated: workType === 'harvesting' ? 
                 (r.harvest_amount || 0) * (r.expected_price || 0) : 
                 (r.expected_revenue || 0),
@@ -601,14 +602,12 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         
         Object.keys(WORK_TYPE_COLORS).forEach(workType => {
           const typeReports = prevMonthReports.filter((r: any) => r.work_type === workType)
-          // duration_hours × worker_count で総作業時間を計算
+          // work_duration(分) または duration_hours(時) × worker_count で総作業時間を計算
           const totalHours = typeReports.reduce((sum: number, r: any) => {
-            // duration_hoursとworker_countがある場合は掛け算
-            if (r.duration_hours && r.worker_count) {
-              return sum + (r.duration_hours * r.worker_count)
-            }
-            // worker_countがない場合はduration_hoursをそのまま使用
-            return sum + (r.duration_hours || 0)
+            // work_duration（分）を優先、なければduration_hoursを使用
+            const minutes = r.work_duration || (r.duration_hours ? r.duration_hours * 60 : 0)
+            const workers = r.worker_count || 1
+            return sum + (minutes * workers) / 60 // 時間単位に変換
           }, 0)
           
           workTypes[workType] = {
@@ -942,7 +941,10 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
           padding: 8, // 固定パディング
           callback: function(value) {
             const numValue = value as number
-            // 小数点第1位まで表示、単位はHで統一
+            // 1000以上は千h表記、未満は通常表記
+            if (numValue >= 1000) {
+              return `${(numValue / 1000).toFixed(1)}千h`
+            }
             return `${numValue.toFixed(1)}h`
           }
         },
@@ -966,12 +968,18 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
           ticks: {
             color: '#059669',
             font: {
-              size: Math.max(11, responsiveDimensions.fontSize),
-              weight: '600' as const
+              size: Math.max(12, responsiveDimensions.fontSize + 1),
+              weight: '600' as const,
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             },
             padding: 1,
             callback: function(value: any) {
-              return `${value}h`
+              const numValue = value as number
+              // 1000以上は千h表記、未満は通常表記
+              if (numValue >= 1000) {
+                return `${(numValue / 1000).toFixed(1)}千h`
+              }
+              return `${numValue}h`
             }
           },
           title: {
@@ -1007,8 +1015,9 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
             stepSize: 10,  // 10度刻みで6個の目盛り（-10, 0, 10, 20, 30, 40）
             color: '#f97316',
             font: {
-              size: Math.max(11, responsiveDimensions.fontSize),
-              weight: '600' as const
+              size: Math.max(12, responsiveDimensions.fontSize + 1),
+              weight: '600' as const,
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             },
             padding: 1,
             callback: function(value: any) {
@@ -1041,8 +1050,9 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
             stepSize: 20,  // 20%刻みで6個の目盛り（0, 20, 40, 60, 80, 100）
             color: '#3b82f6',
             font: {
-              size: Math.max(11, responsiveDimensions.fontSize),
-              weight: '600' as const
+              size: Math.max(12, responsiveDimensions.fontSize + 1),
+              weight: '600' as const,
+              family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             },
             padding: 1,
             callback: function(value: any) {

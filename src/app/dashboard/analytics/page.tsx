@@ -672,12 +672,13 @@ export default function AnalyticsPage() {
       .filter(r => r.harvest_amount)
       .reduce((sum, report) => sum + report.harvest_amount, 0)
 
-    // 総作業時間の計算（人時：duration_hours × worker_count）
+    // 総作業時間の計算（人時：work_duration(分) または duration_hours(時) × worker_count）
     const totalWorkHours = reports
       .reduce((sum, report) => {
-        const hours = report.duration_hours || report.work_hours || 0
+        // work_duration（分）を優先、なければduration_hoursを使用
+        const minutes = report.work_duration || (report.duration_hours ? report.duration_hours * 60 : 0) || (report.work_hours ? report.work_hours * 60 : 0)
         const workers = report.worker_count || 1
-        return sum + (hours * workers)
+        return sum + (minutes * workers) / 60 // 時間単位に変換
       }, 0)
 
     // 最近のアクティビティ生成（会計データ情報付き）

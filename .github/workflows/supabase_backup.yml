@@ -1,0 +1,162 @@
+name: Supabase Schema Backup
+
+on:
+  # 定期実行（毎日午前2時UTC = 日本時間午前11時）
+  schedule:
+    - cron: '0 2 * * *'
+
+  # 手動実行を許可
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: 'バックアップタイプ'
+        required: true
+        default: 'schema'
+        type: choice
+        options:
+          - schema
+          - full
+
+  # mainブランチへのプッシュ時（マイグレーション検出）
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 履歴を取得して差分検出を可能に
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Supabase CLI
+        run: |
+          npm install -g supabase
+          supabase --version
+
+      - name: Link to Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref rsofuafiacwygmfkcrrk --password $SUPABASE_DB_PASSWORD
+
+      - name: Create backup directories
+        run: |
+          mkdir -p supabase/backups/schema
+          mkdir -p supabase/backups/full
+          mkdir -p supabase/backups/versions
+
+      - name: Perform schema backup
+        if: github.event_name == 'schedule' || github.event.inputs.backup_type == 'schema' || github.event_name == 'push'
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          DATE=$(date +%Y%m%d_%H%M%S)
+          echo "Backing up schema at $DATE"
+          echo $SUPABASE_DB_PASSWORD | supabase db dump -s public -f supabase/backups/schema/schema_$DATE.sql --linked
+
+          # 最新版として保存
+          cp supabase/backups/schema/schema_$DATE.sql supabase/backups/schema/latest.sql
+
+          echo "## Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Type: Schema Only" >> $GITHUB_STEP_SUMMARY
+          echo "- Timestamp: $DATE" >> $GITHUB_STEP_SUMMARY
+          echo "- File: supabase/backups/schema/schema_$DATE.sql" >> $GITHUB_STEP_SUMMARY
+
+      - name: Perform full backup
+        if: github.event.inputs.backup_type == 'full'
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          DATE=$(date +%Y%m%d_%H%M%S)
+          echo "Performing full backup at $DATE"
+          echo $SUPABASE_DB_PASSWORD | supabase db dump -f supabase/backups/full/full_$DATE.sql --linked
+
+          # 最新版として保存
+          cp supabase/backups/full/full_$DATE.sql supabase/backups/full/latest_full.sql
+
+          echo "## Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Type: Full (Schema + Data)" >> $GITHUB_STEP_SUMMARY
+          echo "- Timestamp: $DATE" >> $GITHUB_STEP_SUMMARY
+          echo "- File: supabase/backups/full/full_$DATE.sql" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for schema changes
+        if: github.event_name == 'push'
+        id: schema_diff
+        run: |
+          if [ -f supabase/backups/schema/latest.sql ]; then
+            # 前回のバックアップと比較
+            if ! diff -q supabase/backups/schema/latest.sql supabase/backups/schema/schema_*.sql | tail -1; then
+              echo "schema_changed=true" >> $GITHUB_OUTPUT
+              echo "📝 Schema changes detected!" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "schema_changed=false" >> $GITHUB_OUTPUT
+              echo "✅ No schema changes detected" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Commit backup files
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # スキーマバックアップのみをコミット（データは除外）
+          git add supabase/backups/schema/*.sql
+          git add supabase/backups/versions/*.sql
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🔄 Automated schema backup - $(date +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Upload backup artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: supabase-backup-${{ github.run_number }}
+          path: |
+            supabase/backups/schema/*.sql
+            supabase/backups/full/*.sql
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ Supabase Backup Failed',
+              body: `The automated Supabase backup failed.\n\nWorkflow: ${context.workflow}\nRun: ${context.runNumber}\n\n[View logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+            })
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: backup
+    if: success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Clean old backups
+        run: |
+          # 30日以上前のバックアップを削除
+          find supabase/backups/schema -name "*.sql" -mtime +30 -delete 2>/dev/null || true
+          find supabase/backups/full -name "*.sql" -mtime +30 -delete 2>/dev/null || true
+
+          echo "🧹 Old backups cleaned up" >> $GITHUB_STEP_SUMMARY

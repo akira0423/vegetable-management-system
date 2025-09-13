@@ -94,7 +94,7 @@ export default function WorkReportViewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
-      <DialogContent className="max-w-4xl w-[99vw] max-h-[98vh] overflow-y-auto bg-white shadow-2xl border-0 p-0 gap-0">
+      <DialogContent className="w-[90vw] min-w-[1200px] max-w-7xl max-h-[80vh] overflow-y-auto bg-white shadow-2xl border-0 p-0 gap-0">
         <DialogHeader className="sr-only">
           <DialogTitle>
             {vegetableInfo?.name || 'Unknown'} - {getWorkTypeLabel(workReport.work_type)} 作業記録詳細

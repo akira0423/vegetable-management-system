@@ -1709,11 +1709,21 @@ export default function GanttPage() {
               <div>
                 <p className="text-sm text-purple-700 font-medium">総作業時間</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {workReports.reduce((sum: number, report: any) => {
-                    const hours = report.duration_hours || 0
-                    const workers = report.worker_count || 1
-                    return sum + (hours * workers)
-                  }, 0).toFixed(1)}h
+                  {(() => {
+                    const totalMinutes = workReports.reduce((sum: number, report: any) => {
+                      // work_duration（分）を優先、なければduration_hours（時間）を分に変換
+                      const minutes = report.work_duration || (report.duration_hours ? report.duration_hours * 60 : 0)
+                      const workers = report.worker_count || 1
+                      return sum + (minutes * workers)
+                    }, 0)
+
+                    // 60分以上なら時間表示、未満なら分表示
+                    if (totalMinutes >= 60) {
+                      return `${(totalMinutes / 60).toFixed(1)}h`
+                    } else {
+                      return `${totalMinutes}分`
+                    }
+                  })()}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">累計作業時間（人時）</p>
               </div>
@@ -1772,87 +1782,6 @@ export default function GanttPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* 📈 進捗サマリーカード */}
-      <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">作業進捗サマリー</h3>
-            <BarChart3 className="w-5 h-5 text-gray-600" />
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 全体進捗 */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">全体進捗</span>
-                <span className="font-medium text-gray-800">
-                  {Math.round((tasks.reduce((sum, t) => sum + t.progress, 0) / Math.max(tasks.length, 1)))}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
-                  className="bg-blue-500 h-3 rounded-full transition-all duration-300"
-                  style={{ 
-                    width: `${Math.round((tasks.reduce((sum, t) => sum + t.progress, 0) / Math.max(tasks.length, 1)))}%` 
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* タスク状況 */}
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600 mb-2">タスク状況</div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-600">
-                    {tasks.filter(t => t.status === 'pending').length}
-                  </div>
-                  <div className="text-gray-500">待機中</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-blue-600">
-                    {tasks.filter(t => t.status === 'in_progress').length}
-                  </div>
-                  <div className="text-gray-500">進行中</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-green-600">
-                    {tasks.filter(t => t.status === 'completed').length}
-                  </div>
-                  <div className="text-gray-500">完了</div>
-                </div>
-              </div>
-            </div>
-
-            {/* 優先度分布 */}
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600 mb-2">優先度分布</div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-red-600">
-                    {tasks.filter(t => t.priority === 'high').length}
-                  </div>
-                  <div className="text-gray-500">高</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-600">
-                    {tasks.filter(t => t.priority === 'medium').length}
-                  </div>
-                  <div className="text-gray-500">中</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-gray-600">
-                    {tasks.filter(t => t.priority === 'low').length}
-                  </div>
-                  <div className="text-gray-500">低</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
 
 
       {/* 栽培野菜管理チャート */}

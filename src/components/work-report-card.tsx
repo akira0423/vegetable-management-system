@@ -204,11 +204,15 @@ export function WorkReportCard({ report, onClick, onEdit, onDelete }: WorkReport
         {/* 基本情報層 */}
         <div className="p-4 bg-gray-50/50 border-b border-gray-100">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            {report.duration_hours && (
+            {(report.work_duration || report.duration_hours) && (
               <div className="flex items-center gap-2 bg-white p-2 rounded-lg border">
                 <Clock className="w-4 h-4 text-blue-500" />
                 <div>
-                  <div className="font-semibold text-blue-700">{Math.round(report.duration_hours * 60)}分</div>
+                  <div className="font-semibold text-blue-700">
+                    {/* work_durationは分単位で保存されているため、そのまま表示 */}
+                    {report.work_duration ? `${report.work_duration}分` :
+                     report.duration_hours ? `${Math.round(report.duration_hours * 60)}分` : ''}
+                  </div>
                   <div className="text-xs text-gray-500">作業時間</div>
                 </div>
               </div>

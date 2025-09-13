@@ -134,8 +134,9 @@ export default function WorkReportEditModalFull({
         // 基本環境データ
         checkValue('temperature', '気温', data.temperature, -20, 50, '℃')
         checkValue('humidity', '湿度', data.humidity, 0, 100, '%')
-        checkValue('work_duration', '作業時間', data.work_duration, 0, 480, '分')
-        checkValue('worker_count', '作業者数', data.worker_count, 1, 20, '人')
+        // 作業時間と作業者数のチェックを削除（農家によって大きく異なるため）
+        // checkValue('work_duration', '作業時間', data.work_duration, 0, 480, '分')
+        // checkValue('worker_count', '作業者数', data.worker_count, 1, 20, '人')
         
         // 土壌データ
         checkValue('soil_ph', 'pH', data.soil_ph, 3, 12, '')
@@ -165,14 +166,16 @@ export default function WorkReportEditModalFull({
           validatedData.humidity = Math.max(0, Math.min(100, validatedData.humidity))
         }
         
-        // 作業時間: 0-8時間 (分単位なので0-480)
+        // 作業時間: 制限なし（農家によって大きく異なるため）
+        // 最小値0のみチェック（負の値は防ぐ）
         if (validatedData.work_duration !== null && validatedData.work_duration !== undefined) {
-          validatedData.work_duration = Math.max(0, Math.min(480, validatedData.work_duration))
+          validatedData.work_duration = Math.max(0, validatedData.work_duration)
         }
-        
-        // 作業者数: 1-20人
+
+        // 作業者数: 制限なし（農家規模によって異なるため）
+        // 最小値1のみチェック（0人は防ぐ）
         if (validatedData.worker_count !== null && validatedData.worker_count !== undefined) {
-          validatedData.worker_count = Math.max(1, Math.min(20, validatedData.worker_count))
+          validatedData.worker_count = Math.max(1, validatedData.worker_count)
         }
         
         // 土壌データ検証（現実的な範囲）
@@ -360,7 +363,7 @@ export default function WorkReportEditModalFull({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
-      <DialogContent className="!max-w-[1200px] !w-[99vw] max-h-[98vh] overflow-y-auto bg-white shadow-2xl border-0 p-0 gap-0" style={{maxWidth: '1200px', width: '99vw'}}>
+      <DialogContent className="w-[90vw] min-w-[1200px] max-w-[1280px] max-h-[80vh] overflow-y-auto bg-white shadow-2xl border-0 p-0 gap-0">
         <DialogHeader className="sr-only">
           <DialogTitle>
             実績記録を編集 - {workReport.work_type}

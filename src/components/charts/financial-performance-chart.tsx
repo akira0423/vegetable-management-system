@@ -1378,7 +1378,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
             size: 13, // 左軸と統一
             weight: '600'
           },
-          padding: 5, // 右側Y軸の余白を調整
+          padding: -2, // 右側Y軸の余白を調整
           stepSize: cumulativeRange.stepSize, // メモリ数を5個に固定
           callback: function(value) {
             const numValue = value as number
