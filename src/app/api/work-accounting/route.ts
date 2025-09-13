@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         accounting_items:accounting_item_id (
-          id, code, name, type, category
+          id, code, name, type, category, cost_type
         )
       `)
       .eq('work_report_id', workReportId)

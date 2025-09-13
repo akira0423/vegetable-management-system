@@ -23,8 +23,9 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from '@/components/ui/dialog'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils/index'
-import { CalendarIcon, Clock, TrendingUp, TrendingDown, Eye, X, Zap, Target, Award } from 'lucide-react'
+import { CalendarIcon, Clock, TrendingUp, TrendingDown, Eye, X, Zap, Target, Award, ChevronRight } from 'lucide-react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { createClient } from '@supabase/supabase-js'
@@ -211,6 +212,8 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
   const [showCumulativeWorkTime, setShowCumulativeWorkTime] = useState(true)
   const [containerWidth, setContainerWidth] = useState(0)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  // 作業種別・期間合計時間の展開状態
+  const [isWorkTypeTotalsOpen, setIsWorkTypeTotalsOpen] = useState(true)
   
   // 🌡️💧 気象データ表示状態
   const [weatherDisplayOptions, setWeatherDisplayOptions] = useState<WeatherDisplayOptions>({
@@ -225,7 +228,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
   // レスポンシブ寸法計算
   const calculateResponsiveDimensions = useCallback((period: number, containerWidth: number): ResponsiveDimensions => {
     const monthCount = period * 12
-    const availableWidth = containerWidth - 120
+    const availableWidth = containerWidth - 90
     const idealBarWidth = availableWidth / monthCount
     
     const barWidth = Math.max(25, Math.min(80, idealBarWidth))
@@ -263,32 +266,76 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     [displayPeriod, containerWidth, calculateResponsiveDimensions]
   )
 
-  // Y軸範囲の動的計算
+  // Y軸範囲の動的計算（作業時間は0以上のみ、5〜7個の目盛り）
   const calculateYAxisRange = useCallback((data: WorkHoursData[]) => {
-    if (!data || data.length === 0) return { min: 0, max: 100 }
+    if (!data || data.length === 0) return { min: 0, max: 100, stepSize: 20 }
     
-    const maxHours = Math.max(...data.map(d => d.monthly_total_hours))
-    const buffer = Math.max(maxHours * 0.1, 10)
+    const allValues = data.map(d => d.monthly_total_hours)
+    const rawMax = Math.max(...allValues, 10)
+    
+    // 上部に20%の余裕を持たせる
+    let optimizedMax = rawMax * 1.2
+    
+    // 最適な目盛り数を決定する関数
+    const findOptimalStep = (max: number) => {
+      // 候補となるきれいなステップサイズ
+      const niceSteps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000]
+      
+      // 5〜7個の目盛りになるステップサイズを探す
+      for (const step of niceSteps) {
+        const tickCount = Math.ceil(max / step) + 1 // 0を含むため+1
+        if (tickCount >= 5 && tickCount <= 7) {
+          return {
+            stepSize: step,
+            max: step * (tickCount - 1),
+            tickCount: tickCount
+          }
+        }
+      }
+      
+      // 見つからない場合は、6個の目盛りを目標に計算
+      const targetTicks = 6
+      const rawStep = max / (targetTicks - 1)
+      
+      // rawStepに最も近いきれいな値を選択
+      let bestStep = niceSteps[0]
+      for (const step of niceSteps) {
+        if (Math.abs(step - rawStep) < Math.abs(bestStep - rawStep)) {
+          bestStep = step
+        }
+      }
+      
+      const tickCount = Math.ceil(max / bestStep) + 1
+      return {
+        stepSize: bestStep,
+        max: bestStep * (tickCount - 1),
+        tickCount: tickCount
+      }
+    }
+    
+    const optimal = findOptimalStep(optimizedMax)
     
     return {
       min: 0,
-      max: Math.ceil(maxHours + buffer)
+      max: optimal.max,
+      stepSize: optimal.stepSize
     }
   }, [])
 
-  // 🌡️💧 Supabaseから気象データを取得
+  // 🌡️💧 Supabaseから気象データを取得（work_reportsテーブルから）
   const fetchWeatherData = useCallback(async (month: Date): Promise<WorkHoursData['weather_data']> => {
     try {
       const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)
       const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0)
       
       const { data: weatherRecords, error } = await supabase
-        .from('weather_records')
-        .select('*')
+        .from('work_reports')
+        .select('temperature, humidity')
         .eq('company_id', companyId)
-        .gte('recorded_date', startOfMonth.toISOString().split('T')[0])
-        .lte('recorded_date', endOfMonth.toISOString().split('T')[0])
-        .order('recorded_date', { ascending: true })
+        .gte('work_date', startOfMonth.toISOString().split('T')[0])
+        .lte('work_date', endOfMonth.toISOString().split('T')[0])
+        .not('temperature', 'is', null)
+        .not('humidity', 'is', null)
 
       if (error) {
         // テーブルが存在しない場合などは静かに無視
@@ -315,10 +362,10 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       // 月平均値を計算
       const avgTemp = validRecords.reduce((sum, record) => sum + record.temperature, 0) / validRecords.length
       const avgHumidity = validRecords.reduce((sum, record) => sum + record.humidity, 0) / validRecords.length
-      const minTemp = Math.min(...validRecords.map(r => r.temperature_min).filter(t => t && t > 0))
-      const maxTemp = Math.max(...validRecords.map(r => r.temperature_max).filter(t => t && t > 0))
-      const minHumidity = Math.min(...validRecords.map(r => r.humidity_min).filter(h => h && h > 0))
-      const maxHumidity = Math.max(...validRecords.map(r => r.humidity_max).filter(h => h && h > 0))
+      const minTemp = Math.min(...validRecords.map(r => r.temperature))
+      const maxTemp = Math.max(...validRecords.map(r => r.temperature))
+      const minHumidity = Math.min(...validRecords.map(r => r.humidity))
+      const maxHumidity = Math.max(...validRecords.map(r => r.humidity))
 
       return {
         temperature: Math.round(avgTemp * 10) / 10,
@@ -455,7 +502,15 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         Object.keys(WORK_TYPE_COLORS).forEach(workType => {
           const typeReports = monthReports.filter((r: any) => r.work_type === workType)
           
-          const totalHours = typeReports.reduce((sum: number, r: any) => sum + (r.duration_hours || 2), 0)
+          // duration_hours × worker_count で総作業時間を計算
+          const totalHours = typeReports.reduce((sum: number, r: any) => {
+            // duration_hoursとworker_countがある場合は掛け算
+            if (r.duration_hours && r.worker_count) {
+              return sum + (r.duration_hours * r.worker_count)
+            }
+            // worker_countがない場合はduration_hoursをそのまま使用
+            return sum + (r.duration_hours || 0)
+          }, 0)
           const totalRevenue = typeReports.reduce((sum: number, r: any) => {
             if (workType === 'harvesting') {
               return sum + ((r.harvest_amount || 0) * (r.expected_price || 0))
@@ -490,7 +545,9 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
               id: r.id,
               work_type: r.work_type,
               work_date: r.work_date,
-              duration_hours: r.duration_hours || 2,
+              // duration_hours × worker_count
+              duration_hours: (r.duration_hours && r.worker_count) ? 
+                (r.duration_hours * r.worker_count) : (r.duration_hours || 0),
               revenue_generated: workType === 'harvesting' ? 
                 (r.harvest_amount || 0) * (r.expected_price || 0) : 
                 (r.expected_revenue || 0),
@@ -544,7 +601,15 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         
         Object.keys(WORK_TYPE_COLORS).forEach(workType => {
           const typeReports = prevMonthReports.filter((r: any) => r.work_type === workType)
-          const totalHours = typeReports.reduce((sum: number, r: any) => sum + (r.duration_hours || 2), 0)
+          // duration_hours × worker_count で総作業時間を計算
+          const totalHours = typeReports.reduce((sum: number, r: any) => {
+            // duration_hoursとworker_countがある場合は掛け算
+            if (r.duration_hours && r.worker_count) {
+              return sum + (r.duration_hours * r.worker_count)
+            }
+            // worker_countがない場合はduration_hoursをそのまま使用
+            return sum + (r.duration_hours || 0)
+          }, 0)
           
           workTypes[workType] = {
             total_hours: totalHours,
@@ -637,7 +702,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
         type: 'line' as const,
-        yAxisID: 'y1', // 右軸（気温用）
+        yAxisID: 'y2', // 気温用（中間位置）
         order: 0,
         spanGaps: false // null値の箇所で線を切る
       })
@@ -662,7 +727,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
         type: 'line' as const,
-        yAxisID: 'y2', // 右軸（湿度用）
+        yAxisID: 'y3', // 湿度用（最も右側）
         order: 0,
         spanGaps: false // null値の箇所で線を切る
       })
@@ -690,7 +755,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         fill: false,
         tension: 0.4,
         type: 'line' as const,
-        yAxisID: 'y3', // 新しい右軸（累積作業時間用）
+        yAxisID: 'y1', // 累積作業時間用（最も左側）
         order: -1, // 最前面に表示
         pointHoverRadius: 7,
         pointHoverBorderWidth: 3,
@@ -769,37 +834,41 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     }
   }, [workHoursData, updateChartDimensions])
 
-  // 複数右軸表示用のカスタムプラグイン
+  // 複数右軸表示用のカスタムプラグイン（無効化 - 軸位置は afterFit で制御）
   const multipleRightAxisPlugin = {
     id: 'multipleRightAxis',
     beforeDraw: (chart: any) => {
-      if (weatherDisplayOptions.showTemperature && weatherDisplayOptions.showHumidity) {
-        const ctx = chart.ctx
-        const chartArea = chart.chartArea
-        const y1Scale = chart.scales.y1
-        const y2Scale = chart.scales.y2
-        
-        if (y1Scale && y2Scale) {
-          // 湿度軸をより狭い位置に配置（スペース節約）
-          y2Scale.left = chartArea.right + 15
-          y2Scale.right = chartArea.right + 65
-        }
-      }
+      // 軸の動的な位置調整は行わない
+      // 全ての軸位置は afterFit 関数で固定的に制御される
     }
   }
 
   // チャートオプション
-  const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
+  const chartOptions: ChartOptions<'bar'> = useMemo(() => {
+    // 表示されているY軸の数を計算
+    const visibleAxesCount =
+      (showCumulativeWorkTime ? 1 : 0) +
+      (weatherDisplayOptions.showTemperature ? 1 : 0) +
+      (weatherDisplayOptions.showHumidity ? 1 : 0);
+
+    // Y軸の数に応じて右側パディングを動的に調整
+    const rightPadding = visibleAxesCount === 0 ? 0 :
+                        visibleAxesCount === 1 ? 0 :
+                        visibleAxesCount === 2 ? 10 :
+                        20; // 3軸の場合
+
+    return ({
     responsive: true,
     maintainAspectRatio: false,
     layout: {
       padding: {
-        left: (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) ? undefined : 10, // 気象データ表示時はデフォルト（自動計算）
-        right: weatherDisplayOptions.showTemperature && weatherDisplayOptions.showHumidity ? 15 :  // 両軸時：15px
-               weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity ? 15 : 10, // 単軸時：15px
-        top: 10,
-        bottom: 10
-      }
+        left: 0,
+        // Y軸の数に応じて動的に調整
+        right: rightPadding,
+        top: 0,
+        bottom: 0
+      },
+      autoPadding: false // 自動パディング調整を無効化
     },
     interaction: {
       mode: 'index',
@@ -839,8 +908,11 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         barPercentage: responsiveDimensions.barPercentage,
         categoryPercentage: responsiveDimensions.categoryPercentage,
         bounds: 'ticks',
-        afterFit: function(scale) {
+        afterFit: function(scale: any) {
           scale.paddingBottom = 60
+          // 左右のパディングは固定（動的調整しない）
+          scale.paddingLeft = 0
+          scale.paddingRight = 0
         }
       },
       y: {
@@ -857,111 +929,30 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         },
         border: {
           color: '#374151',
-          width: (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) ? 2 : 1 // 気象データ表示時はデフォルトの2px
+          width: 2 // 固定幅
         },
         ticks: {
+          stepSize: yAxisRange.stepSize, // 11個の目盛りに固定
           color: '#1f2937',
           font: {
-            size: (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) ? 
-                  Math.max(13, responsiveDimensions.fontSize + 2) : // 気象データ表示時はデフォルトサイズ
-                  Math.max(12, responsiveDimensions.fontSize + 1), // 非表示時は小さく
+            size: Math.max(12, responsiveDimensions.fontSize + 1), // 固定サイズ
             weight: '600',
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
-          padding: (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) ? 10 : 4, // 気象データ表示時はデフォルトパディング
+          padding: 8, // 固定パディング
           callback: function(value) {
             const numValue = value as number
-            return (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) ? 
-                   `${numValue}時間` : `${numValue}h` // 気象データ表示時は"時間"表記
+            // 小数点第1位まで表示、単位はHで統一
+            return `${numValue.toFixed(1)}h`
           }
-        }
+        },
+        // 左側Y軸は常に固定位置
+        beginAtZero: false,
+        offset: false // オフセットを無効化
       },
-      // 🌡️ 気温軸（右側1番目）
-      ...(weatherDisplayOptions.showTemperature ? {
-        y1: {
-          type: 'linear' as const,
-          display: true,
-          position: 'right' as const,
-          min: -5,
-          max: 45,
-          grid: {
-            drawOnChartArea: false,
-          },
-          border: {
-            color: '#f97316',
-            width: 2
-          },
-          ticks: {
-            color: '#f97316',
-            font: {
-              size: Math.max(11, responsiveDimensions.fontSize),
-              weight: '600' as const
-            },
-            padding: 4, // 軸線からの距離を短く
-            callback: function(value: any) {
-              return `${value}°C`
-            }
-          },
-          title: {
-            display: true,
-            text: '気温 (°C)',
-            color: '#f97316',
-            font: {
-              size: 12,
-              weight: 'bold' as const
-            },
-            padding: 4 // 軸タイトルと軸線の距離を短く
-          }
-        }
-      } : {}),
-      // 💧 湿度軸（右側2番目）
-      ...(weatherDisplayOptions.showHumidity ? {
-        y2: {
-          type: 'linear' as const,
-          display: true,
-          position: 'right' as const,
-          min: 0,
-          max: 100,
-          grid: {
-            drawOnChartArea: false,
-          },
-          border: {
-            color: '#3b82f6',
-            width: 2
-          },
-          ticks: {
-            color: '#3b82f6',
-            font: {
-              size: Math.max(11, responsiveDimensions.fontSize),
-              weight: '600' as const
-            },
-            padding: 6, // 湿度軸メモリーは少し余裕を持たせる
-            callback: function(value: any) {
-              return `${value}%`
-            }
-          },
-          title: {
-            display: true,
-            text: '湿度 (%)',
-            color: '#3b82f6',
-            font: {
-              size: 12,
-              weight: 'bold' as const
-            },
-            padding: 8 // 湿度軸タイトルは少し余裕を持たせる
-          },
-          // 湿度軸を気温軸から右にオフセット
-          offset: weatherDisplayOptions.showTemperature,
-          beforeFit: function(scale: any) {
-            if (weatherDisplayOptions.showTemperature) {
-              scale.paddingLeft = 60 // 気温軸から60px右にずらす（狭めに調整）
-            }
-          }
-        }
-      } : {}),
-      // 📊 累積作業時間軸（右側3番目）
+      // 📊 累積作業時間軸（最も左側）
       ...(showCumulativeWorkTime ? {
-        y3: {
+        y1: {
           type: 'linear' as const,
           display: true,
           position: 'right' as const,
@@ -978,7 +969,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
               size: Math.max(11, responsiveDimensions.fontSize),
               weight: '600' as const
             },
-            padding: 4,
+            padding: 1,
             callback: function(value: any) {
               return `${value}h`
             }
@@ -988,24 +979,81 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
             text: '累積作業時間 (h)',
             color: '#059669',
             font: {
-              size: 12,
+              size: 13,
               weight: 'bold' as const
             },
             padding: 4
           },
-          // 累積作業時間軸を他の軸から更に右にオフセット
-          offset: weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity,
-          beforeFit: function(scale: any) {
-            let offsetAmount = 0
-            if (weatherDisplayOptions.showTemperature && weatherDisplayOptions.showHumidity) {
-              offsetAmount = 120 // 両軸ある場合は120px右にずらす
-            } else if (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity) {
-              offsetAmount = 60 // 一つの軸がある場合は60px右にずらす
+          // 累積作業時間軸は最も左側（グラフに接して配置）
+          offset: false
+        }
+      } : {}),
+      // 🌡️ 気温軸（中間位置）
+      ...(weatherDisplayOptions.showTemperature ? {
+        y2: {
+          type: 'linear' as const,
+          display: true,
+          position: 'right' as const,
+          min: -10,  // 実用的な範囲に調整
+          max: 40,   // 日本の気候に適した範囲
+          grid: {
+            drawOnChartArea: false,
+          },
+          border: {
+            color: '#f97316',
+            width: 2
+          },
+          ticks: {
+            stepSize: 10,  // 10度刻みで6個の目盛り（-10, 0, 10, 20, 30, 40）
+            color: '#f97316',
+            font: {
+              size: Math.max(11, responsiveDimensions.fontSize),
+              weight: '600' as const
+            },
+            padding: 1,
+            callback: function(value: any) {
+              return `${value}°C`
             }
-            if (offsetAmount > 0) {
-              scale.paddingLeft = offsetAmount
+          },
+          title: {
+            display: false
+          },
+          // 気温軸は中間位置に配置
+          offset: true
+        }
+      } : {}),
+      // 💧 湿度軸（最も右側）
+      ...(weatherDisplayOptions.showHumidity ? {
+        y3: {
+          type: 'linear' as const,
+          display: true,
+          position: 'right' as const,
+          min: 0,   // 0%から
+          max: 100,  // 100%まで
+          grid: {
+            drawOnChartArea: false,
+          },
+          border: {
+            color: '#3b82f6',
+            width: 2
+          },
+          ticks: {
+            stepSize: 20,  // 20%刻みで6個の目盛り（0, 20, 40, 60, 80, 100）
+            color: '#3b82f6',
+            font: {
+              size: Math.max(11, responsiveDimensions.fontSize),
+              weight: '600' as const
+            },
+            padding: 1,
+            callback: function(value: any) {
+              return `${value}%`
             }
-          }
+          },
+          title: {
+            display: false
+          },
+          // 湿度軸は最も右側に配置
+          offset: true
         }
       } : {})
     },
@@ -1022,7 +1070,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
-        displayColors: false,
+        displayColors: true, // 色付きマーカーを表示
         titleFont: {
           size: 14,
           weight: '600'
@@ -1031,47 +1079,128 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
           size: 12,
           weight: '400'
         },
+        interaction: {
+          mode: 'point' as const, // ポイントごとに個別表示
+          intersect: false // カーソルが近くにあれば表示
+        },
         callbacks: {
           title: (context) => {
             const dataIndex = context[0].dataIndex
             const data = workHoursData[dataIndex]
-            return `${data.year}年${data.month}の作業時間分析`
+            return `${data.year}年${data.month} - 作業時間分析`
           },
           label: (context) => {
             const value = context.raw as number
-            const datasetLabel = context.dataset.label
+            const datasetLabel = context.dataset.label || ''
+            const datasetType = context.dataset.type || 'bar'
             
-            // 気象データの場合は適切な単位を表示
-            if (datasetLabel?.includes('気温')) {
-              return `${datasetLabel}: ${value}°C`
-            } else if (datasetLabel?.includes('湿度')) {
-              return `${datasetLabel}: ${value}%`
-            } else {
-              return `${datasetLabel}: ${value}時間`
+            // 線グラフ（累積データ）の場合
+            if (datasetType === 'line') {
+              if (datasetLabel.includes('累積')) {
+                return `${datasetLabel}: ${value.toLocaleString()}時間`
+              } else if (datasetLabel.includes('気温')) {
+                return `${datasetLabel}: ${value}°C`
+              } else if (datasetLabel.includes('湿度')) {
+                return `${datasetLabel}: ${value}%`
+              }
             }
+            
+            // 棒グラフ（作業種別データ）の場合
+            const workType = datasetLabel.replace('作業', '')
+            if (value > 0) {
+              return `${datasetLabel}: ${value.toLocaleString()}時間`
+            } else if (value === 0) {
+              return `${datasetLabel}: 実施なし`
+            }
+            return `${datasetLabel}: ${value.toLocaleString()}時間`
           },
           afterBody: (context) => {
             const dataIndex = context[0].dataIndex
             const data = workHoursData[dataIndex]
-            const weatherInfo = []
+            const result = []
             
-            if (data.weather_data && (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity)) {
-              weatherInfo.push('', '🌡️💧 気象条件:')
-              if (weatherDisplayOptions.showTemperature) {
-                weatherInfo.push(`気温: ${data.weather_data.temperature}°C (${data.weather_data.temperature_range.min}°C～${data.weather_data.temperature_range.max}°C)`)
-              }
-              if (weatherDisplayOptions.showHumidity) {
-                weatherInfo.push(`湿度: ${data.weather_data.humidity}% (${data.weather_data.humidity_range.min}%～${data.weather_data.humidity_range.max}%)`)
+            // 月次サマリー
+            result.push('', '📊 【月次サマリー】')
+            result.push(`💪 総作業時間: ${data.monthly_total_hours.toLocaleString()}時間`)
+            result.push(`💰 総収益: ¥${data.monthly_total_revenue.toLocaleString()}`)
+            result.push(`💸 総コスト: ¥${data.monthly_total_cost.toLocaleString()}`)
+            result.push(`📈 平均効率: ${(data.monthly_avg_efficiency * 100).toFixed(1)}%`)
+            
+            // 作業種別の詳細（上位3件）
+            const workTypesArray = Object.entries(data.work_types)
+              .filter(([_, details]) => details.total_hours > 0)
+              .sort((a, b) => b[1].total_hours - a[1].total_hours)
+              .slice(0, 3)
+            
+            if (workTypesArray.length > 0) {
+              result.push('', '🔍 【作業種別TOP3】')
+              workTypesArray.forEach(([type, details]) => {
+                const workTypeLabel = WORK_TYPE_LABELS[type as keyof typeof WORK_TYPE_LABELS] || type
+                result.push(`• ${workTypeLabel}: ${details.total_hours}h (${details.work_count}回)`)
+                if (details.roi_per_hour > 0) {
+                  result.push(`  ROI: ¥${Math.round(details.roi_per_hour)}/h`)
+                }
+              })
+            }
+            
+            // AI予測情報
+            if (data.ai_predictions) {
+              result.push('', '🤖 【AI予測分析】')
+              result.push(`予測作業時間: ${data.ai_predictions.predicted_hours}時間`)
+              
+              const trendEmoji = data.ai_predictions.efficiency_trend === 'improving' ? '📈' :
+                                data.ai_predictions.efficiency_trend === 'declining' ? '📉' : '➡️'
+              const trendText = data.ai_predictions.efficiency_trend === 'improving' ? '改善傾向' :
+                               data.ai_predictions.efficiency_trend === 'declining' ? '低下傾向' : '横ばい'
+              result.push(`効率トレンド: ${trendEmoji} ${trendText}`)
+              result.push(`最適化スコア: ${(data.ai_predictions.optimization_score * 100).toFixed(0)}%`)
+              
+              // AI提案（最初の1つのみ表示）
+              if (data.ai_predictions.suggestions && data.ai_predictions.suggestions.length > 0) {
+                result.push(`💡 ${data.ai_predictions.suggestions[0]}`)
               }
             }
             
-            return [
-              '',
-              `総作業時間: ${data.monthly_total_hours}時間`,
-              ...weatherInfo,
-              '',
-              'クリックで詳細表示'
-            ]
+            // 業界ベンチマーク
+            if (data.benchmarks) {
+              result.push('', '📊 【業界ベンチマーク】')
+              result.push(`業界平均: ${data.benchmarks.industry_average_hours}時間`)
+              result.push(`トップ企業: ${data.benchmarks.top_performers_hours}時間`)
+              result.push(`効率順位: 上位${data.benchmarks.efficiency_percentile}%`)
+            }
+            
+            // 気象情報
+            if (data.weather_data && (weatherDisplayOptions.showTemperature || weatherDisplayOptions.showHumidity)) {
+              result.push('', '🌡️💧 【気象条件】')
+              if (weatherDisplayOptions.showTemperature) {
+                result.push(`平均気温: ${data.weather_data.temperature}°C`)
+                result.push(`気温範囲: ${data.weather_data.temperature_range.min}°C～${data.weather_data.temperature_range.max}°C`)
+              }
+              if (weatherDisplayOptions.showHumidity) {
+                result.push(`平均湿度: ${data.weather_data.humidity}%`)
+                result.push(`湿度範囲: ${data.weather_data.humidity_range.min}%～${data.weather_data.humidity_range.max}%`)
+              }
+            }
+            
+            // 累積作業時間が表示されている場合
+            const hoveredDataset = context[0].dataset
+            if (hoveredDataset && hoveredDataset.type === 'line' && hoveredDataset.label?.includes('累積')) {
+              result.push('', '📈 【累積分析】')
+              const cumulativeHours = hoveredDataset.data[dataIndex] as number
+              result.push(`累積作業時間: ${cumulativeHours.toLocaleString()}時間`)
+              
+              // 前月比較
+              if (dataIndex > 0) {
+                const prevCumulative = hoveredDataset.data[dataIndex - 1] as number
+                const monthlyIncrease = cumulativeHours - prevCumulative
+                const growthRate = prevCumulative > 0 ? ((monthlyIncrease / prevCumulative) * 100).toFixed(1) : '0.0'
+                result.push(`前月比: +${monthlyIncrease.toLocaleString()}時間 (${growthRate}%増)`)
+              }
+            }
+            
+            result.push('', '💡 クリックで詳細分析を表示')
+            
+            return result
           }
         }
       }
@@ -1086,7 +1215,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     onResize: function(chart, size) {
       setTimeout(updateChartDimensions, 50)
     }
-  }), [yAxisRange, workHoursData, updateChartDimensions, responsiveDimensions, weatherDisplayOptions, showCumulativeWorkTime])
+  })}, [yAxisRange, workHoursData, updateChartDimensions, responsiveDimensions, weatherDisplayOptions, showCumulativeWorkTime])
 
   // 年月選択ハンドラー
   const handleYearMonthChange = () => {
@@ -1471,34 +1600,46 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
             )}
           </div>
           
-          {/* 作業種別凡例 */}
-          <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg">
-            <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-              ⏰ 作業種別・期間合計時間 
-              <span className="text-xs text-gray-500 font-normal">
-                （合計: {workTimePercentages.totalHours?.toFixed(1) || 0}時間）
-              </span>
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Object.entries(WORK_TYPE_LABELS).map(([workType, label]) => (
-                <div key={workType} className="flex items-center gap-2 p-2 bg-white rounded border shadow-sm">
-                  <div 
-                    className="w-4 h-4 rounded flex-shrink-0"
-                    style={{ backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS] }}
+          {/* 作業種別凡例（折りたたみ可能） */}
+          <Collapsible open={isWorkTypeTotalsOpen} onOpenChange={setIsWorkTypeTotalsOpen}>
+            <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-indigo-50 border border-gray-200 rounded-lg">
+              <CollapsibleTrigger className="w-full">
+                <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2 cursor-pointer hover:text-gray-600">
+                  <ChevronRight
+                    className={`w-4 h-4 transition-transform duration-200 ${isWorkTypeTotalsOpen ? 'rotate-90' : ''}`}
                   />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-700 truncate">{label}</div>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div>{(periodTotals[workType] || 0).toFixed(1)}時間</div>
-                      <div className="font-semibold text-indigo-600">
-                        {workTimePercentages.percentages?.[workType] || 0}%
+                  ⏰ 作業種別・期間合計時間
+                  <span className="text-xs text-gray-500 font-normal">
+                    （合計: {workTimePercentages.totalHours?.toFixed(1) || 0}時間）
+                  </span>
+                  <span className="text-xs text-gray-500 ml-auto">
+                    {isWorkTypeTotalsOpen ? '閉じる' : '展開する'}
+                  </span>
+                </h4>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(WORK_TYPE_LABELS).map(([workType, label]) => (
+                    <div key={workType} className="flex items-center gap-2 p-2 bg-white rounded border shadow-sm">
+                      <div
+                        className="w-4 h-4 rounded flex-shrink-0"
+                        style={{ backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS] }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-700 truncate">{label}</div>
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div>{(periodTotals[workType] || 0).toFixed(1)}時間</div>
+                          <div className="font-semibold text-indigo-600">
+                            {workTimePercentages.percentages?.[workType] || 0}%
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </CollapsibleContent>
             </div>
-          </div>
+          </Collapsible>
           
           {/* AI洞察パネル */}
           {showAIInsights && workHoursData.length > 0 && (

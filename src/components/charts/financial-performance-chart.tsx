@@ -27,7 +27,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from '@/components/ui/dialog'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils/index'
-import { CalendarIcon, TrendingUp, TrendingDown, Eye, X, Target, Zap, Activity, DollarSign, BarChart3 } from 'lucide-react'
+import { CalendarIcon, TrendingUp, TrendingDown, Eye, X, Target, Zap, Activity, DollarSign, BarChart3, ChevronUp, ChevronDown, ChevronRight, Settings } from 'lucide-react'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
@@ -157,7 +162,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonthNum, setSelectedMonthNum] = useState<number>(1)
-  const [displayPeriod, setDisplayPeriod] = useState<1 | 2>(1)
+  const [displayPeriod, setDisplayPeriod] = useState<1 | 2 | 3>(1)
   const [financialData, setFinancialData] = useState<FinancialPerformanceData[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState<FinancialPerformanceData | null>(null)
@@ -195,16 +200,132 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // 累積損益線の制御状態
   const [showCumulativeLine, setShowCumulativeLine] = useState(true)
   const [cumulativeType, setCumulativeType] = useState<'profit' | 'income' | 'expense'>('profit')
+  // 右側Y軸は常に最適化モード
+  // フィルターセクションの折りたたみ状態（デフォルトは折りたたみ）
+  const [filterSectionExpanded, setFilterSectionExpanded] = useState({
+    period: false,
+    category: false,
+    itemControl: false
+  })
   const MAX_VISIBLE_ITEMS = 6
   
   const chartRef = useRef<ChartJS<'bar'>>(null)
   
-  // 勘定項目データの生成（実際のSupabaseデータから）
-  const processAccountingItems = useCallback((workReports: any[]): { [month: string]: CategoryData } => {
+  // 実際の勘定項目データを処理（work_report_accountingテーブルから）
+  const processRealAccountingItems = useCallback(async (workReportIds: string[]): Promise<{ [month: string]: CategoryData }> => {
     const monthlyData: { [month: string]: CategoryData } = {}
     
+    if (workReportIds.length === 0) return monthlyData
+    
+    try {
+      // work_report_accountingと accounting_itemsを結合して取得
+      const { data: accountingData, error } = await supabase
+        .from('work_report_accounting')
+        .select(`
+          id,
+          work_report_id,
+          accounting_item_id,
+          amount,
+          work_reports!inner (
+            work_date
+          ),
+          accounting_items!inner (
+            id,
+            name,
+            code,
+            cost_type
+          )
+        `)
+        .in('work_report_id', workReportIds)
+        .order('work_report_id')
+      
+      if (error) {
+        console.error('🚨 勘定項目データ取得エラー:', error)
+        // エラー時は推定データを返す
+        return processEstimatedAccountingItems(workReportIds)
+      }
+      
+      if (!accountingData || accountingData.length === 0) {
+        console.log('⚠️ 勘定項目データが見つかりません。推定データを使用します。')
+        return processEstimatedAccountingItems(workReportIds)
+      }
+      
+      // 月別・項目別にデータを集約（年月で区別）
+      accountingData.forEach((record: any) => {
+        const workDate = new Date(record.work_reports.work_date)
+        const monthKey = format(workDate, 'yyyy-MM', { locale: ja })
+        const costType = record.accounting_items.cost_type
+        const categoryKey = costType === 'income' ? 'income' : 
+                           costType === 'variable_cost' ? 'variable_costs' : 'fixed_costs'
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = {
+            income: [],
+            variable_costs: [],
+            fixed_costs: []
+          }
+        }
+        
+        // 既存の項目を探す
+        const existingItem = monthlyData[monthKey][categoryKey].find(
+          item => item.id === record.accounting_items.id
+        )
+        
+        if (existingItem) {
+          // 既存項目に金額を加算
+          existingItem.value += record.amount
+        } else {
+          // 新規項目として追加
+          monthlyData[monthKey][categoryKey].push({
+            id: record.accounting_items.id,
+            name: record.accounting_items.name,
+            category: categoryKey as 'income' | 'variable_costs' | 'fixed_costs',
+            value: record.amount,
+            unit: '円'
+          })
+        }
+      })
+      
+      // 月別に色を割り当て
+      Object.keys(monthlyData).forEach(month => {
+        ['income', 'variable_costs', 'fixed_costs'].forEach(category => {
+          const categoryKey = category as keyof CategoryData
+          const items = monthlyData[month][categoryKey]
+          const colorVariants = CATEGORY_COLORS[categoryKey].variants
+          
+          // 項目を金額順にソート
+          items.sort((a, b) => b.value - a.value)
+          
+          // 色を割り当て
+          items.forEach((item, index) => {
+            item.color = colorVariants[index % colorVariants.length]
+          })
+        })
+      })
+      
+      console.log('💰 実データ勘定項目処理完了:', monthlyData)
+      return monthlyData
+      
+    } catch (error) {
+      console.error('🚨 勘定項目データ処理エラー:', error)
+      return processEstimatedAccountingItems(workReportIds)
+    }
+  }, [])
+  
+  // 推定データを生成（実データが無い場合のフォールバック）
+  const processEstimatedAccountingItems = useCallback(async (workReportIds: string[]): Promise<{ [month: string]: CategoryData }> => {
+    const monthlyData: { [month: string]: CategoryData } = {}
+    
+    // work_reportsから基本データを取得
+    const { data: workReports } = await supabase
+      .from('work_reports')
+      .select('id, work_date, income_total, expense_total, expected_revenue')
+      .in('id', workReportIds)
+    
+    if (!workReports) return monthlyData
+    
     workReports.forEach(report => {
-      const monthKey = format(new Date(report.work_date), 'M月', { locale: ja })
+      const monthKey = format(new Date(report.work_date), 'yyyy-MM', { locale: ja })
       
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = {
@@ -214,126 +335,42 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         }
       }
       
-      // 収入項目の処理
+      // 推定収入項目
       const incomeItems: AccountingItem[] = [
         {
-          id: 'harvest_sales',
-          name: '収穫物売上',
+          id: 'harvest_sales_est',
+          name: '収穫物売上（推定）',
           category: 'income' as const,
           value: report.expected_revenue || 0,
           unit: '円'
         },
         {
-          id: 'subsidy_income',
-          name: '補助金収入',
+          id: 'other_income_est',
+          name: 'その他収入（推定）',
           category: 'income' as const,
-          value: Math.round((report.income_total || 0) * 0.1), // 推定10%
-          unit: '円'
-        },
-        {
-          id: 'contract_sales',
-          name: '契約販売収入',
-          category: 'income' as const,
-          value: Math.round((report.income_total || 0) * 0.3), // 推定30%
-          unit: '円'
-        },
-        {
-          id: 'direct_sales',
-          name: '直販収入',
-          category: 'income' as const,
-          value: Math.round((report.income_total || 0) * 0.6), // 推定60%
+          value: (report.income_total || 0) - (report.expected_revenue || 0),
           unit: '円'
         }
       ]
       
-      // 変動費項目の処理
+      // 推定変動費項目
       const variableCostItems: AccountingItem[] = [
         {
-          id: 'seed_cost',
-          name: '種苗費',
+          id: 'variable_costs_est',
+          name: '変動費合計（推定）',
           category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.15), // 推定15%
-          unit: '円'
-        },
-        {
-          id: 'fertilizer_cost',
-          name: '肥料費',
-          category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.20), // 推定20%
-          unit: '円'
-        },
-        {
-          id: 'pesticide_cost',
-          name: '農薬費',
-          category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.12), // 推定12%
-          unit: '円'
-        },
-        {
-          id: 'packaging_cost',
-          name: '包装費',
-          category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.08), // 推定8%
-          unit: '円'
-        },
-        {
-          id: 'transport_cost',
-          name: '運送費',
-          category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.10), // 推定10%
-          unit: '円'
-        },
-        {
-          id: 'labor_cost_variable',
-          name: 'パート人件費',
-          category: 'variable_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.25), // 推定25%
+          value: Math.round((report.expense_total || 0) * 0.6), // 推定60%
           unit: '円'
         }
       ]
       
-      // 固定費項目の処理
+      // 推定固定費項目
       const fixedCostItems: AccountingItem[] = [
         {
-          id: 'facility_depreciation',
-          name: '設備減価償却費',
+          id: 'fixed_costs_est',
+          name: '固定費合計（推定）',
           category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.15), // 推定15%
-          unit: '円'
-        },
-        {
-          id: 'land_rent',
-          name: '農地借賃',
-          category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.20), // 推定20%
-          unit: '円'
-        },
-        {
-          id: 'insurance_cost',
-          name: '農業保険料',
-          category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.08), // 推定8%
-          unit: '円'
-        },
-        {
-          id: 'utility_cost',
-          name: '光熱費',
-          category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.12), // 推定12%
-          unit: '円'
-        },
-        {
-          id: 'management_salary',
-          name: '経営者給与',
-          category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.35), // 推定35%
-          unit: '円'
-        },
-        {
-          id: 'office_expenses',
-          name: '事務費',
-          category: 'fixed_costs' as const,
-          value: Math.round((report.expense_total || 0) * 0.10), // 推定10%
+          value: Math.round((report.expense_total || 0) * 0.4), // 推定40%
           unit: '円'
         }
       ]
@@ -344,17 +381,14 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       monthlyData[monthKey].fixed_costs = [...monthlyData[monthKey].fixed_costs, ...fixedCostItems]
     })
     
-    // 月別に合計して色を割り当て
+    // 月別に色を割り当て
     Object.keys(monthlyData).forEach(month => {
       ['income', 'variable_costs', 'fixed_costs'].forEach(category => {
         const categoryKey = category as keyof CategoryData
         const items = monthlyData[month][categoryKey]
         const colorVariants = CATEGORY_COLORS[categoryKey].variants
         
-        // 項目を金額順にソート
         items.sort((a, b) => b.value - a.value)
-        
-        // 色を割り当て
         items.forEach((item, index) => {
           item.color = colorVariants[index % colorVariants.length]
         })
@@ -386,7 +420,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       const { data: workReports, error } = await supabase
         .from('work_reports')
         .select(`
-          work_date, duration_hours, work_type,
+          id, work_date, duration_hours, work_type,
           income_total, expense_total, net_income,
           harvest_amount, harvest_unit, expected_revenue,
           vegetable_id
@@ -526,10 +560,11 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       
       console.log('💰 処理済み財務データ:', { count: allData.length, data: allData })
       
-      // 勘定項目データの処理
-      const categoryData = processAccountingItems(workReports)
+      // 実際の勘定項目データを取得して処理
+      const workReportIds = workReports.map(r => r.id).filter(id => id != null)
+      const categoryData = await processRealAccountingItems(workReportIds)
       setCategoryData(categoryData)
-      console.log('📊 勘定項目データ:', categoryData)
+      console.log('📊 勘定項目データ（yyyy-MM形式）:', categoryData)
       
       // 全利用可能項目を生成（分離型凡例用）
       const allItems: { [key: string]: LegendItemInfo } = {}
@@ -581,24 +616,23 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     } finally {
       setLoading(false)
     }
-  }, [companyId, startMonth, displayPeriod, processAccountingItems])
+  }, [companyId, startMonth, displayPeriod, processRealAccountingItems, processEstimatedAccountingItems])
 
-  // 累積データ計算機能
-  const calculateCumulativeData = useCallback((categoryData: { [month: string]: CategoryData }) => {
-    const monthLabels = Object.keys(categoryData).sort()
+  // 累積データ計算機能（すべての月を含む）
+  const calculateCumulativeData = useCallback((categoryData: { [month: string]: CategoryData }, dataKeys: string[]) => {
     const cumulativeData: { [month: string]: { profit: number, income: number, expense: number } } = {}
     
     let cumulativeProfit = 0
     let cumulativeIncome = 0
     let cumulativeExpense = 0
     
-    monthLabels.forEach(month => {
-      const monthData = categoryData[month]
+    dataKeys.forEach(dataKey => {
+      const monthData = categoryData[dataKey]
       
-      // 月次収入・支出を計算
-      const monthlyIncome = monthData.income.reduce((sum, item) => sum + item.value, 0)
-      const monthlyVariableCosts = monthData.variable_costs.reduce((sum, item) => sum + item.value, 0)
-      const monthlyFixedCosts = monthData.fixed_costs.reduce((sum, item) => sum + item.value, 0)
+      // 月次収入・支出を計算（データがない月は0として扱う）
+      const monthlyIncome = monthData ? monthData.income.reduce((sum, item) => sum + item.value, 0) : 0
+      const monthlyVariableCosts = monthData ? monthData.variable_costs.reduce((sum, item) => sum + item.value, 0) : 0
+      const monthlyFixedCosts = monthData ? monthData.fixed_costs.reduce((sum, item) => sum + item.value, 0) : 0
       const monthlyExpense = monthlyVariableCosts + monthlyFixedCosts
       const monthlyProfit = monthlyIncome - monthlyExpense
       
@@ -607,7 +641,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       cumulativeExpense += monthlyExpense
       cumulativeProfit += monthlyProfit
       
-      cumulativeData[month] = {
+      cumulativeData[dataKey] = {
         profit: cumulativeProfit,
         income: cumulativeIncome,
         expense: cumulativeExpense
@@ -659,11 +693,170 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     }
   }
 
+  // Y軸範囲の動的計算（月次キャッシュフローと同じロジック）
+  const calculateYAxisRange = useCallback((categoryData: { [month: string]: CategoryData }) => {
+    if (!categoryData || Object.keys(categoryData).length === 0) {
+      return { min: -100000, max: 100000, stepSize: 20000 }
+    }
+    
+    const allValues: number[] = []
+    Object.values(categoryData).forEach(monthData => {
+      const income = monthData.income.reduce((sum, item) => sum + item.value, 0)
+      const variableCosts = monthData.variable_costs.reduce((sum, item) => sum + item.value, 0)
+      const fixedCosts = monthData.fixed_costs.reduce((sum, item) => sum + item.value, 0)
+      allValues.push(income)
+      allValues.push(-(variableCosts + fixedCosts))
+    })
+    
+    const rawMax = Math.max(...allValues, 0)
+    const rawMin = Math.min(...allValues, 0)
+    const dataRange = rawMax - rawMin
+    
+    // 金融業界標準のプリセット設定（収支混合データ用）
+    const preset = {
+      minMargin: 0.15,  // 下部15%マージン
+      maxMargin: 0.15,  // 上部15%マージン
+      zeroPosition: 0.5,  // ゼロを中央に配置
+      forceZero: true
+    }
+    
+    // プリセットに基づいた範囲計算
+    let optimizedMin = rawMin - dataRange * preset.minMargin
+    let optimizedMax = rawMax + dataRange * preset.maxMargin
+    
+    // ゼロを含むように調整
+    if (preset.forceZero) {
+      optimizedMin = Math.min(optimizedMin, 0)
+      optimizedMax = Math.max(optimizedMax, 0)
+    }
+    
+    // ゼロ位置の調整（中央配置）
+    if (optimizedMax > 0 && optimizedMin < 0) {
+      const maxAbs = Math.max(Math.abs(rawMax), Math.abs(rawMin))
+      const marginedMax = maxAbs * (1 + preset.maxMargin)
+      optimizedMax = marginedMax
+      optimizedMin = -marginedMax
+    }
+    
+    // 最小範囲を保証
+    if (dataRange < 10000 && dataRange > 0) {
+      const minRange = 10000
+      const center = (rawMax + rawMin) / 2
+      optimizedMax = center + minRange / 2
+      optimizedMin = center - minRange / 2
+    }
+    
+    // キリの良い値に丸める関数
+    const roundToNiceValue = (value: number, isMax: boolean = false) => {
+      if (value === 0) return 0
+      
+      const absValue = Math.abs(value)
+      const sign = value < 0 ? -1 : 1
+      let unit: number
+      
+      if (absValue < 1000) {
+        unit = 500
+      } else if (absValue < 10000) {
+        unit = 2000
+      } else if (absValue < 50000) {
+        unit = 10000
+      } else if (absValue < 100000) {
+        unit = 20000
+      } else if (absValue < 500000) {
+        unit = 100000
+      } else if (absValue < 1000000) {
+        unit = 200000
+      } else if (absValue < 5000000) {
+        unit = 1000000
+      } else if (absValue < 10000000) {
+        unit = 2000000
+      } else if (absValue < 50000000) {
+        unit = 10000000
+      } else if (absValue < 100000000) {
+        unit = 20000000
+      } else {
+        const magnitude = Math.pow(10, Math.floor(Math.log10(absValue / 5)))
+        unit = magnitude * Math.ceil(absValue / 5 / magnitude)
+      }
+      
+      return Math.ceil(absValue / unit) * unit * sign
+    }
+    
+    const finalMin = roundToNiceValue(optimizedMin, false)
+    const finalMax = roundToNiceValue(optimizedMax, true)
+    
+    // 11個の目盛り（ゼロを中心に上下5個ずつ）に固定
+    const targetSteps = 11
+    
+    // ゼロを必ず含むように調整
+    let adjustedMin = Math.min(finalMin, 0)
+    let adjustedMax = Math.max(finalMax, 0)
+    
+    // プラス側とマイナス側で大きい方を基準に対称にする
+    const maxAbs = Math.max(Math.abs(adjustedMin), Math.abs(adjustedMax))
+    
+    // 5ステップ分の値を計算
+    const rawStep = maxAbs / 5
+    
+    // キリの良い値にstepSizeを丸める
+    let stepSize: number
+    if (rawStep < 1000) {
+      stepSize = Math.ceil(rawStep / 500) * 500
+    } else if (rawStep < 10000) {
+      stepSize = Math.ceil(rawStep / 2000) * 2000
+    } else if (rawStep < 50000) {
+      stepSize = Math.ceil(rawStep / 10000) * 10000
+    } else if (rawStep < 100000) {
+      stepSize = Math.ceil(rawStep / 20000) * 20000
+    } else if (rawStep < 500000) {
+      stepSize = Math.ceil(rawStep / 100000) * 100000
+    } else if (rawStep < 1000000) {
+      stepSize = Math.ceil(rawStep / 200000) * 200000
+    } else if (rawStep < 5000000) {
+      stepSize = Math.ceil(rawStep / 1000000) * 1000000
+    } else if (rawStep < 10000000) {
+      stepSize = Math.ceil(rawStep / 2000000) * 2000000
+    } else {
+      stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    }
+    
+    // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
+    const symmetricMax = stepSize * 5
+    const symmetricMin = -stepSize * 5
+    
+    return {
+      min: symmetricMin,
+      max: symmetricMax,
+      stepSize: stepSize
+    }
+  }, [])
+
   // チャートデータの準備（全カテゴリ同時表示、費用はマイナス）
   const chartData = useMemo(() => {
-    if (!financialData || financialData.length === 0 || !categoryData) return null
+    if (!categoryData) return null
     
-    const monthLabels = financialData.map(d => d.month)
+    // ユーザーが指定した期間のすべての月を生成（内部は yyyy-MM、表示は M月）
+    const allMonthLabels: string[] = []
+    const dataKeysByIndex: string[] = [] // インデックスごとのデータキー配列
+    const yearLabels: (number | null)[] = [] // 年ラベル用配列
+    
+    for (let i = 0; i < displayPeriod * 12; i++) {
+      const currentMonth = addMonths(startMonth, i)
+      const displayLabel = format(currentMonth, 'M月', { locale: ja })
+      const dataKey = format(currentMonth, 'yyyy-MM', { locale: ja })
+      
+      allMonthLabels.push(displayLabel)
+      dataKeysByIndex.push(dataKey) // インデックスベースでデータキーを保存
+      
+      // 1月または最初の月の場合は年を表示
+      if (currentMonth.getMonth() === 0 || i === 0) {
+        yearLabels.push(currentMonth.getFullYear())
+      } else {
+        yearLabels.push(null)
+      }
+    }
+    
+    const monthLabels = allMonthLabels
     const datasets: any[] = []
     
     // 各カテゴリの処理
@@ -674,9 +867,9 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       
       // 各カテゴリの全項目を収集
       const allItems = new Set<string>()
-      monthLabels.forEach(month => {
-        if (categoryData[month]?.[categoryKey]) {
-          categoryData[month][categoryKey].forEach(item => {
+      dataKeysByIndex.forEach(dataKey => {
+        if (categoryData[dataKey]?.[categoryKey]) {
+          categoryData[dataKey][categoryKey].forEach(item => {
             allItems.add(item.id)
           })
         }
@@ -689,8 +882,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         let name = ''
         let color = ''
         
-        monthLabels.forEach(month => {
-          const monthData = categoryData[month]?.[categoryKey]
+        dataKeysByIndex.forEach(dataKey => {
+          const monthData = categoryData[dataKey]?.[categoryKey]
           const item = monthData?.find(i => i.id === itemId)
           if (item) {
             total += item.value
@@ -721,8 +914,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
           datasets.push({
             type: 'bar' as const,
             label: `${itemInfo.category}: ${itemInfo.name}`,
-            data: monthLabels.map(month => {
-              const monthData = categoryData[month]?.[categoryKey]
+            data: dataKeysByIndex.map(dataKey => {
+              const monthData = categoryData[dataKey]?.[categoryKey]
               const item = monthData?.find(i => i.id === itemId)
               const value = item?.value || 0
               // 費用項目（変動費・固定費）はマイナス表示
@@ -748,8 +941,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
               datasets.push({
                 type: 'bar' as const,
                 label: `${itemInfo.category}: ${itemInfo.name}`,
-                data: monthLabels.map(month => {
-                  const monthData = categoryData[month]?.[categoryKey]
+                data: dataKeysByIndex.map(dataKey => {
+                  const monthData = categoryData[dataKey]?.[categoryKey]
                   const item = monthData?.find(i => i.id === itemId)
                   const value = item?.value || 0
                   // 費用項目（変動費・固定費）はマイナス表示
@@ -771,8 +964,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
           datasets.push({
             type: 'bar' as const,
             label: `${categoryName}: その他 (${otherItems.length}項目)`,
-            data: monthLabels.map(month => {
-              const monthData = categoryData[month]?.[categoryKey]
+            data: dataKeysByIndex.map(dataKey => {
+              const monthData = categoryData[dataKey]?.[categoryKey]
               const value = otherItems.reduce((sum, [itemId]) => {
                 const item = monthData?.find(i => i.id === itemId)
                 return sum + (visibleItems[itemId] === true ? (item?.value || 0) : 0)
@@ -795,7 +988,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     // 累積損益線データセット（右Y軸用）
     const cumulativeDatasets = []
     if (showCumulativeLine && categoryData) {
-      const cumulativeData = calculateCumulativeData(categoryData)
+      // インデックスベースのデータキーを使用
+      const cumulativeData = calculateCumulativeData(categoryData, dataKeysByIndex)
       
       let lineData: number[]
       let lineColor: string
@@ -803,17 +997,18 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       
       switch (cumulativeType) {
         case 'profit':
-          lineData = monthLabels.map(month => cumulativeData[month]?.profit || 0)
+          lineData = dataKeysByIndex.map(dataKey => cumulativeData[dataKey]?.profit || 0)
           lineColor = '#059669' // エメラルド色
           lineLabel = '📈 累積損益'
           break
         case 'income':
-          lineData = monthLabels.map(month => cumulativeData[month]?.income || 0)
+          lineData = dataKeysByIndex.map(dataKey => cumulativeData[dataKey]?.income || 0)
           lineColor = '#0284c7' // 青色
           lineLabel = '💰 累積収入'
           break
         case 'expense':
-          lineData = monthLabels.map(month => cumulativeData[month]?.expense || 0)
+          // 累積支出はマイナス値として表示（月次キャッシュフローと同様）
+          lineData = dataKeysByIndex.map(dataKey => -(cumulativeData[dataKey]?.expense || 0))
           lineColor = '#dc2626' // 赤色
           lineLabel = '💸 累積支出'
           break
@@ -842,9 +1037,189 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
 
     return {
       labels: monthLabels,
-      datasets: [...datasets, ...cumulativeDatasets]
+      datasets: [...datasets, ...cumulativeDatasets],
+      yearLabels, // 年ラベルをデータに含める
+      dataKeysByIndex // データキー配列も含める
     }
-  }, [financialData, categoryData, selectedCategories, visibleItems, expandedOthers, showCumulativeLine, cumulativeType, calculateCumulativeData])
+  }, [categoryData, selectedCategories, visibleItems, expandedOthers, showCumulativeLine, cumulativeType, calculateCumulativeData, startMonth, displayPeriod])
+
+  // Y軸範囲を計算
+  const yAxisRange = useMemo(() => calculateYAxisRange(categoryData), [categoryData, calculateYAxisRange])
+  
+  // 累積データの範囲を計算（モードに応じて切り替え）
+  const cumulativeRange = useMemo(() => {
+    if (!showCumulativeLine || !categoryData) return { min: 0, max: 0 }
+    
+    // 常に最適化モード：プリセット最適化方式（業界標準）
+    
+    const dataKeys = Object.keys(categoryData).sort()
+    const cumulativeData = calculateCumulativeData(categoryData, dataKeys)
+    
+    const allCumulativeValues: number[] = []
+    Object.values(cumulativeData).forEach((data: any) => {
+      if (cumulativeType === 'profit') allCumulativeValues.push(data.profit || 0)
+      else if (cumulativeType === 'income') allCumulativeValues.push(data.income || 0)
+      else allCumulativeValues.push(-(data.expense || 0)) // 累積支出はマイナス値として扱う
+    })
+    
+    const rawMax = Math.max(...allCumulativeValues, 0)
+    const rawMin = Math.min(...allCumulativeValues, 0)
+    const dataRange = rawMax - rawMin
+    
+    // 金融業界標準のプリセット設定
+    const presets = {
+      profit: {  // 損益用
+        minMargin: 0.15,  // 下部15%マージン
+        maxMargin: 0.15,  // 上部15%マージン
+        zeroPosition: 0.5,  // ゼロを中央に
+        forceZero: true
+      },
+      income: {  // 収入用
+        minMargin: 0,  // 下部マージンなし（ゼロから始まる）
+        maxMargin: 0.2,  // 上部20%マージン
+        forceZero: true,  // 必ずゼロを含む
+        zeroPosition: 0  // ゼロを下端に
+      },
+      expense: {  // 支出用
+        minMargin: 0.2,  // 下部20%マージン
+        maxMargin: 0,  // 上部マージンなし（ゼロで終わる）
+        forceZero: true,  // 必ずゼロを含む
+        zeroPosition: 1  // ゼロを上端に
+      }
+    }
+    
+    const preset = presets[cumulativeType] || presets.profit
+    
+    // プリセットに基づいた範囲計算
+    let optimizedMin = rawMin - dataRange * preset.minMargin
+    let optimizedMax = rawMax + dataRange * preset.maxMargin
+    
+    // ゼロを含むように調整
+    if (preset.forceZero) {
+      optimizedMin = Math.min(optimizedMin, 0)
+      optimizedMax = Math.max(optimizedMax, 0)
+    }
+    
+    // ゼロ位置の調整（損益の場合のみ）
+    if (preset.zeroPosition !== undefined && optimizedMax > 0 && optimizedMin < 0) {
+      const totalRange = optimizedMax - optimizedMin
+      const targetZeroPos = totalRange * preset.zeroPosition
+      const currentZeroPos = Math.abs(optimizedMin)
+      
+      if (preset.zeroPosition === 0.5) {  // ゼロを中央に
+        // 正負の大きい方に合わせる
+        const maxAbs = Math.max(Math.abs(rawMax), Math.abs(rawMin))
+        const marginedMax = maxAbs * (1 + preset.maxMargin)
+        optimizedMax = marginedMax
+        optimizedMin = -marginedMax
+      } else if (currentZeroPos < targetZeroPos) {
+        optimizedMin = -targetZeroPos
+      } else if (currentZeroPos > targetZeroPos) {
+        optimizedMax = totalRange - currentZeroPos + targetZeroPos
+      }
+    }
+    
+    // 最小範囲を保証（データが小さすぎる場合）
+    if (dataRange < 10000 && dataRange > 0) {
+      const minRange = 10000
+      const center = (rawMax + rawMin) / 2
+      optimizedMax = center + minRange / 2
+      optimizedMin = center - minRange / 2
+    }
+    
+    // キリの良い値に丸める関数
+    const roundToNiceValue = (value: number, isMax: boolean = false) => {
+      if (value === 0) return 0
+      
+      const absValue = Math.abs(value)
+      const sign = value < 0 ? -1 : 1
+      let unit: number
+      
+      // 値の大きさに応じて適切な単位を選択
+      if (absValue < 1000) {
+        unit = 500  // 500円単位
+      } else if (absValue < 10000) {
+        unit = 2000  // 2,000円単位
+      } else if (absValue < 50000) {
+        unit = 10000  // 10,000円単位
+      } else if (absValue < 100000) {
+        unit = 20000  // 20,000円単位
+      } else if (absValue < 500000) {
+        unit = 100000  // 100,000円単位
+      } else if (absValue < 1000000) {
+        unit = 200000  // 200,000円単位
+      } else if (absValue < 5000000) {
+        unit = 1000000  // 1,000,000円単位
+      } else if (absValue < 10000000) {
+        unit = 2000000  // 2,000,000円単位
+      } else if (absValue < 50000000) {
+        unit = 10000000  // 10,000,000円単位
+      } else if (absValue < 100000000) {
+        unit = 20000000  // 20,000,000円単位
+      } else {
+        // それ以上は値を5で割った単位でキリの良い値に
+        const magnitude = Math.pow(10, Math.floor(Math.log10(absValue / 5)))
+        unit = magnitude * Math.ceil(absValue / 5 / magnitude)
+      }
+      
+      // 最大値は切り上げ、最小値も切り上げ（マイナス値の場合、絶対値を大きくする）
+      if (isMax) {
+        return Math.ceil(absValue / unit) * unit * sign
+      } else {
+        return Math.ceil(absValue / unit) * unit * sign  // 最小値も切り上げて余裕を持たせる
+      }
+    }
+    
+    // 最終的な値をキリの良い値に調整
+    const finalMin = roundToNiceValue(optimizedMin, false)
+    const finalMax = roundToNiceValue(optimizedMax, true)
+    
+    // 11個の目盛り（ゼロを中心に上下5個ずつ）に固定
+    const targetSteps = 11  // 目盛り数を11個に固定
+    
+    // ゼロを必ず含むように調整
+    let adjustedMin = Math.min(finalMin, 0)
+    let adjustedMax = Math.max(finalMax, 0)
+    
+    // プラス側とマイナス側で大きい方を基準に対称にする
+    const maxAbs = Math.max(Math.abs(adjustedMin), Math.abs(adjustedMax))
+    
+    // 5ステップ分の値を計算（ゼロから上下5個ずつ）
+    const rawStep = maxAbs / 5
+    
+    // キリの良い値にstepSizeを丸める
+    let stepSize: number
+    if (rawStep < 1000) {
+      stepSize = Math.ceil(rawStep / 500) * 500
+    } else if (rawStep < 10000) {
+      stepSize = Math.ceil(rawStep / 2000) * 2000
+    } else if (rawStep < 50000) {
+      stepSize = Math.ceil(rawStep / 10000) * 10000
+    } else if (rawStep < 100000) {
+      stepSize = Math.ceil(rawStep / 20000) * 20000
+    } else if (rawStep < 500000) {
+      stepSize = Math.ceil(rawStep / 100000) * 100000
+    } else if (rawStep < 1000000) {
+      stepSize = Math.ceil(rawStep / 200000) * 200000
+    } else if (rawStep < 5000000) {
+      stepSize = Math.ceil(rawStep / 1000000) * 1000000
+    } else if (rawStep < 10000000) {
+      stepSize = Math.ceil(rawStep / 2000000) * 2000000
+    } else {
+      stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    }
+    
+    // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
+    const symmetricMax = stepSize * 5
+    const symmetricMin = -stepSize * 5
+    
+    // 結果を返す
+    return {
+      min: symmetricMin,
+      max: symmetricMax,
+      stepSize: stepSize
+    }
+  }, [showCumulativeLine, categoryData, cumulativeType, calculateCumulativeData, yAxisRange])
 
   // チャートオプション（カテゴリ別積み上げ棒グラフ用）
   const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
@@ -852,10 +1227,10 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     maintainAspectRatio: false,
     layout: {
       padding: {
-        left: 10,
-        right: 10,
-        top: 10,
-        bottom: 10
+        left: 0,  // 左側Y軸を左に移動
+        right: 0,
+        top: 0,
+        bottom: 0
       }
     },
     interaction: {
@@ -890,19 +1265,25 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         grid: {
           display: false,
           drawBorder: true,
-          drawOnChartArea: false
+          drawOnChartArea: false,
+          drawTicks: false
         },
         ticks: {
-          color: '#1f2937',
-          font: {
-            size: 12,
-            weight: '600'
-          }
+          display: false, // ラベルを非表示にしてカスタム表示を使用
+          maxRotation: 0,
+          minRotation: 0
         },
         border: {
           display: true,
           color: '#e5e7eb',
           width: 1
+        },
+        // バーを左端に配置する設定
+        offset: true,
+        // パディング設定
+        bounds: 'ticks',
+        afterFit: function(scale) {
+          scale.paddingBottom = 80 // 月・年表示のためのスペース
         }
       },
       y: {
@@ -910,9 +1291,17 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         stacked: true,
         display: true,
         position: 'left',
+        min: yAxisRange.min,
+        max: yAxisRange.max,
         grid: {
-          color: '#e5e7eb',
-          lineWidth: 1,
+          color: (context) => {
+            // 0ラインだけグレー色で太くする
+            return context.tick.value === 0 ? '#6b7280' : '#e5e7eb'
+          },
+          lineWidth: (context) => {
+            // 0ラインだけ少し太くする（2px）、他は通常（1px）
+            return context.tick.value === 0 ? 2 : 1
+          },
           drawTicks: false
         },
         border: {
@@ -920,13 +1309,34 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
           width: 2
         },
         ticks: {
-          color: '#374151',
+          stepSize: yAxisRange.stepSize, // 11個の目盛りに固定
+          color: '#1f2937',
           font: {
-            size: 12,
-            weight: '600'
+            size: 13,
+            weight: '600',
+            family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
+          padding: 3,  // 左側Y軸のラベルを調整
           callback: function(value) {
-            return `¥${Number(value).toLocaleString()}`
+            const numValue = value as number
+            
+            // 0の場合は強調表示
+            if (numValue === 0) {
+              return '━ 0円 ━'
+            }
+            
+            // 見やすい日本式の単位で表示
+            if (Math.abs(numValue) >= 100000000) {
+              const okuValue = numValue / 100000000
+              return okuValue % 1 === 0 ? `${okuValue}億円` : `${okuValue.toFixed(1)}億円`
+            } else if (Math.abs(numValue) >= 10000) {
+              const manValue = Math.round(numValue / 10000)
+              return `${manValue.toLocaleString()}万円`
+            } else if (Math.abs(numValue) >= 1000) {
+              return `${Math.round(numValue / 1000)}千円`
+            } else {
+              return `${Math.round(numValue)}円`
+            }
           }
         }
       },
@@ -935,6 +1345,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         type: 'linear' as const,
         position: 'right' as const,
         display: showCumulativeLine, // 累積線表示時のみ軸を表示
+        min: cumulativeRange.min, // ゼロ位置を揃えるための最小値
+        max: cumulativeRange.max, // ゼロ位置を揃えるための最大値
         grid: {
           display: false, // 右軸のグリッドは非表示（左軸と重複を避ける）
           drawOnChartArea: false,
@@ -946,35 +1358,48 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         },
         title: {
           display: true,
-          text: cumulativeType === 'profit' ? '累積損益 (¥)' : 
-                cumulativeType === 'income' ? '累積収入 (¥)' : '累積支出 (¥)',
+          text: cumulativeType === 'profit' ? '累積損益' : 
+                cumulativeType === 'income' ? '累積収入' : '累積支出',
           color: cumulativeType === 'profit' ? '#059669' : 
                  cumulativeType === 'income' ? '#0284c7' : '#dc2626',
           font: {
-            size: 12,
-            weight: '600'
+            size: 14,  // サイズを大きく
+            weight: '700'  // より太く
+          },
+          padding: {
+            top: 0,
+            bottom: 2  // タイトルと軸線の間隔を縮める
           }
         },
         ticks: {
           color: cumulativeType === 'profit' ? '#059669' : 
                  cumulativeType === 'income' ? '#0284c7' : '#dc2626',
           font: {
-            size: 11,
+            size: 13, // 左軸と統一
             weight: '600'
           },
-          padding: 8,
+          padding: 5, // 右側Y軸の余白を調整
+          stepSize: cumulativeRange.stepSize, // メモリ数を5個に固定
           callback: function(value) {
-            const numValue = Math.abs(value as number)
+            const numValue = value as number
             
-            if (numValue >= 100000000) {
-              const okuValue = numValue / 100000000
-              return okuValue % 1 === 0 ? `${okuValue}億` : `${okuValue.toFixed(1)}億`
-            } else if (numValue >= 10000) {
-              return `${Math.round(numValue / 10000)}万`
-            } else if (numValue >= 1000) {
-              return `${Math.round(numValue / 1000)}千`
+            // ゼロの場合は強調表示
+            if (numValue === 0) {
+              return '0'
+            }
+            
+            const absValue = Math.abs(numValue)
+            const sign = numValue < 0 ? '-' : ''
+            
+            if (absValue >= 100000000) {
+              const okuValue = absValue / 100000000
+              return sign + (okuValue % 1 === 0 ? `${okuValue}億` : `${okuValue.toFixed(1)}億`)
+            } else if (absValue >= 10000) {
+              return sign + `${Math.round(absValue / 10000)}万`
+            } else if (absValue >= 1000) {
+              return sign + `${Math.round(absValue / 1000)}千`
             } else {
-              return `${Math.round(numValue)}`
+              return sign + `${Math.round(absValue)}`
             }
           }
         }
@@ -1001,20 +1426,59 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
           size: 12,
           weight: '400'
         },
+        interaction: {
+          mode: 'point' as const, // ポイントごとに個別表示
+          intersect: false // カーソルが近くにあれば表示
+        },
         callbacks: {
           title: (context) => {
             const dataIndex = context[0].dataIndex
             const monthLabel = chartData?.labels?.[dataIndex]
-            return `${monthLabel}の財務詳細（収入・費用）`
+            const yearLabel = chartData?.yearLabels?.[dataIndex]
+            if (yearLabel) {
+              return `${yearLabel}年 ${monthLabel}`
+            }
+            return monthLabel || ''
           },
           label: (context) => {
             const value = context.raw as number
             const datasetLabel = context.dataset.label || ''
-            return `${datasetLabel}: ¥${Math.abs(value).toLocaleString()}${value < 0 ? ' (支出)' : ''}`
+            const datasetType = context.dataset.type || 'bar'
+            
+            // 値のフォーマット
+            const formattedValue = new Intl.NumberFormat('ja-JP', {
+              style: 'currency',
+              currency: 'JPY',
+              minimumFractionDigits: 0
+            }).format(Math.abs(value))
+            
+            // 線グラフ（累積データ）の場合
+            if (datasetType === 'line') {
+              if (datasetLabel.includes('累積損益')) {
+                if (value >= 0) {
+                  return `${datasetLabel}: +${formattedValue}`
+                } else {
+                  return `${datasetLabel}: -${formattedValue}`
+                }
+              } else if (datasetLabel.includes('累積収入')) {
+                return `${datasetLabel}: +${formattedValue}`
+              } else if (datasetLabel.includes('累積支出')) {
+                return `${datasetLabel}: -${formattedValue}`
+              }
+            }
+            
+            // 棒グラフの場合
+            if (value < 0) {
+              return `${datasetLabel}: -${formattedValue}`
+            } else if (value > 0) {
+              return `${datasetLabel}: +${formattedValue}`
+            }
+            return `${datasetLabel}: ${formattedValue}`
           },
           afterBody: (context) => {
             const dataIndex = context[0].dataIndex
-            const monthData = categoryData[chartData?.labels?.[dataIndex] as string]
+            const dataKey = chartData?.dataKeysByIndex?.[dataIndex]
+            const monthData = dataKey ? categoryData[dataKey] : null
             if (!monthData) return []
             
             // 各カテゴリの合計を計算
@@ -1023,16 +1487,36 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
             const fixedCostTotal = monthData.fixed_costs?.reduce((sum, item) => sum + item.value, 0) || 0
             const netIncome = incomeTotal - variableCostTotal - fixedCostTotal
             
-            return [
+            const result = [
               '',
+              '【月次データ】',
               `💰 収入合計: ¥${incomeTotal.toLocaleString()}`,
               `📈 変動費合計: ¥${variableCostTotal.toLocaleString()}`,
               `🏢 固定費合計: ¥${fixedCostTotal.toLocaleString()}`,
-              `📊 純利益: ¥${netIncome.toLocaleString()}`,
-              '',
-              '💡 "その他"をクリックで展開/折りたたみ',
-              '📈 月をクリックで詳細分析を表示'
+              `📊 純利益: ¥${netIncome.toLocaleString()}`
             ]
+            
+            // 線グラフがホバーされている場合は累積情報を追加
+            const hoveredDataset = context[0].dataset
+            if (hoveredDataset && hoveredDataset.type === 'line') {
+              const cumulativeData = calculateCumulativeData(categoryData, chartData?.dataKeysByIndex || [])
+              const currentCumulative = cumulativeData[dataKey]
+              if (currentCumulative) {
+                result.push('', '【累積データ】')
+                if (showCumulativeLine && cumulativeType === 'profit') {
+                  result.push(`📈 累積損益: ¥${currentCumulative.profit.toLocaleString()}`)
+                } else if (showCumulativeLine && cumulativeType === 'income') {
+                  result.push(`💰 累積収入: ¥${currentCumulative.income.toLocaleString()}`)
+                } else if (showCumulativeLine && cumulativeType === 'expense') {
+                  result.push(`💸 累積支出: ¥${currentCumulative.expense.toLocaleString()}`)
+                }
+              }
+            }
+            
+            result.push('', '💡 "その他"をクリックで展開/折りたたみ')
+            result.push('📈 月をクリックで詳細分析を表示')
+            
+            return result
           }
         }
       }
@@ -1041,7 +1525,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       duration: 800,
       easing: 'easeInOutQuart'
     }
-  }), [chartData, selectedCategories, categoryData, expandedOthers, financialData, showCumulativeLine, cumulativeType])
+  }), [chartData, selectedCategories, categoryData, expandedOthers, financialData, showCumulativeLine, cumulativeType, yAxisRange, cumulativeRange])
 
   // 年月選択ハンドラー
   const handleYearMonthChange = () => {
@@ -1105,18 +1589,38 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         
         <CardContent className="p-6">
           {/* フィルターコントロール */}
-          <div className="mb-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex items-center gap-3 flex-wrap">
+          <div className="mb-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border">
+            <div className="flex flex-col">
+              {/* 期間選択セクション（折りたたみ可能） */}
+              <Collapsible open={filterSectionExpanded.period} onOpenChange={(open) => setFilterSectionExpanded(prev => ({ ...prev, period: open }))}>
+                <CollapsibleTrigger className="w-full p-3 hover:bg-white/50 transition-all duration-200 border-b border-gray-200 group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`transition-transform duration-200 ${filterSectionExpanded.period ? 'rotate-90' : ''}`}>
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      </div>
+                      <CalendarIcon className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-700">期間設定</span>
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {format(startMonth, 'yyyy年M月', { locale: ja })} から {displayPeriod}年間
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-gray-500 group-hover:text-gray-700">
+                      {filterSectionExpanded.period ? 'クリックで閉じる' : 'クリックで展開'}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="p-4">
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                    <div className="flex items-center gap-3 flex-wrap">
                   {/* 表示期間選択 */}
                   <div className="flex items-center gap-1 bg-white rounded-lg p-1 shadow-sm">
-                    {[1, 2].map((period) => (
+                    {[1, 2, 3].map((period) => (
                       <Button
                         key={period}
                         variant={displayPeriod === period ? 'default' : 'ghost'}
                         size="sm"
-                        onClick={() => setDisplayPeriod(period as 1 | 2)}
+                        onClick={() => setDisplayPeriod(period as 1 | 2 | 3)}
                         className={`px-3 h-7 text-xs ${
                           displayPeriod === period 
                             ? 'bg-blue-600 text-white shadow-sm' 
@@ -1208,24 +1712,48 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
-                
-                <div className="text-xs text-gray-500">
-                  最終更新: {lastUpdated.toLocaleString('ja-JP', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                </div>
-              </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500">
+                      最終更新: {lastUpdated.toLocaleString('ja-JP', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
               
-              {/* カテゴリ選択（複数選択可能） */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">📊 表示カテゴリ選択</label>
-                  <span className="text-xs text-gray-500">（複数選択可、費用はマイナス表示）</span>
-                </div>
+              {/* カテゴリ選択と累積線制御セクション（折りたたみ可能） */}
+              <Collapsible open={filterSectionExpanded.category} onOpenChange={(open) => setFilterSectionExpanded(prev => ({ ...prev, category: open }))}>
+                <CollapsibleTrigger className="w-full p-3 hover:bg-white/50 transition-all duration-200 group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`transition-transform duration-200 ${filterSectionExpanded.category ? 'rotate-90' : ''}`}>
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      </div>
+                      <BarChart3 className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium text-gray-700">表示設定</span>
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {[selectedCategories.income && '収入', selectedCategories.variable_costs && '変動費', selectedCategories.fixed_costs && '固定費'].filter(Boolean).join('・')}
+                        {showCumulativeLine && ` | 累積${cumulativeType === 'profit' ? '損益' : cumulativeType === 'income' ? '収入' : '支出'}線`}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-gray-500 group-hover:text-gray-700">
+                      {filterSectionExpanded.category ? 'クリックで閉じる' : 'クリックで展開'}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="p-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* 左側：カテゴリ選択 */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">📊 表示カテゴリ選択</label>
+                        <span className="text-xs text-gray-500">（複数選択可、費用はマイナス表示）</span>
+                      </div>
                 
                 <div className="flex gap-2 flex-wrap">
                   <Button
@@ -1277,41 +1805,41 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                 
                 {/* 全選択/全解除ボタン */}
                 <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedCategories({
-                      income: true,
-                      variable_costs: true,
-                      fixed_costs: true
-                    })}
-                    className="text-xs h-6 px-2 text-blue-600 hover:bg-blue-50"
-                  >
-                    全選択
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedCategories({
-                      income: false,
-                      variable_costs: false,
-                      fixed_costs: false
-                    })}
-                    className="text-xs h-6 px-2 text-gray-500 hover:bg-gray-50"
-                  >
-                    全解除
-                  </Button>
-                </div>
-              </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedCategories({
+                            income: true,
+                            variable_costs: true,
+                            fixed_costs: true
+                          })}
+                          className="text-xs h-6 px-2 text-blue-600 hover:bg-blue-50"
+                        >
+                          全選択
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedCategories({
+                            income: false,
+                            variable_costs: false,
+                            fixed_costs: false
+                          })}
+                          className="text-xs h-6 px-2 text-gray-500 hover:bg-gray-50"
+                        >
+                          全解除
+                        </Button>
+                      </div>
+                    </div>
 
-              {/* 累積損益線制御 */}
-              <div className="space-y-3 pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">📈 累積損益線制御</label>
-                  <span className="text-xs text-gray-500">（右Y軸表示）</span>
-                </div>
-                
-                <div className="flex gap-2 items-center flex-wrap">
+                    {/* 右側：累積損益線制御 */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">📈 累積損益線制御</label>
+                        <span className="text-xs text-gray-500">（右Y軸表示）</span>
+                      </div>
+                      
+                      <div className="flex gap-2 items-center flex-wrap">
                   {/* 累積線ON/OFFトグル */}
                   <Button
                     variant={showCumulativeLine ? 'default' : 'outline'}
@@ -1370,45 +1898,146 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                       </div>
                     </>
                   )}
-                </div>
+                      </div>
 
-                {showCumulativeLine && (
-                  <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                    💡 {cumulativeType === 'profit' ? '損益' : cumulativeType === 'income' ? '収入' : '支出'}の累積推移を右Y軸に表示しています。
-                    {cumulativeType !== 'profit' && ' 点線で表示されます。'}
+                      {showCumulativeLine && (
+                        <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-2">
+                          💡 {cumulativeType === 'profit' ? '損益' : cumulativeType === 'income' ? '収入' : '支出'}の累積推移を右Y軸に表示しています。
+                          {cumulativeType !== 'profit' && '点線で表示されます。'}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </div>
           
           {/* グラフ */}
           <div className="h-[600px] relative">
             {chartData && (
-              <Bar 
-                ref={chartRef}
-                data={chartData} 
-                options={chartOptions}
-                plugins={[]}
-                key={JSON.stringify(visibleItems)} // 強制再描画用key
-              />
+              <>
+                <Bar 
+                  ref={chartRef}
+                  data={chartData} 
+                  options={chartOptions}
+                  plugins={[]}
+                  key={JSON.stringify(visibleItems)} // 強制再描画用key
+                />
+                
+                {/* カスタムX軸ラベル（月次キャッシュフローと同じデザイン） */}
+                <div 
+                  className="absolute pointer-events-none"
+                  style={{ 
+                    bottom: '0px',
+                    left: '60px',
+                    right: '60px',
+                    height: '80px'
+                  }}
+                >
+                  {/* 月表示層 */}
+                  <div className="relative bg-white border-t border-gray-300" style={{ height: '40px' }}>
+                    {chartData.labels?.map((label, index) => {
+                      const totalMonths = chartData.labels?.length || 1
+                      const monthWidth = 100 / totalMonths
+                      const monthLeft = (index / totalMonths) * 100
+                      
+                      return (
+                        <div
+                          key={`month-${index}`}
+                          className="absolute text-center text-sm font-medium text-gray-800 py-2 flex items-center justify-center"
+                          style={{ 
+                            left: `${monthLeft}%`,
+                            width: `${monthWidth}%`,
+                            top: '0px',
+                            height: '40px'
+                          }}
+                        >
+                          {label}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* 年表示層 */}
+                  <div className="relative border-t-2 border-gray-400 bg-gray-100" style={{ height: '40px' }}>
+                    {(() => {
+                      const yearGroups: { year: number, startIndex: number, endIndex: number }[] = []
+                      let currentYear: number | null = null
+                      let yearStartIndex = 0
+                      
+                      chartData.yearLabels?.forEach((yearLabel, index) => {
+                        if (yearLabel !== null) {
+                          if (currentYear !== null) {
+                            yearGroups.push({ 
+                              year: currentYear, 
+                              startIndex: yearStartIndex, 
+                              endIndex: index - 1 
+                            })
+                          }
+                          currentYear = yearLabel
+                          yearStartIndex = index
+                        }
+                      })
+                      
+                      if (currentYear !== null) {
+                        yearGroups.push({ 
+                          year: currentYear, 
+                          startIndex: yearStartIndex, 
+                          endIndex: (chartData.yearLabels?.length || 1) - 1 
+                        })
+                      }
+                      
+                      return yearGroups.map((yearData) => {
+                        const totalMonths = chartData.labels?.length || 1
+                        const startPercent = (yearData.startIndex / totalMonths) * 100
+                        const endPercent = ((yearData.endIndex + 1) / totalMonths) * 100
+                        const widthPercent = endPercent - startPercent
+                        
+                        return (
+                          <div
+                            key={`year-${yearData.year}`}
+                            className="absolute text-center text-sm font-bold text-gray-900 py-2 bg-gray-50 flex items-center justify-center border-r border-gray-400"
+                            style={{ 
+                              left: `${startPercent}%`,
+                              width: `${widthPercent}%`,
+                              top: '0px',
+                              height: '40px'
+                            }}
+                          >
+                            {yearData.year}年
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                </div>
+              </>
             )}
           </div>
           
-          {/* 分離型スマート凡例 */}
+          {/* 分離型スマート凡例（折りたたみ式） */}
           {Object.keys(allAvailableItems).length > 0 && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  🎯 表示項目制御（分離型凡例）
-                  <span className="text-xs text-gray-500">
-                    （{[selectedCategories.income && '収入', selectedCategories.variable_costs && '変動費', selectedCategories.fixed_costs && '固定費'].filter(Boolean).join('・')}）
-                  </span>
-                </h4>
-                <div className="text-xs text-gray-500">
-                  ON/OFF柔軟切り替え ｜ 全項目常時表示 ｜ 費用はマイナス表示
-                </div>
-              </div>
+            <Collapsible open={filterSectionExpanded.itemControl} onOpenChange={(open) => setFilterSectionExpanded(prev => ({ ...prev, itemControl: open }))}>
+              <div className="mt-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border">
+                <CollapsibleTrigger className="w-full p-3 hover:bg-white/30 transition-all duration-200 group">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`transition-transform duration-200 ${filterSectionExpanded.itemControl ? 'rotate-90' : ''}`}>
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      </div>
+                      <Settings className="w-4 h-4 text-gray-600" />
+                      <h4 className="text-sm font-medium text-gray-700">🎯 表示項目制御</h4>
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {Object.values(visibleItems).filter(v => v).length}/{Object.keys(allAvailableItems).length} 項目表示中
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-gray-500 group-hover:text-gray-700">
+                      {filterSectionExpanded.itemControl ? 'クリックで閉じる' : 'クリックで展開'}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="p-4 pt-0">
               
               {/* カテゴリ別グループ表示 */}
               {['income', 'variable_costs', 'fixed_costs'].map(category => {
@@ -1544,7 +2173,9 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                   🎯 カテゴリ別整理で直感的操作
                 </div>
               </div>
-            </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           )}
           
           <div className="mt-4 text-xs text-gray-500 text-center">

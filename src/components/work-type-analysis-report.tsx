@@ -71,26 +71,46 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
     const year = new Date().getFullYear()
     return `${year}-12-31`
   })
+  // 一時的な日付選択用（確定前）
+  const [tempStartDate, setTempStartDate] = useState(() => {
+    const year = new Date().getFullYear()
+    return `${year}-01-01`
+  })
+  const [tempEndDate, setTempEndDate] = useState(() => {
+    const year = new Date().getFullYear()
+    return `${year}-12-31`
+  })
   const [sortBy, setSortBy] = useState('totalRevenue')
   const [sortOrder, setSortOrder] = useState('desc')
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [expandedVegetables, setExpandedVegetables] = useState<Set<string>>(new Set())
 
 
-  // データ集計の実行
+  // データ集計の実行（startDate, endDateを除外）
   useEffect(() => {
     if (companyId) {
       fetchWorkAnalysisData()
     }
-  }, [companyId, selectedVegetable, startDate, endDate])
+  }, [companyId, selectedVegetable])
 
-  const fetchWorkAnalysisData = async () => {
+  // 日付を適用してデータを更新
+  const applyDateFilter = () => {
+    setStartDate(tempStartDate)
+    setEndDate(tempEndDate)
+    fetchWorkAnalysisData(tempStartDate, tempEndDate)
+  }
+
+  const fetchWorkAnalysisData = async (dateStart?: string, dateEnd?: string) => {
     try {
       setLoading(true)
-      
+
+      // 引数が指定されていない場合は現在のstateの値を使用
+      const startDateToUse = dateStart || startDate
+      const endDateToUse = dateEnd || endDate
+
       // 作業レポート、野菜データ、会計データを取得
       const [reportsResponse, vegetablesResponse] = await Promise.all([
-        fetch(`/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${startDateToUse}&end_date=${endDateToUse}&limit=1000`),
         fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
       ])
 
@@ -122,7 +142,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
         total_reports: workReports.length,
         with_accounting: workReports.filter(r => r.work_report_accounting?.length > 0).length,
         vegetables_count: vegetables.length,
-        period: `${startDate} ~ ${endDate}`
+        period: `${startDateToUse} ~ ${endDateToUse}`
       })
       
       const analysisData = generateGroupedWorkAnalysisData(workReports, vegetables)
@@ -398,17 +418,25 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                 <div className="flex gap-2 items-center">
                   <Input
                     type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    value={tempStartDate}
+                    onChange={(e) => setTempStartDate(e.target.value)}
                     className="w-40"
                   />
                   <span className="text-gray-500">～</span>
                   <Input
                     type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    value={tempEndDate}
+                    onChange={(e) => setTempEndDate(e.target.value)}
                     className="w-40"
                   />
+                  <Button
+                    onClick={applyDateFilter}
+                    size="sm"
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 border border-green-700/20"
+                  >
+                    <Calendar className="w-3 h-3 mr-1" />
+                    適用
+                  </Button>
                 </div>
               </div>
               <div className="space-y-2">

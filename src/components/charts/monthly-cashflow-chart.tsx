@@ -23,8 +23,9 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from '@/components/ui/dialog'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils/index'
-import { CalendarIcon, TrendingUp, TrendingDown, Eye, X } from 'lucide-react'
+import { CalendarIcon, TrendingUp, TrendingDown, Eye, X, ChevronRight } from 'lucide-react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
@@ -176,7 +177,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
   const [showCumulativeLine, setShowCumulativeLine] = useState(true)
   const [cumulativeType, setCumulativeType] = useState<'profit' | 'income' | 'expense'>('profit')
   const [containerWidth, setContainerWidth] = useState(0)
+  // 右側Y軸は常に最適化モード
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [isLegendOpen, setIsLegendOpen] = useState(true) // 凡例セクションの開閉状態（デフォルト展開）
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false) // 前年比較セクションの開閉状態
   
   const chartRef = useRef<ChartJS<'bar'>>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -226,27 +230,154 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
     [displayPeriod, containerWidth, calculateResponsiveDimensions]
   )
 
-  // Y軸範囲の動的計算
+  // Y軸範囲の動的計算（金融プロフェッショナル向け最適化設計）
   const calculateYAxisRange = useCallback((data: CashFlowData[]) => {
-    if (!data || data.length === 0) return { min: -100000, max: 100000 }
+    if (!data || data.length === 0) return { min: -100000, max: 100000, stepSize: 20000 }
     
-    const totals = data.map(d => d.monthly_total)
-    const max = Math.max(...totals)
-    const min = Math.min(...totals)
-    const range = max - min
-    const buffer = Math.max(range * 0.2, 50000) // 最小5万円のバッファ
+    // スタックグラフのため、収入の合計と支出の合計それぞれの最大値を計算
+    let maxIncome = 0
+    let maxExpense = 0
     
-    // キリの良い値に丸める
-    const roundToNice = (value: number) => {
-      if (value === 0) return 0
-      const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(value))))
-      const factor = magnitude >= 10000 ? 10000 : magnitude
-      return Math.ceil(value / factor) * factor
+    data.forEach(d => {
+      let monthlyIncome = 0
+      let monthlyExpense = 0
+      
+      // 各作業種別の収入・支出を集計
+      Object.values(d.work_types).forEach(workType => {
+        if (workType.income > 0) {
+          monthlyIncome += workType.income
+        }
+        if (workType.expense < 0) {
+          monthlyExpense += Math.abs(workType.expense)
+        }
+      })
+      
+      maxIncome = Math.max(maxIncome, monthlyIncome)
+      maxExpense = Math.max(maxExpense, monthlyExpense)
+    })
+    
+    // 最大値と最小値を決定
+    const rawMax = maxIncome
+    const rawMin = -maxExpense
+    const dataRange = rawMax - rawMin
+    
+    // 金融業界標準のプリセット設定（収支混合データ用）
+    const preset = {
+      minMargin: 0.15,  // 下部15%マージン
+      maxMargin: 0.15,  // 上部15%マージン
+      zeroPosition: 0.5,  // ゼロを中央に配置
+      forceZero: true
     }
     
+    // プリセットに基づいた範囲計算
+    let optimizedMin = rawMin - dataRange * preset.minMargin
+    let optimizedMax = rawMax + dataRange * preset.maxMargin
+    
+    // ゼロを含むように調整
+    if (preset.forceZero) {
+      optimizedMin = Math.min(optimizedMin, 0)
+      optimizedMax = Math.max(optimizedMax, 0)
+    }
+    
+    // ゼロ位置の調整（中央配置）
+    if (optimizedMax > 0 && optimizedMin < 0) {
+      const maxAbs = Math.max(Math.abs(rawMax), Math.abs(rawMin))
+      const marginedMax = maxAbs * (1 + preset.maxMargin)
+      optimizedMax = marginedMax
+      optimizedMin = -marginedMax
+    }
+    
+    // 最小範囲を保証
+    if (dataRange < 10000 && dataRange > 0) {
+      const minRange = 10000
+      const center = (rawMax + rawMin) / 2
+      optimizedMax = center + minRange / 2
+      optimizedMin = center - minRange / 2
+    }
+    
+    // キリの良い値に丸める関数
+    const roundToNice = (value: number, isMax: boolean = false) => {
+      if (value === 0) return 0
+      
+      const absValue = Math.abs(value)
+      let unit: number
+      
+      // 値の大きさに応じて適切な単位を選択
+      if (absValue < 1000) {
+        unit = 500  // 500円単位
+      } else if (absValue < 10000) {
+        unit = 2000  // 2,000円単位
+      } else if (absValue < 50000) {
+        unit = 10000  // 10,000円単位
+      } else if (absValue < 100000) {
+        unit = 20000  // 20,000円単位
+      } else if (absValue < 500000) {
+        unit = 100000  // 100,000円単位
+      } else if (absValue < 1000000) {
+        unit = 200000  // 200,000円単位
+      } else if (absValue < 5000000) {
+        unit = 1000000  // 1,000,000円単位
+      } else if (absValue < 10000000) {
+        unit = 2000000  // 2,000,000円単位
+      } else if (absValue < 50000000) {
+        unit = 10000000  // 10,000,000円単位
+      } else if (absValue < 100000000) {
+        unit = 20000000  // 20,000,000円単位
+      } else {
+        // それ以上は値を5で割った単位でキリの良い値に
+        const magnitude = Math.pow(10, Math.floor(Math.log10(absValue / 5)))
+        unit = magnitude * Math.ceil(absValue / 5 / magnitude)
+      }
+      
+      return Math.ceil(absValue / unit) * unit * (value < 0 ? -1 : 1)
+    }
+    
+    const finalMin = roundToNice(optimizedMin, false)
+    const finalMax = roundToNice(optimizedMax, true)
+    
+    // 11個の目盛り（ゼロを中心に上下5個ずつ）に固定
+    const targetSteps = 11
+    
+    // ゼロを必ず含むように調整
+    let adjustedMin = Math.min(finalMin, 0)
+    let adjustedMax = Math.max(finalMax, 0)
+    
+    // プラス側とマイナス側で大きい方を基準に対称にする
+    const maxAbs = Math.max(Math.abs(adjustedMin), Math.abs(adjustedMax))
+    
+    // 5ステップ分の値を計算
+    const rawStep = maxAbs / 5
+    
+    // キリの良い値にstepSizeを丸める
+    let stepSize: number
+    if (rawStep < 1000) {
+      stepSize = Math.ceil(rawStep / 500) * 500
+    } else if (rawStep < 10000) {
+      stepSize = Math.ceil(rawStep / 2000) * 2000
+    } else if (rawStep < 50000) {
+      stepSize = Math.ceil(rawStep / 10000) * 10000
+    } else if (rawStep < 100000) {
+      stepSize = Math.ceil(rawStep / 20000) * 20000
+    } else if (rawStep < 500000) {
+      stepSize = Math.ceil(rawStep / 100000) * 100000
+    } else if (rawStep < 1000000) {
+      stepSize = Math.ceil(rawStep / 200000) * 200000
+    } else if (rawStep < 5000000) {
+      stepSize = Math.ceil(rawStep / 1000000) * 1000000
+    } else if (rawStep < 10000000) {
+      stepSize = Math.ceil(rawStep / 2000000) * 2000000
+    } else {
+      stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    }
+    
+    // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
+    const symmetricMax = stepSize * 5
+    const symmetricMin = -stepSize * 5
+    
     return {
-      min: roundToNice(min - buffer),
-      max: roundToNice(max + buffer)
+      min: symmetricMin,
+      max: symmetricMax,
+      stepSize: stepSize
     }
   }, [])
 
@@ -316,27 +447,41 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         Object.keys(WORK_TYPE_COLORS).forEach(workType => {
           const typeReports = monthReports.filter((r: any) => r.work_type === workType)
           
-          // 収入の計算（収穫作業の場合は収穫量×予想価格、その他は予想収益）
-          let income = 0
-          if (workType === 'harvesting') {
-            income = typeReports.reduce((sum: number, r: any) => {
-              const harvestRevenue = (r.harvest_amount || 0) * (r.expected_price || 0)
-              const expectedRevenue = r.expected_revenue || 0
-              return sum + Math.max(harvestRevenue, expectedRevenue)
-            }, 0)
-          } else {
-            income = typeReports.reduce((sum: number, r: any) => sum + (r.expected_revenue || 0), 0)
+          // 会計項目から収入と支出を分けて集計
+          let accountingIncome = 0
+          let accountingExpense = 0
+          
+          typeReports.forEach((r: any) => {
+            if (r.work_report_accounting && Array.isArray(r.work_report_accounting)) {
+              r.work_report_accounting.forEach((acc: any) => {
+                // accounting_itemsのtypeで収入・支出を判定
+                if (acc.accounting_items?.type === 'income' || acc.accounting_items?.code?.startsWith('①') || 
+                    acc.accounting_items?.code?.startsWith('②') || acc.accounting_items?.code?.startsWith('③')) {
+                  accountingIncome += acc.amount || 0
+                } else {
+                  accountingExpense += acc.amount || 0
+                }
+              })
+            }
+          })
+          
+          // 収入の計算（会計収入を優先、なければ収穫量×予想価格または予想収益）
+          let income = accountingIncome
+          if (income === 0) {
+            if (workType === 'harvesting') {
+              income = typeReports.reduce((sum: number, r: any) => {
+                const harvestRevenue = (r.harvest_amount || 0) * (r.expected_price || 0)
+                const expectedRevenue = r.expected_revenue || 0
+                return sum + Math.max(harvestRevenue, expectedRevenue)
+              }, 0)
+            } else {
+              income = typeReports.reduce((sum: number, r: any) => sum + (r.expected_revenue || 0), 0)
+            }
           }
           
-          // 支出の計算（会計項目も考慮）
+          // 支出の計算（会計支出を優先、なければ推定コスト）
           const directCosts = typeReports.reduce((sum: number, r: any) => sum + (r.estimated_cost || 0), 0)
-          const accountingCosts = typeReports.reduce((sum: number, r: any) => {
-            if (r.work_report_accounting && Array.isArray(r.work_report_accounting)) {
-              return sum + r.work_report_accounting.reduce((accSum: number, acc: any) => accSum + (acc.amount || 0), 0)
-            }
-            return sum
-          }, 0)
-          const totalExpense = directCosts + accountingCosts
+          const totalExpense = accountingExpense > 0 ? accountingExpense : directCosts
           
           workTypes[workType] = {
             income,
@@ -534,7 +679,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       borderColor: '#dc2626', // 赤色の線
       backgroundColor: 'rgba(220, 38, 38, 0.1)',
       borderWidth: 4, // 少し太くして視認性向上
-      pointRadius: 6,
+      pointRadius: 8, // ポイントを大きくして見やすく
       pointBackgroundColor: '#ffffff',
       pointBorderColor: '#dc2626',
       pointBorderWidth: 3,
@@ -542,8 +687,9 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       tension: 0.3, // カーブを滑らかに
       yAxisID: 'y', // 左軸を使用
       order: 0, // 最上面に表示（数値が小さいほど前面）
-      pointHoverRadius: 8, // ホバー時のポイント拡大
-      pointHoverBorderWidth: 4
+      pointHoverRadius: 10, // ホバー時のポイント拡大
+      pointHoverBorderWidth: 4,
+      pointHitRadius: 15 // クリック・ホバー判定エリアを拡大
     }
 
     // 累積損益線グラフ（右Y軸）- 条件付きで表示
@@ -578,7 +724,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         borderColor: lineColor,
         backgroundColor: `${lineColor}20`,
         borderWidth: 3,
-        pointRadius: 5,
+        pointRadius: 7, // ポイントを大きくして見やすく
         pointBackgroundColor: '#ffffff',
         pointBorderColor: lineColor,
         pointBorderWidth: 2,
@@ -586,8 +732,9 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         tension: 0.4,
         yAxisID: 'y1', // 右Y軸を使用
         order: -1, // 純損益線より前面に表示
-        pointHoverRadius: 7,
+        pointHoverRadius: 9,
         pointHoverBorderWidth: 3,
+        pointHitRadius: 12, // クリック・ホバー判定エリアを拡大
         borderDash: cumulativeType !== 'profit' ? [5, 5] : [], // 損益以外は点線
       })
     }
@@ -603,6 +750,169 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
   const yAxisRange = useMemo(() => 
     calculateYAxisRange(cashflowData), [cashflowData, calculateYAxisRange]
   )
+  
+  // 右側Y軸の範囲を計算（モードに応じて切り替え）
+  const rightAxisRange = useMemo(() => {
+    // 常に最適化モード：プリセット最適化方式（業界標準）
+    if (!showCumulativeLine || !chartData || !chartData.datasets) {
+      return yAxisRange
+    }
+    
+    // 累積線のデータを取得
+    const cumulativeDataset = chartData.datasets.find(d => d.type === 'line')
+    if (!cumulativeDataset || !cumulativeDataset.data) {
+      return yAxisRange
+    }
+    
+    const values = cumulativeDataset.data as number[]
+    const rawMax = Math.max(...values, 0)
+    const rawMin = Math.min(...values, 0)
+    const dataRange = rawMax - rawMin
+    
+    // 金融業界標準のプリセット設定
+    const presets = {
+      profit: {  // 損益用
+        minMargin: 0.15,  // 下部15%マージン
+        maxMargin: 0.15,  // 上部15%マージン
+        zeroPosition: 0.5,  // ゼロを中央に
+        forceZero: true
+      },
+      income: {  // 収入用
+        minMargin: 0,  // 下部マージンなし（ゼロから始まる）
+        maxMargin: 0.2,  // 上部20%マージン
+        forceZero: true,  // 必ずゼロを含む
+        zeroPosition: 0  // ゼロを下端に
+      },
+      expense: {  // 支出用
+        minMargin: 0.2,  // 下部20%マージン
+        maxMargin: 0,  // 上部マージンなし（ゼロで終わる）
+        forceZero: true,  // 必ずゼロを含む
+        zeroPosition: 1  // ゼロを上端に
+      }
+    }
+    
+    const preset = presets[cumulativeType] || presets.profit
+    
+    // プリセットに基づいた範囲計算
+    let optimizedMin = rawMin - dataRange * preset.minMargin
+    let optimizedMax = rawMax + dataRange * preset.maxMargin
+    
+    // ゼロを含むように調整
+    if (preset.forceZero) {
+      optimizedMin = Math.min(optimizedMin, 0)
+      optimizedMax = Math.max(optimizedMax, 0)
+    }
+    
+    // ゼロ位置の調整（損益の場合のみ）
+    if (preset.zeroPosition !== undefined && optimizedMax > 0 && optimizedMin < 0) {
+      const totalRange = optimizedMax - optimizedMin
+      const targetZeroPos = totalRange * preset.zeroPosition
+      const currentZeroPos = Math.abs(optimizedMin)
+      
+      if (preset.zeroPosition === 0.5) {  // ゼロを中央に
+        // 正負の大きい方に合わせる
+        const maxAbs = Math.max(Math.abs(rawMax), Math.abs(rawMin))
+        const marginedMax = maxAbs * (1 + preset.maxMargin)
+        optimizedMax = marginedMax
+        optimizedMin = -marginedMax
+      } else if (currentZeroPos < targetZeroPos) {
+        optimizedMin = -targetZeroPos
+      } else if (currentZeroPos > targetZeroPos) {
+        optimizedMax = totalRange - currentZeroPos + targetZeroPos
+      }
+    }
+    
+    // 最小範囲を保証（データが小さすぎる場合）
+    if (dataRange < 10000 && dataRange > 0) {
+      const minRange = 10000
+      const center = (rawMax + rawMin) / 2
+      optimizedMax = center + minRange / 2
+      optimizedMin = center - minRange / 2
+    }
+    
+    // キリの良い値に丸める
+    const roundToNice = (value: number) => {
+      if (value === 0) return 0
+      const absValue = Math.abs(value)
+      let unit: number
+      
+      if (absValue < 1000) {
+        unit = 500
+      } else if (absValue < 10000) {
+        unit = 2000
+      } else if (absValue < 50000) {
+        unit = 10000
+      } else if (absValue < 100000) {
+        unit = 20000
+      } else if (absValue < 500000) {
+        unit = 100000
+      } else if (absValue < 1000000) {
+        unit = 200000
+      } else if (absValue < 5000000) {
+        unit = 1000000
+      } else if (absValue < 10000000) {
+        unit = 2000000
+      } else if (absValue < 50000000) {
+        unit = 10000000
+      } else if (absValue < 100000000) {
+        unit = 20000000
+      } else {
+        const magnitude = Math.pow(10, Math.floor(Math.log10(absValue / 5)))
+        unit = magnitude * Math.ceil(absValue / 5 / magnitude)
+      }
+      
+      const rounded = Math.ceil(absValue / unit) * unit
+      return value < 0 ? -rounded : rounded
+    }
+    
+    const finalMin = roundToNice(optimizedMin)
+    const finalMax = roundToNice(optimizedMax)
+    
+    // 11個の目盛り（ゼロを中心に上下5個ずつ）に固定
+    const targetSteps = 11  // 目盛り数を11個に固定
+    
+    // ゼロを必ず含むように調整
+    let adjustedMin = Math.min(finalMin, 0)
+    let adjustedMax = Math.max(finalMax, 0)
+    
+    // プラス側とマイナス側で大きい方を基準に対称にする
+    const maxAbs = Math.max(Math.abs(adjustedMin), Math.abs(adjustedMax))
+    
+    // 5ステップ分の値を計算（ゼロから上下5個ずつ）
+    const rawStep = maxAbs / 5
+    
+    // キリの良い値にstepSizeを丸める
+    let stepSize: number
+    if (rawStep < 1000) {
+      stepSize = Math.ceil(rawStep / 500) * 500
+    } else if (rawStep < 10000) {
+      stepSize = Math.ceil(rawStep / 2000) * 2000
+    } else if (rawStep < 50000) {
+      stepSize = Math.ceil(rawStep / 10000) * 10000
+    } else if (rawStep < 100000) {
+      stepSize = Math.ceil(rawStep / 20000) * 20000
+    } else if (rawStep < 500000) {
+      stepSize = Math.ceil(rawStep / 100000) * 100000
+    } else if (rawStep < 1000000) {
+      stepSize = Math.ceil(rawStep / 200000) * 200000
+    } else if (rawStep < 5000000) {
+      stepSize = Math.ceil(rawStep / 1000000) * 1000000
+    } else if (rawStep < 10000000) {
+      stepSize = Math.ceil(rawStep / 2000000) * 2000000
+    } else {
+      stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    }
+    
+    // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
+    const symmetricMax = stepSize * 5
+    const symmetricMin = -stepSize * 5
+    
+    return {
+      min: symmetricMin,
+      max: symmetricMax,
+      stepSize: stepSize
+    }
+  }, [yAxisRange, showCumulativeLine, chartData, cumulativeType])
 
   // Chart.jsの実際のチャートエリア寸法を取得（より正確な計算）
   const updateChartDimensions = useCallback(() => {
@@ -715,9 +1025,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           width: 2
         },
         ticks: {
+          stepSize: yAxisRange.stepSize, // キリの良い間隔で目盛りを設定
           color: '#1f2937', // より濃い色で視認性向上
           font: {
-            size: Math.max(13, responsiveDimensions.fontSize + 2), // Y軸は最低13px、通常より2px大きく
+            size: 13, // 統一サイズ
             weight: '600', // より太字で視認性向上
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
@@ -754,6 +1065,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         type: 'linear' as const,
         position: 'right' as const,
         display: showCumulativeLine, // 累積線表示時のみ軸を表示
+        min: rightAxisRange.min, // モードに応じた最小値
+        max: rightAxisRange.max, // モードに応じた最大値
         grid: {
           display: false, // 右軸のグリッドは非表示（左軸と重複を避ける）
           drawOnChartArea: false,
@@ -765,23 +1078,24 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         },
         title: {
           display: true,
-          text: cumulativeType === 'profit' ? '累積損益 (¥)' : 
-                cumulativeType === 'income' ? '累積収入 (¥)' : '累積支出 (¥)',
+          text: cumulativeType === 'profit' ? '累積損益' : 
+                cumulativeType === 'income' ? '累積収入' : '累積支出',
           color: cumulativeType === 'profit' ? '#059669' : 
                  cumulativeType === 'income' ? '#0284c7' : '#dc2626',
           font: {
-            size: Math.max(12, responsiveDimensions.fontSize),
-            weight: '600'
+            size: 14,  // サイズを大きく統一
+            weight: '700'  // より太く
           }
         },
         ticks: {
+          stepSize: rightAxisRange.stepSize, // モードに応じた目盛り間隔
           color: cumulativeType === 'profit' ? '#059669' : 
                  cumulativeType === 'income' ? '#0284c7' : '#dc2626',
           font: {
-            size: Math.max(12, responsiveDimensions.fontSize),
+            size: 13, // 左軸と統一
             weight: '600'
           },
-          padding: 8,
+          padding: 0, // 余白を縮める
           callback: function(value) {
             const numValue = Math.abs(value as number)
             
@@ -811,7 +1125,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
-        displayColors: false,
+        displayColors: true, // 色付きのマーカーを表示
         titleFont: {
           size: 14,
           weight: '600'
@@ -820,27 +1134,66 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           size: 12,
           weight: '400'
         },
+        interaction: {
+          mode: 'point', // ポイントごとに個別表示
+          intersect: false // カーソルが近くにあれば表示
+        },
         callbacks: {
           title: (context) => {
             const dataIndex = context[0].dataIndex
             const data = cashflowData[dataIndex]
-            return `${data.year}年${data.month}のキャッシュフロー`
+            return `${data.year}年${data.month}`
           },
           label: (context) => {
             const value = context.raw as number
+            const datasetType = context.dataset.type || 'bar'
+            
+            // 値のフォーマット
             const formattedValue = new Intl.NumberFormat('ja-JP', {
               style: 'currency',
               currency: 'JPY',
               minimumFractionDigits: 0
-            }).format(Math.abs(value))
+            }).format(value < 0 ? Math.abs(value) : value)
             
-            return `${context.dataset.label}: ${formattedValue}`
+            // ラベルの作成
+            let label = context.dataset.label || ''
+            
+            // 棒グラフの場合（作業種別）
+            if (datasetType === 'bar') {
+              if (value > 0) {
+                return `${label} (収入): +${formattedValue}`
+              } else if (value < 0) {
+                return `${label} (支出): -${formattedValue}`
+              } else {
+                return `${label}: ${formattedValue}`
+              }
+            }
+            
+            // 線グラフの場合（累積値）
+            if (datasetType === 'line') {
+              return `${label}: ${formattedValue}`
+            }
+            
+            return `${label}: ${formattedValue}`
           },
           afterBody: (context) => {
             const dataIndex = context[0].dataIndex
             const data = cashflowData[dataIndex]
+            
+            // 月間サマリー情報を追加
             return [
               '',
+              '━━━━━━━━━━━━━━━',
+              `月間収入合計: ${new Intl.NumberFormat('ja-JP', { 
+                style: 'currency', 
+                currency: 'JPY',
+                minimumFractionDigits: 0 
+              }).format(data.monthly_income)}`,
+              `月間支出合計: ${new Intl.NumberFormat('ja-JP', { 
+                style: 'currency', 
+                currency: 'JPY',
+                minimumFractionDigits: 0 
+              }).format(Math.abs(data.monthly_expense))}`,
               `月間純損益: ${new Intl.NumberFormat('ja-JP', { 
                 style: 'currency', 
                 currency: 'JPY',
@@ -1348,38 +1701,62 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
             )}
           </div>
           
-          {/* グラフ凡例コンテナ */}
-          <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-              📊 作業種別凡例・期間合計
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Object.entries(WORK_TYPE_LABELS).map(([workType, label]) => (
-                <div key={workType} className="flex items-center gap-2 p-2 bg-white rounded border">
-                  <div 
-                    className="w-4 h-4 rounded flex-shrink-0"
-                    style={{ backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS] }}
+          {/* グラフ凡例コンテナ（折りたたみ可能） */}
+          <Collapsible open={isLegendOpen} onOpenChange={setIsLegendOpen}>
+            <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <CollapsibleTrigger className="w-full">
+                <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2 cursor-pointer hover:text-gray-600">
+                  <ChevronRight 
+                    className={`w-4 h-4 transition-transform duration-200 ${isLegendOpen ? 'rotate-90' : ''}`}
                   />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-700 truncate">{label}</div>
-                    <div className="text-xs text-gray-500">
-                      {new Intl.NumberFormat('ja-JP', { 
-                        style: 'currency', 
-                        currency: 'JPY', 
-                        minimumFractionDigits: 0 
-                      }).format(periodTotals[workType] || 0)}
+                  📊 作業種別凡例・期間合計
+                  <span className="text-xs text-gray-500 ml-auto">
+                    {isLegendOpen ? '閉じる' : '展開する'}
+                  </span>
+                </h4>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(WORK_TYPE_LABELS).map(([workType, label]) => (
+                    <div key={workType} className="flex items-center gap-2 p-2 bg-white rounded border">
+                      <div 
+                        className="w-4 h-4 rounded flex-shrink-0"
+                        style={{ backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS] }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-700 truncate">{label}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Intl.NumberFormat('ja-JP', { 
+                            style: 'currency', 
+                            currency: 'JPY', 
+                            minimumFractionDigits: 0 
+                          }).format(periodTotals[workType] || 0)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </CollapsibleContent>
             </div>
-          </div>
+          </Collapsible>
           
           {/* 前年比較サマリー */}
           {showComparison && previousYearData.length > 0 && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-3">📊 前年同期比較</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <Collapsible open={isComparisonOpen} onOpenChange={setIsComparisonOpen} className="mt-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <CollapsibleTrigger className="w-full">
+                  <h4 className="font-medium text-blue-800 mb-3 flex items-center gap-2 cursor-pointer hover:text-blue-600">
+                    <ChevronRight 
+                      className={`w-4 h-4 transition-transform duration-200 ${isComparisonOpen ? 'rotate-90' : ''}`}
+                    />
+                    📊 前年同期比較
+                    <span className="text-xs text-blue-600 ml-auto">
+                      {isComparisonOpen ? '閉じる' : '展開する'}
+                    </span>
+                  </h4>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 {(() => {
                   const currentTotal = cashflowData.reduce((sum, d) => sum + d.monthly_total, 0)
                   const previousTotal = previousYearData.reduce((sum, d) => sum + d.monthly_total, 0)
@@ -1430,8 +1807,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
                     </>
                   )
                 })()}
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
           )}
           
           <div className="mt-4 text-xs text-gray-500 text-center">

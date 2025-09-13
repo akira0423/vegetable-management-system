@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       // オプショナルフィールド
       description,
       created_by: created_by || 'd0efa1ac-7e7e-420b-b147-dabdf01454b7', // 既存ユーザーID
-      status: 'pending',
+      status: 'in_progress',
       progress: 0
     }
 

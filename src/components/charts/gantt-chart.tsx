@@ -619,7 +619,7 @@ export function GanttChart({
 
   if (!chartData || hierarchicalTasks.length === 0) {
     return (
-      <Card className={className}>
+      <Card className={` ${className || ''}`}>
         {/* ヘッダーとフィルターは常に表示 */}
         <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
           <div className="space-y-4">
@@ -635,10 +635,6 @@ export function GanttChart({
                     階層表示・フィルタリング・期間設定を統合管理
                   </p>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-                <div className="text-sm font-medium text-white">Gantt Chart System</div>
               </div>
               
               <div className="flex items-center gap-2 text-sm">
@@ -740,7 +736,7 @@ export function GanttChart({
   const { yearMonthHeaders, dayHeaders, weekdayHeaders, processedTasks, processedReports, totalWidth, dayWidth, step } = chartData
 
   return (
-    <Card className={className}>
+    <Card className={` ${className || ''}`}>
         {/* 改善されたヘッダーデザイン */}
         <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
           <div className="space-y-4">
@@ -756,10 +752,6 @@ export function GanttChart({
                     階層表示・フィルタリング・期間設定を統合管理
                   </p>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-                <div className="text-sm font-medium text-white">Gantt Chart System</div>
               </div>
               
               <div className="flex items-center gap-2 text-sm">
@@ -849,7 +841,7 @@ export function GanttChart({
               {/* Header - 階層化された固定ヘッダー */}
               <div className="sticky top-0 z-40 bg-white border-b shadow-sm flex">
                 {/* タスク情報ヘッダー - 上下左右固定 */}
-                <div className="sticky top-0 left-0 z-50 bg-white border-r border-gray-200 shadow-sm">
+                <div className="sticky top-0 left-0 z-50 bg-white border-r ">
                   <div className="flex" style={{ height: viewUnit === 'day' ? '84px' : '68px' }}>
                     <div className="w-80 px-2 py-1 border-r border-gray-100 font-bold text-sm text-gray-800 flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-100">
                       野菜・タスク名 (階層表示)
@@ -951,7 +943,7 @@ export function GanttChart({
                       style={{ minHeight: viewUnit === 'day' ? 64 : 56 }}
                     >
                       {/* Task info - 固定列 */}
-                      <div className="sticky left-0 z-20 bg-white/95 border-r border-gray-200 shadow-sm">
+                      <div className="sticky left-0 z-20 bg-white/95 border-r ">
                         <div className="flex" style={{ height: viewUnit === 'day' ? '64px' : '56px' }}>
                           {/* 階層タスク名表示 */}
                           <div 

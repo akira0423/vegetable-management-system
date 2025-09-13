@@ -23,11 +23,21 @@
       "Bash(set BACKUP_DIR=C:workbackup-20250830_154500)",
       "Bash(BACKUP_DIR=\"C:\\work\\backup-20250830_154000\")",
       "Bash(npm run build:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(claude update --check)",
+      "Bash(claude update --help)",
+      "Bash(claude update)",
+      "Bash(claude --version)",
+      "Bash(git checkout:*)",
+      "Bash(npx supabase db push:*)"
     ],
     "deny": [],
     "additionalDirectories": [
       "C:\\c\\work"
     ]
-  }
+  },
+  "model": "opus"
 }

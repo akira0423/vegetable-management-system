@@ -26,7 +26,7 @@ import WorkReportForm from '@/components/work-report-form'
 import WorkReportViewModal from '@/components/work-report-view-modal'
 import WorkReportEditModalFull from '@/components/work-report-edit-modal-full'
 import { WorkReportCard } from '@/components/work-report-card'
-import { AdvancedSearchFilter } from '@/components/advanced-search-filter'
+import { CollapsibleSearchFilter } from '@/components/collapsible-search-filter'
 import FarmMapView from '@/components/farm-map-view'
 import { 
   Calendar, 
@@ -36,6 +36,8 @@ import {
   RefreshCw, 
   Settings,
   ChevronDown,
+  ChevronUp,
+  X,
   Search,
   CalendarDays,
   Sprout,
@@ -301,6 +303,10 @@ export default function GanttPage() {
   const [networkError, setNetworkError] = useState(false)
   const [error, setError] = useState('')
   
+  // フィルター展開状態
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false)
+  const [activeFilterCount, setActiveFilterCount] = useState(0)
+  
   // 検索フィルター状態
   const [filteredVegetableData, setFilteredVegetableData] = useState<{
     filteredVegetables: any[]
@@ -317,7 +323,28 @@ export default function GanttPage() {
   // 検索フィルター変更ハンドラー
   const handleFiltersChange = useCallback((filters: any, filteredData: any) => {
     setFilteredVegetableData(filteredData)
-  }, [])
+    // アクティブフィルター数を計算
+    let count = 0
+    if (filteredData.hasActiveFilters) {
+      if (filters.selectedVegetables?.length > 0 && filters.selectedVegetables.length < vegetables.length) count++
+      if (filters.workType !== 'all') count++
+      if (filters.period !== 'all') count++
+      if (!filters.showPlanned || !filters.showCompleted) count++
+    }
+    setActiveFilterCount(count)
+  }, [vegetables.length])
+
+  const handleResetFilters = () => {
+    // フィルターをリセット
+    setFilteredVegetableData({
+      filteredVegetables: [],
+      filteredTasks: [],
+      filteredReports: [],
+      resultSummary: '',
+      hasActiveFilters: false
+    })
+    setActiveFilterCount(0)
+  }
   
   // 期間計算
   const getDateRange = useCallback(() => {
@@ -892,9 +919,9 @@ export default function GanttPage() {
   }
 
   const handleExport = () => {
-    // CSV出力
+    // CSV出力（ガントチャートの全データを出力）
     const csvHeaders = ['タスク名', '野菜', '担当者', '開始日', '終了日', '進捗率', 'ステータス', '優先度']
-    const csvData = filteredTasks.map(task => [
+    const csvData = ganttTasks.map(task => [
       task.name,
       task.vegetable.name,
       task.assignedUser?.name || '未割当',
@@ -1491,13 +1518,31 @@ export default function GanttPage() {
     }
   }
 
-  // フィルタリング
-  const filteredTasks = tasks.filter(task => {
+  // 旧フィルタリング（CollapsibleSearchFilterが優先されるため、現在は使用されない）
+  const oldFilteredTasks = tasks.filter(task => {
     if (selectedVegetable !== 'all' && task.vegetable.id !== selectedVegetable) return false
     if (selectedPriority !== 'all' && task.priority !== selectedPriority) return false
     if (searchQuery && !task.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
   })
+
+  // ガントチャート用データ（フィルター適用なし）
+  const ganttVegetables = vegetables
+  const ganttTasks = tasks
+  const ganttReports = workReports
+  
+  // 個別野菜管理用データ（フィルター適用）
+  const displayVegetables = filteredVegetableData.hasActiveFilters 
+    ? filteredVegetableData.filteredVegetables 
+    : vegetables
+  
+  const displayTasks = filteredVegetableData.hasActiveFilters 
+    ? filteredVegetableData.filteredTasks 
+    : tasks
+  
+  const displayReports = filteredVegetableData.hasActiveFilters 
+    ? filteredVegetableData.filteredReports 
+    : workReports
 
   const { start, end } = getDateRange()
 
@@ -1664,9 +1709,13 @@ export default function GanttPage() {
               <div>
                 <p className="text-sm text-purple-700 font-medium">総作業時間</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {workReports.reduce((sum: number, report: any) => sum + ((report.duration_hours || 0) * 60), 0).toFixed(1)}h
+                  {workReports.reduce((sum: number, report: any) => {
+                    const hours = report.duration_hours || 0
+                    const workers = report.worker_count || 1
+                    return sum + (hours * workers)
+                  }, 0).toFixed(1)}h
                 </p>
-                <p className="text-xs text-purple-600 mt-1">累計作業時間</p>
+                <p className="text-xs text-purple-600 mt-1">累計作業時間（人時）</p>
               </div>
               <div className="bg-purple-500 p-3 rounded-full">
                 <Clock className="w-6 h-6 text-white" />
@@ -1807,11 +1856,11 @@ export default function GanttPage() {
 
 
       {/* 栽培野菜管理チャート */}
-      {filteredTasks.length > 0 || vegetables.length > 0 ? (
+      {ganttTasks.length > 0 || ganttVegetables.length > 0 ? (
         <GanttChart 
-          tasks={filteredTasks}
-          workReports={workReports}
-          vegetables={vegetables}
+          tasks={ganttTasks}
+          workReports={ganttReports}
+          vegetables={ganttVegetables}
           startDate={start}
           endDate={end}
           viewUnit={viewUnit}
@@ -1869,20 +1918,59 @@ export default function GanttPage() {
 
       {/* 野菜別 計画タスク・実績記録 */}
       <div className="space-y-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Sprout className="w-5 h-5 text-green-600" />
-          <h2 className="text-xl font-bold text-gray-900">野菜別 計画・実績管理</h2>
-          <Badge variant="outline" className="text-sm">
-            {vegetables.length}種類の野菜
-          </Badge>
+        {/* ガントチャートと同じ緑色ヘッダーデザイン */}
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+              <Sprout className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold">野菜別 計画・実績管理</h2>
+              <p className="text-green-100 text-sm">
+                各野菜の栽培計画と作業実績を個別に管理
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm">
+                {vegetables.length}種類の野菜
+              </Badge>
+              <Button 
+                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-white/20 border border-white/30 h-9 px-3"
+              >
+                <Filter className="w-4 h-4 mr-1.5" />
+                フィルター
+                {activeFilterCount > 0 && (
+                  <Badge className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-400 text-green-800 border-0">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+                {isFilterExpanded ? <ChevronUp className="w-4 h-4 ml-1.5" /> : <ChevronDown className="w-4 h-4 ml-1.5" />}
+              </Button>
+              {activeFilterCount > 0 && (
+                <Button 
+                  onClick={handleResetFilters} 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-white hover:bg-white/20 border border-white/30 h-9 w-9 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* AI支援統合検索フィルター */}
-        <AdvancedSearchFilter
+        {/* フィルターパネル */}
+        <CollapsibleSearchFilter
           vegetables={vegetables}
           workReports={workReports}
-          tasks={filteredTasks}
+          tasks={tasks}
           onFiltersChange={handleFiltersChange}
+          isExpanded={isFilterExpanded}
+          onToggleExpanded={setIsFilterExpanded}
         />
 
         {/* フィルター結果がない場合のメッセージ */}
@@ -1917,10 +2005,10 @@ export default function GanttPage() {
             </CardContent>
           </Card>
         ) : (
-          // フィルター結果が存在する場合はそれを使用、そうでなければ全データを表示
-          (filteredVegetableData.filteredVegetables.length > 0 ? filteredVegetableData.filteredVegetables : vegetables).map(vegetable => {
-            const vegetableTasks = (filteredVegetableData.filteredTasks.length > 0 ? filteredVegetableData.filteredTasks : filteredTasks).filter(task => task.vegetable?.id === vegetable.id)
-            const vegetableReports = (filteredVegetableData.filteredReports.length > 0 ? filteredVegetableData.filteredReports : workReports).filter((report: any) => report.vegetable_id === vegetable.id)
+          // フィルター済みデータを使用して個別野菜を表示
+          displayVegetables.map(vegetable => {
+            const vegetableTasks = displayTasks.filter(task => task.vegetable?.id === vegetable.id)
+            const vegetableReports = displayReports.filter((report: any) => report.vegetable_id === vegetable.id)
             
             // データがない野菜はスキップ
             if (vegetableTasks.length === 0 && vegetableReports.length === 0) {

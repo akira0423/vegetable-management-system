@@ -164,7 +164,11 @@ export async function GET(request: NextRequest) {
     console.log('✅ 表示されるタスク:', ganttTasks.map(t => ({
       task_id: t.id,
       task_name: t.name,
-      vegetable_name: t.vegetable.name
+      vegetable_name: t.vegetable.name,
+      status: t.status,
+      progress: t.progress,
+      start: t.start,
+      end: t.end
     })))
 
     // 野菜一覧も取得（削除された野菜を除外）

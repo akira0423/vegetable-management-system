@@ -15,7 +15,10 @@ import {
   Calendar,
   Sprout,
   ChevronDown,
-  RotateCcw
+  ChevronUp,
+  RotateCcw,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -47,6 +50,7 @@ interface AdvancedSearchFilterProps {
     filteredTasks: any[]
     filteredReports: any[]
     resultSummary: string
+    hasActiveFilters: boolean
   }) => void
 }
 
@@ -90,6 +94,18 @@ export function AdvancedSearchFilter({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [savedSearches, setSavedSearches] = useState<string[]>([])
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  // アクティブフィルター数の計算
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.searchQuery.trim() !== '') count++
+    if (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) count++
+    if (filters.workType !== 'all') count++
+    if (filters.period !== 'all') count++
+    if (!filters.showPlanned || !filters.showCompleted) count++
+    return count
+  }, [filters, vegetables.length])
 
   // AI支援検索候補生成
   const generateAISuggestions = useCallback(() => {
@@ -186,20 +202,21 @@ export function AdvancedSearchFilter({
 
   // フィルター処理
   const applyFilters = useMemo(() => {
-    // 検索条件が何も設定されていない場合は空の結果を返す
+    // フィルターが設定されているかチェック
     const hasActiveFilters = 
       filters.searchQuery.trim() !== '' ||
-      filters.selectedVegetables.length > 0 ||
+      (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
       filters.workType !== 'all' ||
       filters.period !== 'all' ||
       !filters.showPlanned ||
       !filters.showCompleted
 
+    // フィルターが何も設定されていない場合は全てのデータを返す
     if (!hasActiveFilters) {
       return {
-        filteredVegetables: [],
-        filteredTasks: [],
-        filteredReports: []
+        filteredVegetables: [...vegetables],
+        filteredTasks: [...tasks],
+        filteredReports: [...workReports]
       }
     }
 
@@ -306,14 +323,14 @@ export function AdvancedSearchFilter({
     // フィルター条件が何も設定されていない場合
     const hasActiveFilters = 
       filters.searchQuery.trim() !== '' ||
-      filters.selectedVegetables.length > 0 ||
+      (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
       filters.workType !== 'all' ||
       filters.period !== 'all' ||
       !filters.showPlanned ||
       !filters.showCompleted
 
     if (!hasActiveFilters) {
-      return '検索条件やフィルターを設定してください'
+      return `全データ表示 - 計画${filteredTasks.length}件・実績${filteredReports.length}件`
     }
     
     const selectedVegetableNames = filters.selectedVegetables.length > 0 
@@ -334,9 +351,16 @@ export function AdvancedSearchFilter({
         filteredVegetables,
         filteredTasks,
         filteredReports,
-        resultSummary
+        resultSummary,
+        hasActiveFilters: 
+          filters.searchQuery.trim() !== '' ||
+          (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
+          filters.workType !== 'all' ||
+          filters.period !== 'all' ||
+          !filters.showPlanned ||
+          !filters.showCompleted
       })
-    }, 100) // 100ms のデバウンス
+    }, 300) // 300ms のデバウンス（パフォーマンス最適化）
 
     return () => clearTimeout(timeoutId)
   }, [
@@ -413,364 +437,383 @@ export function AdvancedSearchFilter({
   }
 
   return (
-    <Card className="mb-6 shadow-lg border-0 bg-gradient-to-br from-white via-blue-50/30 to-green-50/30">
+    <Card className="mb-4 shadow-md border border-green-200/50 bg-gradient-to-b from-lime-50/80 to-green-100/60 backdrop-blur-sm">
       <CardContent className="p-0">
-        {/* ヘッダー部分 */}
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-4 rounded-t-lg">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Search className="w-6 h-6 text-white" />
+        {/* コンパクトヘッダー */}
+        <div className="bg-gradient-to-r from-lime-600 via-green-600 to-emerald-700 p-3 rounded-t-lg">
+          <div className="flex items-center justify-between gap-3">
+            {/* 左側: タイトルとAIアイコン */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white/20 rounded-md flex items-center justify-center backdrop-blur-sm">
+                <Sparkles className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">🔍 AI支援統合検索システム</h3>
-                <p className="text-green-100 text-sm">自然言語で検索・高度フィルタリング機能</p>
+                <h3 className="text-sm font-bold text-white">🔍 AI統合検索</h3>
+                <p className="text-green-100 text-xs font-medium">AgriFinance Pro</p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-              <div className="text-sm font-medium text-white">AI Search System</div>
+            
+            {/* 右側: 結果表示とアクション */}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-xs text-white/90 font-medium flex items-center gap-1">
+                  <BarChart3 className="w-3 h-3" />
+                  {resultSummary.includes('計画') ? resultSummary.split(' - ')[1] : `${applyFilters.filteredTasks.length + applyFilters.filteredReports.length}件`}
+                </div>
+                <div className="text-xs text-green-100">検索結果</div>
+              </div>
+              
+              <Button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-white/20 border border-white/30 h-8 px-3"
+              >
+                <Filter className="w-3 h-3 mr-1" />
+                {activeFilterCount > 0 && (
+                  <Badge className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-400 text-green-800 border-0">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+                {isExpanded ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+              </Button>
+              
+              {activeFilterCount > 0 && (
+                <Button 
+                  onClick={handleReset} 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-white hover:bg-white/20 border border-white/30 h-8 px-2"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
             </div>
-          </div>
-          <div className="mt-4 flex items-center justify-end">
-            <Button 
-              onClick={handleReset} 
-              variant="ghost" 
-              size="sm" 
-              className="text-white hover:bg-white/20 border border-white/30"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              リセット
-            </Button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* メイン検索バー */}
-          <div className="relative">
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                </div>
-                <Input
-                  placeholder="例: 「昨日のトマト収穫実績」「キャベツ 播種 今週」「完了していない作業」"
-                  value={filters.searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-12 pr-12 py-4 text-base border-2 border-blue-200 focus:border-blue-500 rounded-xl shadow-sm bg-white/80 backdrop-blur-sm"
-                  onFocus={() => setShowSuggestions(filters.searchQuery.length > 0)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                />
-                {filters.searchQuery && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleSearchChange('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full"
-                    variant="ghost"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
+        {/* メイン検索バー - コンパクト表示 */}
+        <div className="p-3 bg-gradient-to-r from-green-50/90 to-lime-50/90 border-b border-green-200/30">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 text-green-500" />
               </div>
-              <Button 
-                onClick={handleSaveSearch} 
-                variant="outline" 
-                size="lg" 
-                className="shrink-0 bg-white/80 border-blue-200 hover:bg-blue-50 px-6"
-              >
-                <Bookmark className="w-4 h-4 mr-2" />
-                検索を保存
-              </Button>
-            </div>
-
-            {/* 検索候補 */}
-            {showSuggestions && (searchSuggestions.length > 0 || aiSuggestions.length > 0) && (
-              <div className="absolute top-full mt-2 w-full bg-white border-2 border-blue-200 rounded-xl shadow-2xl z-50 backdrop-blur-sm">
-                {searchSuggestions.length > 0 && (
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="text-xs font-semibold text-blue-600 mb-3 flex items-center gap-2">
-                      <Search className="w-4 h-4" />
-                      💡 検索候補
-                    </div>
-                    {searchSuggestions.map((suggestion, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="block w-full text-left px-4 py-3 text-sm hover:bg-blue-50 rounded-lg transition-colors duration-200 mb-1 border border-transparent hover:border-blue-200"
-                      >
-                        <span className="text-blue-600 mr-2">🔍</span>
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                {aiSuggestions.length > 0 && (
-                  <div className="p-3">
-                    <div className="text-xs font-semibold text-purple-600 mb-3 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      🤖 AI提案
-                    </div>
-                    {aiSuggestions.map((suggestion, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="block w-full text-left px-4 py-3 text-sm hover:bg-purple-50 rounded-lg transition-colors duration-200 mb-1 border border-transparent hover:border-purple-200"
-                      >
-                        <span className="text-purple-600 mr-2">✨</span>
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 野菜選択フィルター */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-green-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <Sprout className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h4 className="text-base font-semibold text-green-800">🥬 野菜選択</h4>
-                <p className="text-sm text-green-600">表示する野菜を選択してください</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant={filters.selectedVegetables.length === vegetables.length ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleVegetableSelectAll(filters.selectedVegetables.length !== vegetables.length)}
-                className={`
-                  ${filters.selectedVegetables.length === vegetables.length 
-                    ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                    : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                  }
-                  transition-all duration-200 shadow-sm hover:shadow-md
-                `}
-              >
-                <span className="mr-2">{filters.selectedVegetables.length === vegetables.length ? '✅' : '☐'}</span>
-                全ての野菜
-              </Button>
-              {vegetables.map(vegetable => (
-                <Button
-                  key={vegetable.id}
-                  variant={filters.selectedVegetables.includes(vegetable.id) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleVegetableToggle(vegetable.id, !filters.selectedVegetables.includes(vegetable.id))}
-                  className={`
-                    ${filters.selectedVegetables.includes(vegetable.id)
-                      ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                      : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                    }
-                    transition-all duration-200 shadow-sm hover:shadow-md
-                  `}
+              <Input
+                placeholder="AI検索: 'トマト 昨日 収穫', 'キャベツ 今週 播種'..."
+                value={filters.searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 pr-10 py-2 text-sm border border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-500/20 rounded-lg bg-white/90 backdrop-blur-sm transition-all duration-200"
+                onFocus={() => setShowSuggestions(filters.searchQuery.length > 0)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              />
+              {filters.searchQuery && (
+                <Button 
+                  size="sm" 
+                  onClick={() => handleSearchChange('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full"
+                  variant="ghost"
                 >
-                  <span className="mr-2">{filters.selectedVegetables.includes(vegetable.id) ? '✅' : '🥬'}</span>
-                  {vegetable.name}
+                  <X className="w-3 h-3" />
                 </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* 期間・表示設定セクション */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 期間選択 */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-blue-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="text-base font-semibold text-blue-800">📅 期間設定</h4>
-                  <p className="text-sm text-blue-600">表示期間を選択</p>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="w-full justify-between bg-white hover:bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      📅 {periodOptions.find(p => p.value === filters.period)?.label || '選択'}
-                    </span>
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-full bg-white border border-blue-200 shadow-lg">
-                  {periodOptions.map(option => (
-                    <DropdownMenuItem
-                      key={option.value}
-                      onClick={() => setFilters(prev => ({ ...prev, period: option.value }))}
-                      className="flex items-center gap-2 py-3 bg-white hover:bg-blue-50"
-                    >
-                      <Calendar className="w-4 h-4 text-blue-500" />
-                      {option.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* 表示設定 */}
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-indigo-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <Filter className="w-5 h-5 text-indigo-600" />
-                </div>
-                <div>
-                  <h4 className="text-base font-semibold text-indigo-800">👁️ 表示設定</h4>
-                  <p className="text-sm text-indigo-600">表示項目を選択</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <Button
-                  variant={filters.showPlanned ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilters(prev => ({ ...prev, showPlanned: !prev.showPlanned }))}
-                  className={`
-                    w-full justify-start
-                    ${filters.showPlanned
-                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600' 
-                      : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
-                    }
-                    transition-all duration-200 shadow-sm
-                  `}
-                >
-                  <span className="mr-2">{filters.showPlanned ? '✅' : '☐'}</span>
-                  📅 計画タスクを表示
-                </Button>
-                <Button
-                  variant={filters.showCompleted ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilters(prev => ({ ...prev, showCompleted: !prev.showCompleted }))}
-                  className={`
-                    w-full justify-start
-                    ${filters.showCompleted
-                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600' 
-                      : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
-                    }
-                    transition-all duration-200 shadow-sm
-                  `}
-                >
-                  <span className="mr-2">{filters.showCompleted ? '✅' : '☐'}</span>
-                  📋 実績記録を表示
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* 作業種類タブ */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-purple-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <Filter className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <h4 className="text-base font-semibold text-purple-800">🔧 作業種類</h4>
-                <p className="text-sm text-purple-600">フィルタする作業を選択してください</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {workTypeOptions.map(option => (
-                <Button
-                  key={option.value}
-                  size="sm"
-                  variant={filters.workType === option.value ? "default" : "outline"}
-                  onClick={() => setFilters(prev => ({ ...prev, workType: option.value }))}
-                  className={`
-                    ${filters.workType === option.value
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-600' 
-                      : 'bg-white hover:bg-purple-50 text-purple-700 border-purple-200'
-                    }
-                    transition-all duration-200 shadow-sm hover:shadow-md px-4 py-2
-                  `}
-                >
-                  <span className="mr-2 text-base">{option.icon}</span>
-                  <span className="font-medium">{option.label.substring(2)}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* 検索結果サマリー */}
-          <div className="bg-gradient-to-r from-emerald-50 via-blue-50 to-purple-50 p-6 rounded-xl border-2 border-emerald-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <Filter className="w-6 h-6 text-emerald-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold text-emerald-800 mb-1">
-                    📊 検索・フィルター結果
-                  </h4>
-                  <p className="text-base text-emerald-700 font-medium">
-                    {resultSummary}
-                  </p>
-                </div>
-              </div>
-              
-              {/* 保存された検索があれば表示 */}
-              {savedSearches.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="text-xs text-gray-500">保存済み検索:</div>
-                  <div className="flex gap-1">
-                    {savedSearches.slice(0, 2).map((search, index) => (
-                      <Button
-                        key={index}
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSearchChange(search)}
-                        className="text-xs px-2 py-1 h-6 bg-white/80 hover:bg-white border-emerald-200 text-emerald-600 hover:text-emerald-700"
-                      >
-                        <Bookmark className="w-3 h-3 mr-1" />
-                        {search.length > 10 ? `${search.substring(0, 10)}...` : search}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
             
-            {/* フィルター適用中の表示 */}
-            {(filters.selectedVegetables.length > 0 || filters.workType !== 'all' || filters.period !== 'all' || !filters.showPlanned || !filters.showCompleted || filters.searchQuery.trim() !== '') && (
-              <div className="mt-4 pt-4 border-t border-emerald-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length && (
-                      <div className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
-                        <Sprout className="w-3 h-3" />
-                        選択野菜: {filters.selectedVegetables.length}種類
-                      </div>
-                    )}
-                    {filters.workType !== 'all' && (
-                      <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-xs font-medium">
-                        <Filter className="w-3 h-3" />
-                        {workTypeOptions.find(w => w.value === filters.workType)?.label}
-                      </div>
-                    )}
-                    {filters.period !== 'all' && (
-                      <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
-                        <Calendar className="w-3 h-3" />
-                        {periodOptions.find(p => p.value === filters.period)?.label}
-                      </div>
-                    )}
-                    {(!filters.showPlanned || !filters.showCompleted) && (
-                      <div className="flex items-center gap-1 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-medium">
-                        👁️ {!filters.showPlanned && !filters.showCompleted ? '非表示' : !filters.showPlanned ? '実績のみ' : '計画のみ'}
-                      </div>
-                    )}
+            <Button 
+              onClick={handleSaveSearch} 
+              variant="outline" 
+              size="sm" 
+              className="shrink-0 bg-white/90 border-green-300 hover:bg-green-50 px-3 h-9 text-xs"
+            >
+              <Bookmark className="w-3 h-3 mr-1" />
+              保存
+            </Button>
+          </div>
+
+          {/* 検索候補 - コンパクト表示 */}
+          {showSuggestions && (searchSuggestions.length > 0 || aiSuggestions.length > 0) && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white/95 border border-green-200 rounded-lg shadow-lg z-50 backdrop-blur-sm">
+              {searchSuggestions.length > 0 && (
+                <div className="p-2">
+                  <div className="text-xs font-medium text-green-600 mb-2 flex items-center gap-1">
+                    <Search className="w-3 h-3" />
+                    検索候補
                   </div>
-                  <div className="text-xs text-emerald-600 font-medium">
-                    フィルター適用中
+                  {searchSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="block w-full text-left px-3 py-2 text-xs hover:bg-green-50 rounded-md transition-colors duration-150 mb-1"
+                    >
+                      <span className="text-green-600 mr-2">🔍</span>
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {aiSuggestions.length > 0 && (
+                <div className="p-2 border-t border-green-100">
+                  <div className="text-xs font-medium text-purple-600 mb-2 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    AI提案
+                  </div>
+                  {aiSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="block w-full text-left px-3 py-2 text-xs hover:bg-purple-50 rounded-md transition-colors duration-150 mb-1"
+                    >
+                      <span className="text-purple-600 mr-2">✨</span>
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 展開式詳細フィルター */}
+        {isExpanded && (
+          <div className="bg-gradient-to-b from-white to-green-50/30 border-t border-green-200/50 animate-in slide-in-from-top-2 duration-200">
+            <div className="p-4 space-y-4">
+              {/* 野菜選択 - コンパクト表示 */}
+              <div className="bg-white/80 rounded-lg p-3 border border-green-200/50">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-green-800 flex items-center gap-2">
+                    <Sprout className="w-4 h-4" />
+                    🥬 野菜選択
+                  </h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleVegetableSelectAll(filters.selectedVegetables.length !== vegetables.length)}
+                    className="h-6 px-2 text-xs bg-green-50 border-green-200 hover:bg-green-100"
+                  >
+                    {filters.selectedVegetables.length === vegetables.length ? '✅ 全解除' : '☐ 全選択'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {vegetables.map(vegetable => (
+                    <Button
+                      key={vegetable.id}
+                      variant={filters.selectedVegetables.includes(vegetable.id) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleVegetableToggle(vegetable.id, !filters.selectedVegetables.includes(vegetable.id))}
+                      className={`
+                        h-7 px-2 text-xs transition-all duration-150
+                        ${filters.selectedVegetables.includes(vegetable.id)
+                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                          : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                        }
+                      `}
+                    >
+                      <span className="mr-1 text-xs">{filters.selectedVegetables.includes(vegetable.id) ? '✅' : '🥬'}</span>
+                      {vegetable.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 期間・表示設定 - コンパクトグリッド */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 期間選択 */}
+                <div className="bg-white/80 rounded-lg p-3 border border-green-200/50">
+                  <h4 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    📅 期間設定
+                  </h4>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full justify-between bg-white hover:bg-green-50 border-green-200 text-green-700 h-8 text-xs"
+                      >
+                        {periodOptions.find(p => p.value === filters.period)?.label || '選択'}
+                        <ChevronDown className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full bg-white border border-green-200 shadow-md">
+                      {periodOptions.map(option => (
+                        <DropdownMenuItem
+                          key={option.value}
+                          onClick={() => setFilters(prev => ({ ...prev, period: option.value }))}
+                          className="text-xs py-2 hover:bg-green-50"
+                        >
+                          <Calendar className="w-3 h-3 mr-2 text-green-500" />
+                          {option.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* 表示設定 */}
+                <div className="bg-white/80 rounded-lg p-3 border border-green-200/50">
+                  <h4 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    👁️ 表示設定
+                  </h4>
+                  <div className="space-y-2">
+                    <Button
+                      variant={filters.showPlanned ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilters(prev => ({ ...prev, showPlanned: !prev.showPlanned }))}
+                      className={`
+                        w-full justify-start h-7 text-xs
+                        ${filters.showPlanned
+                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                          : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                        }
+                      `}
+                    >
+                      <span className="mr-1">{filters.showPlanned ? '✅' : '☐'}</span>
+                      計画タスク
+                    </Button>
+                    <Button
+                      variant={filters.showCompleted ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilters(prev => ({ ...prev, showCompleted: !prev.showCompleted }))}
+                      className={`
+                        w-full justify-start h-7 text-xs
+                        ${filters.showCompleted
+                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                          : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                        }
+                      `}
+                    >
+                      <span className="mr-1">{filters.showCompleted ? '✅' : '☐'}</span>
+                      実績記録
+                    </Button>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* 作業種類 - コンパクトタブ */}
+              <div className="bg-white/80 rounded-lg p-3 border border-green-200/50">
+                <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  🔧 作業種類
+                </h4>
+                <div className="grid grid-cols-3 gap-1">
+                  {workTypeOptions.map(option => (
+                    <Button
+                      key={option.value}
+                      size="sm"
+                      variant={filters.workType === option.value ? "default" : "outline"}
+                      onClick={() => setFilters(prev => ({ ...prev, workType: option.value }))}
+                      className={`
+                        h-8 px-2 text-xs transition-all duration-150
+                        ${filters.workType === option.value
+                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                          : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                        }
+                      `}
+                    >
+                      <span className="mr-1">{option.icon}</span>
+                      <span className="font-medium">{option.label.substring(2)}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* アクションバー - コンパクト配置 */}
+              <div className="flex items-center justify-between pt-3 border-t border-green-200/50">
+                <div className="flex items-center gap-2">
+                  {/* アクティブフィルター表示 */}
+                  <div className="flex flex-wrap gap-1">
+                    {filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5">
+                        🥬 {filters.selectedVegetables.length}種
+                      </Badge>
+                    )}
+                    {filters.workType !== 'all' && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5">
+                        {workTypeOptions.find(w => w.value === filters.workType)?.icon}
+                      </Badge>
+                    )}
+                    {filters.period !== 'all' && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5">
+                        📅 {periodOptions.find(p => p.value === filters.period)?.label}
+                      </Badge>
+                    )}
+                    {(!filters.showPlanned || !filters.showCompleted) && (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5">
+                        👁️ {!filters.showPlanned ? '実績' : '計画'}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* 保存された検索 */}
+                  {savedSearches.length > 0 && (
+                    <div className="flex gap-1 ml-2">
+                      {savedSearches.slice(0, 1).map((search, index) => (
+                        <Button
+                          key={index}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSearchChange(search)}
+                          className="h-6 px-2 text-xs bg-white border-green-200 text-green-600 hover:bg-green-50"
+                        >
+                          <Bookmark className="w-3 h-3 mr-1" />
+                          {search.length > 8 ? `${search.substring(0, 8)}...` : search}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleReset}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-3 text-xs text-gray-600 hover:text-gray-800 border-green-200 hover:bg-green-50"
+                  >
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    リセット
+                  </Button>
+                  
+                  <Button
+                    onClick={() => setIsExpanded(false)}
+                    variant="default"
+                    size="sm"
+                    className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
+                  >
+                    適用・閉じる
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 結果サマリーバー */}
+        <div className="bg-gradient-to-r from-green-50 to-lime-50 p-3 border-t border-green-200/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-green-800">
+                  📊 検索結果
+                </div>
+                <div className="text-xs text-green-700">
+                  {resultSummary}
+                </div>
+              </div>
+            </div>
+            
+            {/* クイックアクション */}
+            <div className="text-right">
+              <div className="text-lg font-bold text-green-800">
+                {applyFilters.filteredTasks.length + applyFilters.filteredReports.length}
+              </div>
+              <div className="text-xs text-green-600">件数</div>
+            </div>
           </div>
         </div>
       </CardContent>

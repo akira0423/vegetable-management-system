@@ -570,6 +570,7 @@ export default function WorkReportEditModal({
                 </div>
               </div>
             </TabsContent>
+            </TabsContent>
           </Tabs>
           
           {/* 保存ボタンエリア */}

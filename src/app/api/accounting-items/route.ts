@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     
     let query = supabase
       .from('accounting_items')
-      .select('*')
+      .select('id, code, name, type, category, cost_type, is_active, sort_order')
       .eq('is_active', true)
       .order('sort_order')
     

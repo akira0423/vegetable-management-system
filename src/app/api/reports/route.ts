@@ -60,13 +60,15 @@ export async function GET(request: NextRequest) {
         start_time,
         end_time,
         duration_hours,
+        work_duration,
+        worker_count,
         weather,
         temperature,
+        humidity,
         harvest_amount,
         harvest_unit,
         harvest_quality,
         expected_price,
-        worker_count,
         notes,
         created_by,
         created_at,
@@ -108,6 +110,14 @@ export async function GET(request: NextRequest) {
       `)
       .eq('company_id', companyId)
     
+    // 削除された作業レポートを除外
+    if (activeOnly) {
+      console.log('🔍 Reports API: 削除済み作業レポートを除外中 (deleted_at IS NULL)')
+      query = query.is('deleted_at', null)
+    } else {
+      console.log('🔍 Reports API: active_only=false のため、削除済み作業レポートも含める')
+    }
+    
     query = query.order('work_date', { ascending: false })
       .order('created_at', { ascending: false })
 
@@ -143,8 +153,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    console.log('📊 Reports API - 取得された作業レポート数:', data?.length || 0)
+    console.log('📊 Reports API - 取得されたレポート詳細:', data?.map(r => ({
+      id: r.id,
+      work_date: r.work_date,
+      work_type: r.work_type,
+      vegetable_name: r.vegetables?.name,
+      accounting_items: r.work_report_accounting?.length || 0
+    })) || [])
+
     // 削除された野菜に関連する作業記録を除外
     const filteredData = data?.filter(report => report.vegetables !== null) || []
+    
+    console.log('📊 Reports API - 野菜フィルタ後のレポート数:', filteredData.length)
 
     return NextResponse.json({
       success: true,
@@ -228,8 +249,10 @@ export async function POST(request: NextRequest) {
       start_time: body.start_time || null,
       end_time: body.end_time || null,
       duration_hours: body.duration_hours || null,
+      work_duration: body.work_duration || null,  // 作業時間（分）
       weather: body.weather || null,
       temperature: body.temperature || null,
+      humidity: body.humidity || null,
       notes: body.notes || body.work_notes || null,
       created_by: body.created_by || null,
       
