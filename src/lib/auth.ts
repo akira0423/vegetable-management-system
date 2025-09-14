@@ -5,13 +5,14 @@ import { AuthUser, AuthUserWithMembership } from '@/types'
 // 開発環境用の認証チェック
 function getDevUser(): AuthUser | null {
   if (typeof window === 'undefined') return null
-  
+
   const devUser = localStorage.getItem('dev_user')
-  if (!devUser) return null
-  
+  if (!devUser || devUser === '') return null
+
   try {
     return JSON.parse(devUser) as AuthUser
   } catch {
+    localStorage.removeItem('dev_user')
     return null
   }
 }
@@ -117,7 +118,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       const cookieStore = await cookies()
       const devUserCookie = cookieStore.get('dev_user')
       
-      if (devUserCookie?.value) {
+      if (devUserCookie?.value && devUserCookie.value !== '') {
         try {
           return JSON.parse(devUserCookie.value) as AuthUser
         } catch {

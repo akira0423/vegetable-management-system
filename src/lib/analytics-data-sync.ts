@@ -137,15 +137,15 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       const numbersValid = reports.every(report => {
         // 会計データの検証
         if (report.work_report_accounting) {
-          const invalidAccounting = report.work_report_accounting.some(item => 
-            item.amount < 0 || item.amount > 10000000
+          const invalidAccounting = report.work_report_accounting.some(item =>
+            item.amount < 0 || item.amount > 100000000000 // 1000億円まで対応
           )
           if (invalidAccounting) return false
         }
         if (report.harvest_amount && report.harvest_amount < 0) return false
         if (report.expected_revenue && report.expected_revenue < 0) return false
-        if (report.work_duration && (report.work_duration < 0 || report.work_duration > 1440)) return false
-        if (report.worker_count && (report.worker_count < 1 || report.worker_count > 50)) return false
+        if (report.work_duration && (report.work_duration < 0 || report.work_duration > 10000000)) return false // 1000万分まで対応
+        if (report.worker_count && (report.worker_count < 1 || report.worker_count > 10000)) return false // 1万人まで対応
         return true
       })
 

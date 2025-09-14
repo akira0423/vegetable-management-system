@@ -585,7 +585,7 @@ export default function GanttPage() {
       // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
       const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`),
-        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true&limit=999999`),  // 実質無制限
         fetch(`/api/vegetables?company_id=${companyId}`) // 最新の野菜データを直接取得
       ])
 
@@ -695,7 +695,7 @@ export default function GanttPage() {
 
       const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`, { headers: authHeaders }),
-        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true`, { headers: authHeaders }),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true&limit=999999`, { headers: authHeaders }),  // 実質無制限
         fetch(`/api/vegetables?company_id=${companyId}`, { headers: authHeaders }) // 最新の野菜データを直接取得
       ])
 

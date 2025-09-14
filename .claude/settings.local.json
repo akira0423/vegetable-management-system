@@ -33,7 +33,10 @@
       "Bash(claude --version)",
       "Bash(git checkout:*)",
       "Bash(npx supabase db push:*)",
-      "Bash(supabase:*)"
+      "Bash(supabase:*)",
+      "Bash(npx supabase db dump:*)",
+      "Bash(where node)",
+      "Bash(npm:*)"
     ],
     "deny": [],
     "additionalDirectories": [

@@ -136,14 +136,14 @@ export class AccountingAnalyticsProcessor {
   /**
    * データソース情報付きでコストデータを取得
    */
-  getCostDataWithSource(report: WorkReport, fallbackToEstimate = true): DataSource {
+  getCostDataWithSource(report: WorkReport, fallbackToEstimate = false): DataSource {
     const accountingEntries = report.work_report_accounting?.filter(
       entry => entry.accounting_items?.type === 'expense'
     ) || []
-    
+
     const accountingAmount = accountingEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0)
     const aiRecommendedCount = accountingEntries.filter(e => e.is_ai_recommended).length
-    
+
     if (accountingAmount > 0) {
       return {
         amount: accountingAmount,
@@ -157,24 +157,11 @@ export class AccountingAnalyticsProcessor {
         }
       }
     }
-    
-    // フォールバック：推定コスト
-    if (fallbackToEstimate) {
-      const estimatedAmount = this.calculateEstimatedCost(report)
-      return {
-        amount: estimatedAmount,
-        source: 'estimated',
-        reliability: 'low',
-        badge: '推定',
-        details: {
-          estimatedAmount
-        }
-      }
-    }
-    
+
+    // 会計データがない場合は0を返す（推定計算は行わない）
     return {
       amount: 0,
-      source: 'estimated',
+      source: 'accounting',
       reliability: 'low',
       badge: 'なし'
     }
@@ -183,14 +170,14 @@ export class AccountingAnalyticsProcessor {
   /**
    * データソース情報付きで収入データを取得
    */
-  getIncomeDataWithSource(report: WorkReport, fallbackToEstimate = true): DataSource {
+  getIncomeDataWithSource(report: WorkReport, fallbackToEstimate = false): DataSource {
     const accountingEntries = report.work_report_accounting?.filter(
       entry => entry.accounting_items?.type === 'income'
     ) || []
-    
+
     const accountingAmount = accountingEntries.reduce((sum, entry) => sum + (entry.amount || 0), 0)
     const aiRecommendedCount = accountingEntries.filter(e => e.is_ai_recommended).length
-    
+
     if (accountingAmount > 0) {
       return {
         amount: accountingAmount,
@@ -204,24 +191,11 @@ export class AccountingAnalyticsProcessor {
         }
       }
     }
-    
-    // フォールバック：推定収入
-    if (fallbackToEstimate) {
-      const estimatedAmount = this.calculateEstimatedRevenue(report)
-      return {
-        amount: estimatedAmount,
-        source: 'estimated',
-        reliability: 'low',
-        badge: '推定',
-        details: {
-          estimatedAmount
-        }
-      }
-    }
-    
+
+    // 会計データがない場合は0を返す（推定計算は行わない）
     return {
       amount: 0,
-      source: 'estimated',
+      source: 'accounting',
       reliability: 'low',
       badge: 'なし'
     }
@@ -430,9 +404,9 @@ export class AccountingAnalyticsProcessor {
     let totalEstimated = 0
     let totalActual = 0
     const workTypeVariances: { [workType: string]: VarianceItem } = {}
-    
+
     reports.forEach(report => {
-      const estimated = this.calculateEstimatedCost(report)
+      const estimated = 0  // 推定計算は行わない
       const actual = this.getActualCost(report)
       
       totalEstimated += estimated
@@ -478,18 +452,13 @@ export class AccountingAnalyticsProcessor {
   }
 
   private calculateEstimatedCost(report: WorkReport): number {
-    // 推定コスト計算（時給ベース + 想定コスト）
-    const hours = report.duration_hours || 0
-    const workerCount = report.worker_count || 1
-    const hourlyRate = 1000 // デフォルト時給
-    const laborCost = hours * workerCount * hourlyRate
-    const materialCost = 0 // report.estimated_cost || 0 // データベースに存在しない
-    
-    return laborCost + materialCost
+    // 推定計算は行わない - 常に0を返す
+    return 0
   }
 
   private calculateEstimatedRevenue(report: WorkReport): number {
-    return report.expected_revenue || (report.harvest_amount || 0) * (report.expected_price || 0)
+    // 推定計算は行わない - 常に0を返す
+    return 0
   }
 
   private getActualCost(report: WorkReport): number {

@@ -104,7 +104,8 @@ export async function GET(request: NextRequest) {
             code,
             name,
             type,
-            category
+            category,
+            cost_type
           )
         )
       `)

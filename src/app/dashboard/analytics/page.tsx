@@ -406,9 +406,14 @@ export default function AnalyticsPage() {
       console.log('📊 Analytics: データ取得開始, companyId:', companyId)
       setLoading(true)
       
+      // 直近12カ月の期間を計算
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setFullYear(startDate.getFullYear() - 1)
+
       // 作業レポートデータと野菜データを並行取得
       const [reportsResponse, vegetablesResponse, ganttResponse] = await Promise.all([
-        fetch(`/api/reports?company_id=${companyId}&limit=200`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}&limit=999999`),  // 実質無制限
         fetch(`/api/gantt?company_id=${companyId}&start_date=2024-01-01&end_date=2025-12-31`),
         fetch(`/api/gantt?company_id=${companyId}&start_date=2024-01-01&end_date=2025-12-31`)
       ])
@@ -554,24 +559,20 @@ export default function AnalyticsPage() {
     let expenseFromAccounting = 0
 
     reports.forEach(report => {
-      // 会計統合プロセッサーを使用してデータ取得
-      const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
-      const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
-      
-      // 収入データの集計
-      if (incomeData.source === 'accounting') {
-        totalActualRevenue += incomeData.amount
+      // 会計統合プロセッサーを使用してデータ取得（推定計算なし）
+      const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, false)
+      const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, false)
+
+      // 収入データの集計（会計データのみ）
+      totalActualRevenue += incomeData.amount
+      if (incomeData.amount > 0) {
         revenueFromAccounting += incomeData.amount
-      } else {
-        totalEstimatedRevenue += incomeData.amount
       }
 
-      // 支出データの集計
-      if (costData.source === 'accounting') {
-        totalActualCost += costData.amount
+      // 支出データの集計（会計データのみ）
+      totalActualCost += costData.amount
+      if (costData.amount > 0) {
         expenseFromAccounting += costData.amount
-      } else {
-        totalEstimatedCost += costData.amount
       }
 
       // 作業種別コスト分類
@@ -632,8 +633,8 @@ export default function AnalyticsPage() {
       let totalCost = 0
       
       vegReports.forEach(report => {
-        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
-        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
+        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, false)
+        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, false)
         totalRevenue += incomeData.amount
         totalCost += costData.amount
       })
@@ -697,8 +698,8 @@ export default function AnalyticsPage() {
         }
         const workTypeName = workTypeNames[report.work_type] || report.work_type
         
-        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, true)
-        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, true)
+        const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, false)
+        const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, false)
         
         return {
           id: report.id || `act_${index}`,
@@ -1146,13 +1147,71 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* メインコンテンツタブ */}
+      {/* メインコンテンツタブ - 金融系プロフェッショナルデザイン */}
       <Tabs defaultValue="performance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="performance">パフォーマンス</TabsTrigger>
-          <TabsTrigger value="harvest-revenue">収益コスト分析</TabsTrigger>
-          <TabsTrigger value="worklog-cost">作業時間分析</TabsTrigger>
-        </TabsList>
+        <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm">
+          <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-1">
+            <TabsTrigger
+              value="performance"
+              className="
+                relative px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200
+                data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600
+                data-[state=inactive]:hover:bg-gray-50 data-[state=inactive]:hover:text-gray-800
+                data-[state=inactive]:border data-[state=inactive]:border-gray-200
+                data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-700 data-[state=active]:to-slate-800
+                data-[state=active]:text-white data-[state=active]:shadow-md
+                data-[state=active]:border-0
+                group
+              "
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Activity className="w-4 h-4" />
+                <span>パフォーマンス</span>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 scale-x-0 group-data-[state=active]:scale-x-100 transition-transform duration-200" />
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="harvest-revenue"
+              className="
+                relative px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200
+                data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600
+                data-[state=inactive]:hover:bg-gray-50 data-[state=inactive]:hover:text-gray-800
+                data-[state=inactive]:border data-[state=inactive]:border-gray-200
+                data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-700 data-[state=active]:to-slate-800
+                data-[state=active]:text-white data-[state=active]:shadow-md
+                data-[state=active]:border-0
+                group
+              "
+            >
+              <div className="flex items-center justify-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                <span>収益コスト分析</span>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 scale-x-0 group-data-[state=active]:scale-x-100 transition-transform duration-200" />
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="worklog-cost"
+              className="
+                relative px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200
+                data-[state=inactive]:bg-white data-[state=inactive]:text-gray-600
+                data-[state=inactive]:hover:bg-gray-50 data-[state=inactive]:hover:text-gray-800
+                data-[state=inactive]:border data-[state=inactive]:border-gray-200
+                data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-700 data-[state=active]:to-slate-800
+                data-[state=active]:text-white data-[state=active]:shadow-md
+                data-[state=active]:border-0
+                group
+              "
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Clock className="w-4 h-4" />
+                <span>作業時間分析</span>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 scale-x-0 group-data-[state=active]:scale-x-100 transition-transform duration-200" />
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* パフォーマンスタブ */}
         <TabsContent value="performance" className="space-y-6">

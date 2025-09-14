@@ -241,7 +241,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
     data.forEach(d => {
       let monthlyIncome = 0
       let monthlyExpense = 0
-      
+
       // 各作業種別の収入・支出を集計
       Object.values(d.work_types).forEach(workType => {
         if (workType.income > 0) {
@@ -251,7 +251,18 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           monthlyExpense += Math.abs(workType.expense)
         }
       })
-      
+
+      // デバッグ: 大きな支出を検出
+      if (monthlyExpense >= 100000000) {
+        console.log('📊 Y軸計算 - 大規模支出検出:', {
+          月: d.month,
+          年: d.year,
+          月間支出: monthlyExpense,
+          月間収入: monthlyIncome,
+          work_types: d.work_types
+        })
+      }
+
       maxIncome = Math.max(maxIncome, monthlyIncome)
       maxExpense = Math.max(maxExpense, monthlyExpense)
     })
@@ -323,6 +334,14 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         unit = 10000000  // 10,000,000円単位
       } else if (absValue < 100000000) {
         unit = 20000000  // 20,000,000円単位
+      } else if (absValue < 1000000000) {
+        unit = 100000000  // 1億円単位
+      } else if (absValue < 10000000000) {
+        unit = 1000000000  // 10億円単位
+      } else if (absValue < 100000000000) {
+        unit = 10000000000  // 100億円単位
+      } else if (absValue < 1000000000000) {
+        unit = 100000000000  // 1000億円単位
       } else {
         // それ以上は値を5で割った単位でキリの良い値に
         const magnitude = Math.pow(10, Math.floor(Math.log10(absValue / 5)))
@@ -366,14 +385,32 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       stepSize = Math.ceil(rawStep / 1000000) * 1000000
     } else if (rawStep < 10000000) {
       stepSize = Math.ceil(rawStep / 2000000) * 2000000
-    } else {
+    } else if (rawStep < 100000000) {
       stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    } else if (rawStep < 1000000000) {
+      stepSize = Math.ceil(rawStep / 100000000) * 100000000  // 1億円単位
+    } else if (rawStep < 10000000000) {
+      stepSize = Math.ceil(rawStep / 1000000000) * 1000000000  // 10億円単位
+    } else if (rawStep < 100000000000) {
+      stepSize = Math.ceil(rawStep / 10000000000) * 10000000000  // 100億円単位
+    } else {
+      // 1000億円以上は1000億円単位
+      stepSize = Math.ceil(rawStep / 100000000000) * 100000000000
     }
     
     // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
     const symmetricMax = stepSize * 5
     const symmetricMin = -stepSize * 5
-    
+
+    // デバッグ: Y軸範囲の最終値
+    if (Math.abs(symmetricMin) >= 100000000) {
+      console.log('📐 Y軸範囲計算結果:', {
+        計算されたステップ: stepSize,
+        Y軸最小値: symmetricMin,
+        Y軸最大値: symmetricMax
+      })
+    }
+
     return {
       min: symmetricMin,
       max: symmetricMax,
@@ -391,7 +428,17 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       
       const endMonth = addMonths(startMonth, responsiveDimensions.monthCount - 1)
       const startDate = format(startMonth, 'yyyy-MM-01')
-      const endDate = format(endMonth, 'yyyy-MM-dd')
+      // 終了月の最終日を取得（例：2025-12-31）
+      const lastDayOfEndMonth = new Date(endMonth.getFullYear(), endMonth.getMonth() + 1, 0)
+      const endDate = format(lastDayOfEndMonth, 'yyyy-MM-dd')
+
+      console.log('📅 データ取得期間:', {
+        開始月: format(startMonth, 'yyyy年M月'),
+        終了月: format(endMonth, 'yyyy年M月'),
+        月数: responsiveDimensions.monthCount,
+        開始日: startDate,
+        終了日: endDate
+      })
       
       // 現在年と前年データを並行取得
       let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
@@ -401,7 +448,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       
       // 前年同期のデータも取得
       const previousYearStart = format(subMonths(startMonth, 12), 'yyyy-MM-01')
-      const previousYearEnd = format(subMonths(endMonth, 12), 'yyyy-MM-dd')
+      // 前年の終了月の最終日を取得
+      const previousYearEndMonth = subMonths(endMonth, 12)
+      const lastDayOfPreviousYearEndMonth = new Date(previousYearEndMonth.getFullYear(), previousYearEndMonth.getMonth() + 1, 0)
+      const previousYearEnd = format(lastDayOfPreviousYearEndMonth, 'yyyy-MM-dd')
       let previousYearApiUrl = `/api/reports?company_id=${companyId}&start_date=${previousYearStart}&end_date=${previousYearEnd}&limit=1000`
       if (selectedVegetable && selectedVegetable !== 'all') {
         previousYearApiUrl += `&vegetable_id=${selectedVegetable}`
@@ -454,12 +504,41 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           typeReports.forEach((r: any) => {
             if (r.work_report_accounting && Array.isArray(r.work_report_accounting)) {
               r.work_report_accounting.forEach((acc: any) => {
-                // accounting_itemsのtypeで収入・支出を判定
-                if (acc.accounting_items?.type === 'income' || acc.accounting_items?.code?.startsWith('①') || 
-                    acc.accounting_items?.code?.startsWith('②') || acc.accounting_items?.code?.startsWith('③')) {
-                  accountingIncome += acc.amount || 0
-                } else {
-                  accountingExpense += acc.amount || 0
+                // accounting_itemsのcost_typeで収入・支出を判定
+                const costType = acc.accounting_items?.cost_type
+                const code = acc.accounting_items?.code
+                const itemName = acc.accounting_items?.name || acc.custom_item_name
+                const amount = acc.amount || 0
+
+                // デバッグ: 大きな金額の場合ログ出力
+                if (Math.abs(amount) >= 100000000) {
+                  console.log('💰 大規模金額検出:', {
+                    項目名: itemName,
+                    金額: amount,
+                    cost_type: costType,
+                    code: code,
+                    作業種別: workType,
+                    日付: r.work_date
+                  })
+                }
+
+                // cost_typeがある場合はそれを優先
+                if (costType === 'income') {
+                  accountingIncome += amount
+                } else if (costType === 'variable_cost' || costType === 'fixed_cost') {
+                  accountingExpense += amount
+                }
+                // cost_typeがない場合はcodeで判定（フォールバック）
+                else if (code) {
+                  if (code.startsWith('①') || code.startsWith('②') || code.startsWith('③')) {
+                    accountingIncome += amount
+                  } else {
+                    accountingExpense += amount
+                  }
+                }
+                // どちらもない場合は支出として扱う
+                else {
+                  accountingExpense += amount
                 }
               })
             }
@@ -521,6 +600,22 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           const profitChange = cumulativeProfit - prevProfit
           if (profitChange > 0) trend = 'up'
           else if (profitChange < 0) trend = 'down'
+        }
+
+        // デバッグ：大きな金額の月を検出
+        if (Math.abs(monthlyExpense) >= 100000000) {
+          console.log('🔍 月次キャッシュフロー - 大規模支出検出:', {
+            月: format(currentMonth, 'yyyy年M月', { locale: ja }),
+            総支出: monthlyExpense,
+            総収入: monthlyIncome,
+            純損益: monthlyIncome - monthlyExpense,
+            作業種別別内訳: Object.entries(workTypes).map(([type, data]: [string, any]) => ({
+              作業種別: type,
+              収入: data.income,
+              支出: data.expense,
+              純額: data.net
+            }))
+          })
         }
 
         monthlyData.push({
@@ -640,24 +735,48 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
   // チャートデータの準備
   const chartData = useMemo(() => {
     if (!cashflowData || cashflowData.length === 0) return null
-    
+
     const workTypes = Object.keys(WORK_TYPE_COLORS)
-    const datasets = workTypes.map(workType => {
-      // 純損益（収入-支出）を同じ列にプロット
-      const netData = cashflowData.map(d => {
+    const datasets: any[] = []
+
+    // 収入と支出を別々に表示（収支構造分析と同じ方式）
+    workTypes.forEach(workType => {
+      // 収入データ
+      const incomeData = cashflowData.map(d => {
         const income = d.work_types[workType]?.income || 0
-        const expense = d.work_types[workType]?.expense || 0
-        return income + expense // expenseは既にマイナス値なのでそのまま加算
+        return income
       })
-      
-      return {
-        label: `${WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS]}`,
-        data: netData,
-        backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderWidth: 1,
-        stack: 'main', // 全て同じスタックに配置
-        order: 1 // 線グラフより後ろに表示
+
+      // 支出データ（マイナス表示）
+      const expenseData = cashflowData.map(d => {
+        const expense = d.work_types[workType]?.expense || 0
+        return expense // 既にマイナス値
+      })
+
+      // 収入がある場合のみ収入棒グラフを追加
+      if (incomeData.some(v => v > 0)) {
+        datasets.push({
+          label: `${WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS]} (収入)`,
+          data: incomeData,
+          backgroundColor: `${WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS]}CC`,
+          borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
+          borderWidth: 1,
+          stack: 'income', // 収入用スタック
+          order: 2
+        })
+      }
+
+      // 支出がある場合のみ支出棒グラフを追加
+      if (expenseData.some(v => v < 0)) {
+        datasets.push({
+          label: `${WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS]} (支出)`,
+          data: expenseData,
+          backgroundColor: `${WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS]}99`,
+          borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
+          borderWidth: 1,
+          stack: 'expense', // 支出用スタック
+          order: 3
+        })
       }
     })
     
@@ -758,8 +877,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       return yAxisRange
     }
     
-    // 累積線のデータを取得
-    const cumulativeDataset = chartData.datasets.find(d => d.type === 'line')
+    // 累積線のデータを取得（右Y軸を使用しているlineデータセットを探す）
+    const cumulativeDataset = chartData.datasets.find(d =>
+      d.type === 'line' && (d as any).yAxisID === 'y1'
+    )
     if (!cumulativeDataset || !cumulativeDataset.data) {
       return yAxisRange
     }
@@ -899,14 +1020,32 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       stepSize = Math.ceil(rawStep / 1000000) * 1000000
     } else if (rawStep < 10000000) {
       stepSize = Math.ceil(rawStep / 2000000) * 2000000
-    } else {
+    } else if (rawStep < 100000000) {
       stepSize = Math.ceil(rawStep / 10000000) * 10000000
+    } else if (rawStep < 1000000000) {
+      stepSize = Math.ceil(rawStep / 100000000) * 100000000  // 1億円単位
+    } else if (rawStep < 10000000000) {
+      stepSize = Math.ceil(rawStep / 1000000000) * 1000000000  // 10億円単位
+    } else if (rawStep < 100000000000) {
+      stepSize = Math.ceil(rawStep / 10000000000) * 10000000000  // 100億円単位
+    } else {
+      // 1000億円以上は1000億円単位
+      stepSize = Math.ceil(rawStep / 100000000000) * 100000000000
     }
     
     // 11個の目盛りに合わせて範囲を設定（ゼロ中心、上下対称）
     const symmetricMax = stepSize * 5
     const symmetricMin = -stepSize * 5
-    
+
+    // デバッグ: Y軸範囲の最終値
+    if (Math.abs(symmetricMin) >= 100000000) {
+      console.log('📐 Y軸範囲計算結果:', {
+        計算されたステップ: stepSize,
+        Y軸最小値: symmetricMin,
+        Y軸最大値: symmetricMax
+      })
+    }
+
     return {
       min: symmetricMin,
       max: symmetricMax,
@@ -1148,12 +1287,14 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
             const value = context.raw as number
             const datasetType = context.dataset.type || 'bar'
             
-            // 値のフォーマット
+            // 値のフォーマット（マイナス符号を保持）
+            const absValue = Math.abs(value)
             const formattedValue = new Intl.NumberFormat('ja-JP', {
               style: 'currency',
               currency: 'JPY',
               minimumFractionDigits: 0
-            }).format(value < 0 ? Math.abs(value) : value)
+            }).format(absValue)
+            const displayValue = value < 0 ? `-${formattedValue}` : formattedValue
             
             // ラベルの作成
             let label = context.dataset.label || ''
@@ -1161,20 +1302,20 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
             // 棒グラフの場合（作業種別）
             if (datasetType === 'bar') {
               if (value > 0) {
-                return `${label} (収入): +${formattedValue}`
+                return `${label}: +${formattedValue}`
               } else if (value < 0) {
-                return `${label} (支出): -${formattedValue}`
+                return `${label}: ${displayValue}`
               } else {
                 return `${label}: ${formattedValue}`
               }
             }
-            
+
             // 線グラフの場合（累積値）
             if (datasetType === 'line') {
-              return `${label}: ${formattedValue}`
+              return `${label}: ${displayValue}`
             }
-            
-            return `${label}: ${formattedValue}`
+
+            return `${label}: ${displayValue}`
           },
           afterBody: (context) => {
             const dataIndex = context[0].dataIndex
@@ -1333,7 +1474,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
                   variant={showCumulativeLine ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setShowCumulativeLine(!showCumulativeLine)}
-                  className={showCumulativeLine ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                  className={showCumulativeLine ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-white'}
                 >
                   📊 累積線
                 </Button>
@@ -1352,9 +1493,9 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
                         size="sm"
                         onClick={() => setCumulativeType(type.value as 'profit' | 'income' | 'expense')}
                         className={`px-2 h-6 text-xs ${
-                          cumulativeType === type.value 
-                            ? `bg-${type.color}-600 text-white shadow-sm hover:bg-${type.color}-700` 
-                            : `text-gray-600 hover:bg-${type.color}-50 hover:text-${type.color}-800`
+                          cumulativeType === type.value
+                            ? `bg-${type.color}-600 text-white shadow-sm hover:bg-${type.color}-700`
+                            : `text-white bg-gray-600 hover:bg-${type.color}-600 hover:text-white`
                         }`}
                       >
                         {type.label}

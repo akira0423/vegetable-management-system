@@ -46,6 +46,7 @@ interface GroupedVegetableData {
   works: WorkAnalysisData[]
   totalHarvestAmount: number
   unitCostPerVegetable: number
+  actualReportCount?: number // 実際のレポート件数
 }
 
 
@@ -110,7 +111,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
 
       // 作業レポート、野菜データ、会計データを取得
       const [reportsResponse, vegetablesResponse] = await Promise.all([
-        fetch(`/api/reports?company_id=${companyId}&start_date=${startDateToUse}&end_date=${endDateToUse}&limit=1000`),
+        fetch(`/api/reports?company_id=${companyId}&start_date=${startDateToUse}&end_date=${endDateToUse}&active_only=true&limit=999999`),  // active_onlyを追加して統一
         fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
       ])
 
@@ -171,7 +172,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
 
   const generateGroupedWorkAnalysisData = (reports: any[], vegetables: any[]): GroupedVegetableData[] => {
     const vegetableMap = new Map<string, GroupedVegetableData>()
-    
+
     // 各野菜の初期化
     vegetables.forEach(vegetable => {
       vegetableMap.set(vegetable.id, {
@@ -182,12 +183,21 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
         harvestUnit: vegetable.harvest_unit || '個', // 収穫単位、デフォルトは「個」
         works: [],
         totalHarvestAmount: 0,
-        unitCostPerVegetable: 0
+        unitCostPerVegetable: 0,
+        actualReportCount: 0  // 実際のレポート件数を追加
       })
     })
 
     // 作業データの集計
     const workAnalysisMap = new Map<string, any>()
+
+    // 各野菜の実際のレポート件数をカウント
+    reports.forEach(report => {
+      const vegetableData = vegetableMap.get(report.vegetable_id)
+      if (vegetableData) {
+        vegetableData.actualReportCount++
+      }
+    })
 
     reports.forEach(report => {
       const vegetable = vegetables.find(v => v.id === report.vegetable_id)
@@ -210,7 +220,9 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
       }
 
       existing.count += 1
-      existing.totalHours += (report.duration_hours || 0) * (report.worker_count || 1)
+      // work_durationを優先、なければduration_hoursを使用（データ分析ページと同じロジック）
+      const minutes = report.work_duration || (report.duration_hours ? report.duration_hours * 60 : 0)
+      existing.totalHours += (minutes / 60) * (report.worker_count || 1)
       
       // 収穫量の集計（収穫作業の場合）
       if (report.work_type === 'harvesting' && report.harvest_amount) {
@@ -220,51 +232,26 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
       // 会計データから実際のコストと収入を計算
       if (report.work_report_accounting && report.work_report_accounting.length > 0) {
         report.work_report_accounting.forEach((accounting: any) => {
-          const accountingType = accounting.accounting_items?.type
+          // cost_typeフィールドを使用（APIが返す正しいフィールド）
+          const costType = accounting.accounting_items?.cost_type
           const amount = accounting.amount || 0
-          
+
           console.log('📊 会計データ:', {
             work_type: report.work_type,
             vegetable: existing.vegetableName,
-            accounting_type: accountingType,
+            cost_type: costType,
             amount: amount
           })
-          
-          if (accountingType === 'expense') {
+
+          // cost_typeに基づいて収入・支出を判定
+          if (costType === 'variable_cost' || costType === 'fixed_cost') {
             existing.totalCost += amount
-          } else if (accountingType === 'income' || accountingType === 'revenue') {
+          } else if (costType === 'income') {
             existing.totalRevenue += amount
           }
         })
-      } else {
-        // フォールバック: 収穫作業の場合は特別計算（月次キャッシュフローと同じロジック）
-        if (report.work_type === 'harvesting') {
-          const harvestRevenue = (report.harvest_amount || 0) * (report.expected_price || 0)
-          const expectedRevenue = report.expected_revenue || 0
-          const calculatedRevenue = Math.max(harvestRevenue, expectedRevenue)
-          existing.totalRevenue += calculatedRevenue
-          console.log('🌾 収穫作業フォールバック:', {
-            vegetable: existing.vegetableName,
-            harvest_amount: report.harvest_amount,
-            expected_price: report.expected_price,
-            harvest_revenue: harvestRevenue,
-            expected_revenue: expectedRevenue,
-            calculated_revenue: calculatedRevenue
-          })
-        } else {
-          // 収穫以外の作業はexpected_revenueを使用
-          const expectedRevenue = report.expected_revenue || 0
-          existing.totalRevenue += expectedRevenue
-          console.log('🔧 その他作業フォールバック:', {
-            vegetable: existing.vegetableName,
-            work_type: report.work_type,
-            expected_revenue: expectedRevenue
-          })
-        }
-        // コストは作業時間ベースで推定
-        const estimatedCost = existing.totalHours * 1000 // 時給1000円と仮定
-        existing.totalCost += estimatedCost
       }
+      // 会計データがない場合は何も追加しない（推定計算は行わない）
 
       workAnalysisMap.set(key, existing)
     })
@@ -520,8 +507,8 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                       <div className="text-right">
                         <div className="flex gap-4 text-sm">
                           <div>
-                            <span className="text-gray-500">総作業:</span>
-                            <span className="font-semibold ml-1">{vegetableTotalCount}回</span>
+                            <span className="text-gray-500">登録件数:</span>
+                            <span className="font-semibold ml-1" title="この野菜の全作業記録数">{vegetableData.actualReportCount || 0}件</span>
                           </div>
                           <div>
                             <span className="text-gray-500">総時間:</span>

@@ -242,6 +242,8 @@ export default function WorkReportEditModalFull({
         temperature: editData.temperature,
         humidity: editData.humidity,
         work_duration: editData.work_duration,
+        // work_durationからduration_hoursを自動計算
+        duration_hours: editData.work_duration ? (editData.work_duration / 60) : null,
         worker_count: editData.worker_count,
         work_amount: editData.work_amount,
         work_unit: editData.work_unit,
@@ -500,9 +502,19 @@ export default function WorkReportEditModalFull({
                     id="temperature"
                     type="number"
                     value={editData.temperature || ''}
-                    onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value) || undefined)}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value)
+                      // -50.0 ～ 50.0 の範囲に制限（現実的な気温範囲）
+                      if (!isNaN(value) && value >= -50.0 && value <= 50.0) {
+                        handleInputChange('temperature', value)
+                      } else if (e.target.value === '') {
+                        handleInputChange('temperature', undefined)
+                      }
+                    }}
                     placeholder="例: 25.3"
                     step="0.1"
+                    min="-50"
+                    max="50"
                   />
                 </div>
 

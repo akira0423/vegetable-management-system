@@ -898,9 +898,18 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                                 <Input
                                   type="number"
                                   value={currentReport.phosphorus_absorption || ''}
-                                  onChange={(e) => handleInputChange('phosphorus_absorption', parseFloat(e.target.value) || undefined)}
-                                  placeholder="例: 1500"
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value)
+                                    // NUMERIC(4,1)の制限を考慮（最大999）
+                                    if (!isNaN(value) && value <= 999) {
+                                      handleInputChange('phosphorus_absorption', value)
+                                    } else if (e.target.value === '') {
+                                      handleInputChange('phosphorus_absorption', undefined)
+                                    }
+                                  }}
+                                  placeholder="例: 999以下"
                                   step="1"
+                                  max="999"
                                 />
                               </div>
 

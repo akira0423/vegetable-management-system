@@ -427,12 +427,8 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
   const generateAIPredictions = (monthData: any[], workReports: any[]): WorkHoursData['ai_predictions'] => {
     if (workReports.length === 0) return undefined
 
-    // 平均作業時間を計算（work_durationを優先、worker_count考慮）
-    const totalHours = workReports.reduce((sum: number, r: any) => {
-      const minutes = r.work_duration || (r.duration_hours ? r.duration_hours * 60 : 0) || 120 // デフォルト2時間
-      const workers = r.worker_count || 1
-      return sum + (minutes * workers) / 60
-    }, 0)
+    // 平均作業時間を計算
+    const totalHours = workReports.reduce((sum: number, r: any) => sum + (r.duration_hours || 2), 0)
     const avgEfficiency = workReports.reduce((sum: number, r: any) => {
       const revenue = (r.harvest_amount || 0) * (r.expected_price || 0)
       const cost = r.estimated_cost || (r.duration_hours || 2) * 1000 // 時給1000円想定
@@ -489,7 +485,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       const startDate = format(startMonth, 'yyyy-MM-01')
       const endDate = format(endMonth, 'yyyy-MM-dd')
       
-      let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=999999`  // 実質無制限
+      let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
       if (selectedVegetable && selectedVegetable !== 'all') {
         apiUrl += `&vegetable_id=${selectedVegetable}`
       }
@@ -497,7 +493,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       // 前年同期のデータも取得
       const previousYearStart = format(subMonths(startMonth, 12), 'yyyy-MM-01')
       const previousYearEnd = format(subMonths(endMonth, 12), 'yyyy-MM-dd')
-      let previousYearApiUrl = `/api/reports?company_id=${companyId}&start_date=${previousYearStart}&end_date=${previousYearEnd}&limit=999999`  // 実質無制限
+      let previousYearApiUrl = `/api/reports?company_id=${companyId}&start_date=${previousYearStart}&end_date=${previousYearEnd}&limit=1000`
       if (selectedVegetable && selectedVegetable !== 'all') {
         previousYearApiUrl += `&vegetable_id=${selectedVegetable}`
       }
@@ -701,6 +697,120 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     }
   }, [fetchWorkHoursData, companyId])
 
+  // チャートデータの準備
+  const chartData = useMemo(() => {
+    if (!workHoursData || workHoursData.length === 0) return null
+
+    const workTypes = Object.keys(WORK_TYPE_COLORS)
+    const datasets = workTypes.map(workType => {
+      // Y軸の単位に応じてデータを変換
+      const hoursData = workHoursData.map(d => {
+        const hours = d.work_types[workType]?.total_hours || 0
+        return hours / yAxisRange.unitDivisor
+      })
+
+      return {
+        label: `${WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS]}`,
+        data: hoursData,
+        backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
+        borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
+        borderWidth: 1,
+        stack: 'hours',
+        type: 'bar' as const,
+        yAxisID: 'y',
+        order: 1
+      }
+    })
+    
+    // 🌡️💧 気象データのライン追加（ユーザー選択に応じて）
+    if (weatherDisplayOptions.showTemperature) {
+      datasets.push({
+        label: '気温 (°C)',
+        data: workHoursData.map(d => {
+          // 有効な気象データがある場合のみプロット
+          return (d.weather_data?.temperature && d.weather_data.temperature > 0) 
+            ? d.weather_data.temperature 
+            : null
+        }),
+        borderColor: '#f97316', // オレンジ色
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: '#f97316',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        type: 'line' as const,
+        yAxisID: 'y2', // 気温用（中間位置）
+        order: 0,
+        spanGaps: false // null値の箇所で線を切る
+      })
+    }
+    
+    if (weatherDisplayOptions.showHumidity) {
+      datasets.push({
+        label: '湿度 (%)',
+        data: workHoursData.map(d => {
+          // 有効な気象データがある場合のみプロット
+          return (d.weather_data?.humidity && d.weather_data.humidity > 0) 
+            ? d.weather_data.humidity 
+            : null
+        }),
+        borderColor: '#3b82f6', // 青色
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        type: 'line' as const,
+        yAxisID: 'y3', // 湿度用（最も右側）
+        order: 0,
+        spanGaps: false // null値の箇所で線を切る
+      })
+    }
+    
+    // 累積作業時間線（右Y軸用）
+    if (showCumulativeWorkTime) {
+      let cumulativeHours = 0
+      const cumulativeData = workHoursData.map(d => {
+        const monthlyTotal = Object.values(d.work_types).reduce((sum, workType) => sum + (workType.total_hours || 0), 0)
+        cumulativeHours += monthlyTotal
+        // 累積データも単位変換を適用
+        return cumulativeHours / cumulativeYAxisRange.unitDivisor
+      })
+
+      datasets.push({
+        label: '📊 累積作業時間',
+        data: cumulativeData,
+        borderColor: '#059669', // エメラルド色
+        backgroundColor: 'rgba(5, 150, 105, 0.1)',
+        borderWidth: 3,
+        pointRadius: 5,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: '#059669',
+        pointBorderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        type: 'line' as const,
+        yAxisID: 'y1', // 累積作業時間用（最も左側）
+        order: -1, // 最前面に表示
+        pointHoverRadius: 7,
+        pointHoverBorderWidth: 3,
+      })
+    }
+    
+    const monthLabels = workHoursData.map(d => d.month)
+    
+    return {
+      labels: monthLabels,
+      datasets: [...datasets]
+    }
+  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange])
+
   // 作業時間割合の計算
   const workTimePercentages = useMemo(() => {
     if (!workHoursData || workHoursData.length === 0) return {}
@@ -816,120 +926,6 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       unitLabel
     }
   }, [workHoursData, yAxisRange, showCumulativeWorkTime])
-
-  // チャートデータの準備
-  const chartData = useMemo(() => {
-    if (!workHoursData || workHoursData.length === 0) return null
-
-    const workTypes = Object.keys(WORK_TYPE_COLORS)
-    const datasets = workTypes.map(workType => {
-      // Y軸の単位に応じてデータを変換
-      const hoursData = workHoursData.map(d => {
-        const hours = d.work_types[workType]?.total_hours || 0
-        return hours / yAxisRange.unitDivisor
-      })
-
-      return {
-        label: `${WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS]}`,
-        data: hoursData,
-        backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderWidth: 1,
-        stack: 'hours',
-        type: 'bar' as const,
-        yAxisID: 'y',
-        order: 1
-      }
-    })
-
-    // 🌡️💧 気象データのライン追加（ユーザー選択に応じて）
-    if (weatherDisplayOptions.showTemperature) {
-      datasets.push({
-        label: '気温 (°C)',
-        data: workHoursData.map(d => {
-          // 有効な気象データがある場合のみプロット
-          return (d.weather_data?.temperature && d.weather_data.temperature > 0)
-            ? d.weather_data.temperature
-            : null
-        }),
-        borderColor: '#f97316', // オレンジ色
-        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-        fill: false,
-        tension: 0.4,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointBackgroundColor: '#f97316',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        type: 'line' as const,
-        yAxisID: 'y2', // 気温用（中間位置）
-        order: 0,
-        spanGaps: false // null値の箇所で線を切る
-      })
-    }
-
-    if (weatherDisplayOptions.showHumidity) {
-      datasets.push({
-        label: '湿度 (%)',
-        data: workHoursData.map(d => {
-          // 有効な気象データがある場合のみプロット
-          return (d.weather_data?.humidity && d.weather_data.humidity > 0)
-            ? d.weather_data.humidity
-            : null
-        }),
-        borderColor: '#3b82f6', // 青色
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        fill: false,
-        tension: 0.4,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointBackgroundColor: '#3b82f6',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        type: 'line' as const,
-        yAxisID: 'y3', // 湿度用（最も右側）
-        order: 0,
-        spanGaps: false // null値の箇所で線を切る
-      })
-    }
-
-    // 累積作業時間線（右Y軸用）
-    if (showCumulativeWorkTime) {
-      let cumulativeHours = 0
-      const cumulativeData = workHoursData.map(d => {
-        const monthlyTotal = Object.values(d.work_types).reduce((sum, workType) => sum + (workType.total_hours || 0), 0)
-        cumulativeHours += monthlyTotal
-        // 累積データも単位変換を適用
-        return cumulativeHours / cumulativeYAxisRange.unitDivisor
-      })
-
-      datasets.push({
-        label: '📊 累積作業時間',
-        data: cumulativeData,
-        borderColor: '#059669', // エメラルド色
-        backgroundColor: 'rgba(5, 150, 105, 0.1)',
-        borderWidth: 3,
-        pointRadius: 5,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#059669',
-        pointBorderWidth: 2,
-        fill: false,
-        tension: 0.4,
-        type: 'line' as const,
-        yAxisID: 'y1', // 累積作業時間用（最も左側）
-        order: -1, // 最前面に表示
-        pointHoverRadius: 7,
-        pointHoverBorderWidth: 3,
-      })
-    }
-
-    const monthLabels = workHoursData.map(d => d.month)
-
-    return {
-      labels: monthLabels,
-      datasets: [...datasets]
-    }
-  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange])
 
   // チャートエリア寸法の更新
   const updateChartDimensions = useCallback(() => {
@@ -1071,15 +1067,11 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
           padding: 8, // 固定パディング
           callback: function(value) {
             const numValue = value as number
-            // 単位に応じた表示フォーマット（常に小数点第1位まで表示）
-            if (yAxisRange.unit === 'man') {
-              return `${numValue.toFixed(1)}万h`
-            } else if (yAxisRange.unit === 'sen') {
-              return `${numValue.toFixed(1)}千h`
-            } else {
-              // 通常の時間表示も小数点第1位まで
-              return `${numValue.toFixed(1)}h`
+            // 1000以上は千h表記、未満は通常表記
+            if (numValue >= 1000) {
+              return `${(numValue / 1000).toFixed(1)}千h`
             }
+            return `${numValue.toFixed(1)}h`
           }
         },
         // 左側Y軸は常に固定位置
@@ -1112,15 +1104,11 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
             padding: 1,
             callback: function(value: any) {
               const numValue = value as number
-              // 単位に応じた表示フォーマット（常に小数点第1位まで表示）
-              if (cumulativeYAxisRange.unit === 'man') {
-                return `${numValue.toFixed(1)}万h`
-              } else if (cumulativeYAxisRange.unit === 'sen') {
-                return `${numValue.toFixed(1)}千h`
-              } else {
-                // 通常の時間表示も小数点第1位まで
-                return `${numValue.toFixed(1)}h`
+              // 1000以上は千h表記、未満は通常表記
+              if (numValue >= 1000) {
+                return `${(numValue / 1000).toFixed(1)}千h`
               }
+              return `${numValue}h`
             }
           },
           title: {
