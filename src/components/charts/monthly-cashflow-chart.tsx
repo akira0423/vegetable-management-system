@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogO
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils/index'
-import { CalendarIcon, TrendingUp, TrendingDown, Eye, X, ChevronRight } from 'lucide-react'
+import { CalendarIcon, TrendingUp, TrendingDown, Eye, X, ChevronRight, Download } from 'lucide-react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
@@ -1389,15 +1389,141 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
   // 合計値の計算
   const periodTotals = useMemo(() => {
     if (!cashflowData || cashflowData.length === 0) return {}
-    
+
     const totals: { [workType: string]: number } = {}
     Object.keys(WORK_TYPE_COLORS).forEach(workType => {
-      totals[workType] = cashflowData.reduce((sum, d) => 
+      totals[workType] = cashflowData.reduce((sum, d) =>
         sum + (d.work_types[workType]?.net || 0), 0
       )
     })
     return totals
   }, [cashflowData])
+
+  // CSV エクスポート機能（詳細データ取得版）
+  const handleExportCSV = async () => {
+    if (!cashflowData || cashflowData.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    try {
+      // 詳細な作業レポートデータを再取得
+      const endMonth = addMonths(startMonth, responsiveDimensions.monthCount - 1)
+      const startDate = format(startMonth, 'yyyy-MM-01')
+      const lastDayOfEndMonth = new Date(endMonth.getFullYear(), endMonth.getMonth() + 1, 0)
+      const endDate = format(lastDayOfEndMonth, 'yyyy-MM-dd')
+
+      let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
+      if (selectedVegetable && selectedVegetable !== 'all') {
+        apiUrl += `&vegetable_id=${selectedVegetable}`
+      }
+
+      const response = await fetch(apiUrl)
+      if (!response.ok) {
+        throw new Error('データの取得に失敗しました')
+      }
+
+      const result = await response.json()
+      const reports = result.success ? result.data : []
+
+      // BOMを追加してExcelでの文字化けを防ぐ
+      const BOM = '\uFEFF'
+
+      // CSVヘッダー
+      const headers = [
+        '年月',
+        '作業日',
+        '野菜名',
+        '作業種類',
+        '勘定科目コード',
+        '勘定科目名',
+        '金額',
+        '作業時間(分)',
+        '作業人数',
+        '収穫量',
+        '収穫単位',
+        '備考'
+      ]
+
+      // データを行に変換
+      const rows: string[][] = []
+
+      // レポートデータを処理
+      reports.forEach((report: any) => {
+        const workDate = new Date(report.work_date)
+        const yearMonth = `${workDate.getFullYear()}年${workDate.getMonth() + 1}月`
+        const vegetableName = report.vegetables?.name || ''  // vegetables に修正
+        const workTypeName = WORK_TYPE_LABELS[report.work_type as keyof typeof WORK_TYPE_LABELS] || report.work_type
+        const workDuration = report.work_duration || report.duration_hours ? (report.work_duration || (report.duration_hours * 60)) : 0
+        const workerCount = report.worker_count || 1
+
+        // 会計データがある場合
+        if (report.work_report_accounting && Array.isArray(report.work_report_accounting)) {
+          report.work_report_accounting.forEach((acc: any) => {
+            const accountingItem = acc.accounting_items
+            const code = accountingItem?.code || ''
+            const itemName = accountingItem?.name || acc.custom_item_name || ''
+            const amount = acc.amount || 0
+
+            rows.push([
+              yearMonth,
+              report.work_date,
+              vegetableName,
+              workTypeName,
+              code,
+              itemName,
+              amount.toString(),
+              workDuration.toString(),
+              workerCount.toString(),
+              report.harvest_amount ? report.harvest_amount.toString() : '',
+              report.harvest_unit || '',
+              report.work_notes || ''
+            ])
+          })
+        } else {
+          // 会計データがない場合でも作業記録として出力
+          rows.push([
+            yearMonth,
+            report.work_date,
+            vegetableName,
+            workTypeName,
+            '',
+            '',
+            '0',
+            workDuration.toString(),
+            workerCount.toString(),
+            report.harvest_amount ? report.harvest_amount.toString() : '',
+            report.harvest_unit || '',
+            report.work_notes || ''
+          ])
+        }
+      })
+
+      // CSV文字列を作成
+      const csvContent = BOM + [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => {
+          // セル内の値にダブルクォートが含まれる場合はエスケープ
+          const escapedCell = String(cell).replace(/"/g, '""')
+          return `"${escapedCell}"`
+        }).join(','))
+      ].join('\n')
+
+      // ダウンロード処理
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `月次キャッシュフロー詳細_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('CSVエクスポートエラー:', error)
+      alert('CSVエクスポートに失敗しました')
+    }
+  }
 
   if (loading) {
     return (
@@ -1957,6 +2083,19 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
           <div className="mt-4 text-xs text-gray-500 text-center">
             💡 各月の棒グラフをクリックすると詳細データを表示できます
             {showComparison && previousYearData.length > 0 && <span className="ml-2">｜📈 前年比較モード有効</span>}
+          </div>
+
+          {/* CSVエクスポートボタン */}
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={handleExportCSV}
+            >
+              <Download className="w-4 h-4" />
+              CSVエクスポート
+            </Button>
           </div>
         </CardContent>
       </Card>

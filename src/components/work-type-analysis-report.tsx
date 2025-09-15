@@ -92,6 +92,68 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [expandedVegetables, setExpandedVegetables] = useState<Set<string>>(new Set())
 
+  // CSV エクスポート機能
+  const handleExportCSV = () => {
+    if (!data || data.length === 0) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+
+    // BOMを追加してExcelでの文字化けを防ぐ
+    const BOM = '\uFEFF'
+
+    // CSVヘッダー
+    const headers = [
+      '野菜名',
+      '品種',
+      '作業種別',
+      '作業回数',
+      '総作業時間(h)',
+      '総コスト(円)',
+      'コスト/㎡',
+      '総収益(円)',
+      '収益/㎡',
+      '収穫量',
+      '単位原価'
+    ]
+
+    // データを行に変換
+    const rows: string[][] = []
+    data.forEach(vegData => {
+      vegData.works.forEach(work => {
+        rows.push([
+          vegData.vegetableName,
+          vegData.varietyName || '',
+          work.workTypeName,
+          work.count.toString(),
+          work.totalHours.toFixed(1),
+          Math.round(work.totalCost).toString(),
+          Math.round(work.costPerSqm).toString(),
+          Math.round(work.totalRevenue).toString(),
+          Math.round(work.revenuePerSqm).toString(),
+          work.harvestAmount ? work.harvestAmount.toFixed(1) : '0',
+          work.costPerUnit ? Math.round(work.costPerUnit).toString() : '0'
+        ])
+      })
+    })
+
+    // CSV文字列を作成
+    const csvContent = BOM + [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    // ダウンロード処理
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `作業別収支分析_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   // データ集計の実行（startDate, endDateを除外）
   useEffect(() => {
@@ -635,7 +697,11 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
               <Eye className="w-4 h-4" />
               印刷プレビュー
             </Button>
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={handleExportCSV}
+            >
               <Download className="w-4 h-4" />
               CSVエクスポート
             </Button>

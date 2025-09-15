@@ -1,9 +1,14 @@
+'use client'
+
+import { useState } from 'react'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sprout, Users, BarChart3, Shield, Calendar, Camera } from "lucide-react"
+import { Sprout, Users, BarChart3, Shield, Calendar, Camera, Map } from "lucide-react"
+import DemoFarmMapView from '@/components/demo/farm-map-view'
 
 export default function Home() {
+  const [showDemoFarmMap, setShowDemoFarmMap] = useState(false)
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
       {/* Header */}
@@ -133,6 +138,29 @@ export default function Home() {
               </CardHeader>
             </Card>
           </div>
+
+          {/* デモ機能ボタン */}
+          <div className="mt-12 text-center">
+            <Card className="max-w-2xl mx-auto border-2 border-green-500 bg-green-50">
+              <CardHeader>
+                <Map className="h-12 w-12 text-green-600 mb-4 mx-auto" />
+                <CardTitle className="text-2xl">栽培野菜・農地ポリゴン管理</CardTitle>
+                <CardDescription className="text-base">
+                  地図上で農地を描画し、野菜の栽培情報を管理できるデモ機能です
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  size="lg"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => setShowDemoFarmMap(true)}
+                >
+                  <Map className="mr-2 h-5 w-5" />
+                  デモ機能を体験する
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
@@ -197,6 +225,13 @@ export default function Home() {
           </p>
         </div>
       </footer>
+
+      {/* デモ版農地管理ビュー */}
+      {showDemoFarmMap && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <DemoFarmMapView onClose={() => setShowDemoFarmMap(false)} />
+        </div>
+      )}
     </div>
   )
 }

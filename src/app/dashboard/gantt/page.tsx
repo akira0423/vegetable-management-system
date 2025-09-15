@@ -20,8 +20,6 @@ import {
 } from '@/components/ui/dialog'
 import { GanttChart } from '@/components/charts/gantt-chart'
 import NewTaskForm from '@/components/forms/NewTaskForm'
-// サンプルデータのインポートを削除
-// import { unifiedTestData } from '@/lib/unified-test-data'
 import WorkReportForm from '@/components/work-report-form'
 import WorkReportViewModal from '@/components/work-report-view-modal'
 import WorkReportEditModalFull from '@/components/work-report-edit-modal-full'
