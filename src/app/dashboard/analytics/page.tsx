@@ -180,6 +180,7 @@ export default function AnalyticsPage() {
   const [selectedVegetable, setSelectedVegetable] = useState('all')
   const [availableVegetables, setAvailableVegetables] = useState<Array<{id: string, name: string}>>([])
   const [vegetableOptions, setVegetableOptions] = useState<Array<{id: string, name: string}>>([{id: 'all', name: 'すべての野菜'}])
+  const [vegetablesData, setVegetablesData] = useState<any[]>([])
   const [selectedPlot, setSelectedPlot] = useState('all')
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -318,7 +319,8 @@ export default function AnalyticsPage() {
         const vegetablesResult = await vegetablesResponse.json()
         if (vegetablesResult.success && vegetablesResult.data.vegetables) {
           vegetables = vegetablesResult.data.vegetables
-          
+          setVegetablesData(vegetables) // 完全な野菜データを保存
+
           // 野菜オプションリストを更新
           const vegOptions = vegetables.map((veg: any) => ({
             id: veg.id,
@@ -340,7 +342,7 @@ export default function AnalyticsPage() {
       // データが取得できない場合は空状態を維持
       console.log('📊 分析データ取得結果:', {
         作業レポート数: workReports.length,
-        野菜データ数: vegetables.length,
+        野菜データ数: vegetables ? vegetables.length : 0,
         タスクデータ数: tasks.length
       })
       
@@ -351,7 +353,7 @@ export default function AnalyticsPage() {
       if (selectedVegetable !== 'all') {
         const selectedVegId = selectedVegetable
         filteredWorkReports = workReports.filter((report: any) => report.vegetable_id === selectedVegId)
-        filteredVegetables = vegetables.filter((veg: any) => veg.id === selectedVegId)
+        filteredVegetables = vegetables && vegetables.length > 0 ? vegetables.filter((veg: any) => veg.id === selectedVegId) : []
       }
       
       console.log('🔍 Analytics: フィルター後のデータ', {
@@ -510,12 +512,12 @@ export default function AnalyticsPage() {
     }, {})
 
     // 野菜別パフォーマンス分析（会計データ統合）
-    const vegetablePerformance = vegetables.map((veg: any) => {
+    const vegetablePerformance = vegetables && vegetables.length > 0 ? vegetables.map((veg: any) => {
       const vegReports = reports.filter(r => r.vegetable_id === veg.id)
-      
+
       let totalRevenue = 0
       let totalCost = 0
-      
+
       vegReports.forEach(report => {
         const incomeData = accountingAnalyticsProcessor.getIncomeDataWithSource(report, false)
         const costData = accountingAnalyticsProcessor.getCostDataWithSource(report, false)
@@ -526,15 +528,15 @@ export default function AnalyticsPage() {
       const totalHarvest = vegReports
         .filter(r => r.harvest_amount)
         .reduce((sum, r) => sum + r.harvest_amount, 0)
-      
+
       const profit = totalRevenue - totalCost
       const roi = totalCost > 0 ? (profit / totalCost) * 100 : 0
-      
+
       let status: 'excellent' | 'good' | 'average' | 'poor' = 'average'
       if (roi > 120) status = 'excellent'
       else if (roi > 80) status = 'good'
       else if (roi < 50) status = 'poor'
-      
+
       return {
         name: veg.name.split('（')[0] || veg.name,
         variety: veg.variety || veg.name.match(/（(.+?)）/)?.[1] || '',
@@ -547,7 +549,7 @@ export default function AnalyticsPage() {
         roi: roi,
         status: status
       }
-    })
+    }) : []
 
     // 総計算（実績データを優先）
     const totalRevenue = totalActualRevenue + totalEstimatedRevenue
@@ -570,7 +572,9 @@ export default function AnalyticsPage() {
     const recentActivities = reports
       .slice(-5)
       .map((report, index) => {
-        const vegetableName = vegetables.find(v => v.id === report.vegetable_id)?.name || '未知の野菜'
+        const vegetableName = vegetables && vegetables.length > 0
+          ? vegetables.find(v => v.id === report.vegetable_id)?.name || '未知の野菜'
+          : '未知の野菜'
         const workTypeNames: any = {
           harvesting: '収穫',
           fertilizing: '施肥',
@@ -640,6 +644,11 @@ export default function AnalyticsPage() {
         }))
       : []
 
+    // 実際の総栽培面積を計算
+    const totalArea = vegetablesData && vegetablesData.length > 0
+      ? vegetablesData.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
+      : 300 // デフォルト値
+
     // サマリー情報（実データのみ）
     const summary = {
       total_revenue: Math.round(reportsData.totalRevenue || 0),
@@ -647,8 +656,8 @@ export default function AnalyticsPage() {
       profit_margin: Math.round((reportsData.profitMargin || 0) * 10) / 10,
       total_harvest: Math.round((reportsData.totalHarvest || 0) * 10) / 10,
       total_work_hours: Math.round((reportsData.totalWorkHours || 0) * 10) / 10,
-      avg_yield_per_sqm: reportsData.totalHarvest && reportsData.totalHarvest > 0
-        ? Math.round((reportsData.totalHarvest / 300) * 10) / 10
+      avg_yield_per_sqm: reportsData.totalHarvest && reportsData.totalHarvest > 0 && totalArea > 0
+        ? Math.round((reportsData.totalHarvest / totalArea) * 10) / 10
         : 0,
       active_plots: reportsData.activePlots || 0,
       completed_harvests: reportsData.completedHarvests || 0,
@@ -705,6 +714,11 @@ export default function AnalyticsPage() {
         }))
       : [] // 空配列を返す
 
+    // 実際の総栽培面積を計算
+    const totalArea = vegetablesData && vegetablesData.length > 0
+      ? vegetablesData.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
+      : 300 // デフォルト値
+
     // サマリー情報の更新（数値の整合性を保証）
     const updatedSummary = {
       ...baseData.summary,
@@ -713,10 +727,10 @@ export default function AnalyticsPage() {
       profit_margin: Math.round((reportsData.profitMargin || baseData.summary.profit_margin) * 10) / 10,
       total_harvest: Math.round((reportsData.totalHarvest || baseData.summary.total_harvest) * 10) / 10,
       total_work_hours: Math.round((reportsData.totalWorkHours || 0) * 10) / 10, // 総作業時間を追加
-      avg_yield_per_sqm: reportsData.totalHarvest 
-        ? Math.round((reportsData.totalHarvest / 300) * 10) / 10 // 300㎡あたりの平均
+      avg_yield_per_sqm: reportsData.totalHarvest && totalArea > 0
+        ? Math.round((reportsData.totalHarvest / totalArea) * 10) / 10 // 実際の面積で計算
         : baseData.summary.avg_yield_per_sqm,
-      efficiency_score: Math.min(100, Math.max(60, 
+      efficiency_score: Math.min(100, Math.max(60,
         Math.round(75 + (reportsData.profitMargin || 0) / 5)
       )) // 利益率ベースの動的スコア
     }
@@ -869,6 +883,147 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* 野菜登録情報サマリーカード - 4列レイアウトに統一 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <p className="text-sm text-green-700 font-medium mb-2">登録野菜数</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {availableVegetables.length}
+                  <span className="text-base ml-2">品種</span>
+                </p>
+                <p className="text-xs text-green-600 flex items-center mt-2">
+                  <Sprout className="w-3 h-3 mr-1" />
+                  {selectedVegetable === 'all' ? '全野菜' : '選択中'}
+                </p>
+              </div>
+              <div className="relative">
+                <Sprout className="w-10 h-10 text-green-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">{availableVegetables.length}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-sky-100 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <p className="text-sm text-blue-700 font-medium mb-2">総栽培面積</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {formatNumber(
+                    vegetablesData && vegetablesData.length > 0
+                      ? vegetablesData.reduce((sum: number, veg: any) => {
+                          return sum + (veg.area_size || 0)
+                        }, 0)
+                      : 0,
+                    0
+                  )}
+                  <span className="text-base ml-2">㎡</span>
+                </p>
+                <p className="text-xs text-blue-600 flex items-center mt-2">
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {vegetablesData && vegetablesData.length > 0
+                    ? vegetablesData.filter((veg: any) => veg.area_size > 0).length
+                    : 0} 野菜
+                </p>
+              </div>
+              <div className="relative">
+                <MapPin className="w-10 h-10 text-blue-600 opacity-90" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">㎡</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 純利益カード（2段目から1段目に移動） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-green-700 font-medium">純利益</p>
+                  {data?.dataQuality && (
+                    <Badge className="text-xs bg-green-500 text-white px-1 py-0">
+                      {data.dataQuality.reliability === 'high' ? '実' :
+                       data.dataQuality.reliability === 'medium' ? '混' : '推'}
+                    </Badge>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-green-900">
+                      ¥{data ? formatNumber((data.summary.total_revenue || 0) - (data.summary.total_cost || 0)) : '0'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-green-600 flex items-center">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    利益率: {data ? formatNumber(data.summary.profit_margin || 0, 1) : '0'}%
+                  </p>
+                </div>
+              </div>
+              <div className="relative">
+                {data && ((data.summary.total_revenue || 0) - (data.summary.total_cost || 0)) >= 0 ? (
+                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90" />
+                ) : (
+                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90" />
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ROIカード（2段目から1段目に移動） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-100 border-purple-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-purple-700 font-medium">投資収益率</p>
+                  <Badge className="text-xs bg-purple-500 text-white px-1 py-0">ROI</Badge>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-purple-900">
+                      {data && data.summary.total_cost > 0
+                        ? `${(((data.summary.total_revenue - data.summary.total_cost) / data.summary.total_cost) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    <div className="flex justify-between">
+                      <span>収益</span>
+                      <span className="font-medium">
+                        {data ? `${(data.summary.total_revenue / 10000).toFixed(0)}万円` : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>コスト</span>
+                      <span className="font-medium">
+                        {data ? `${(data.summary.total_cost / 10000).toFixed(0)}万円` : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="relative">
+                {data && data.summary.total_revenue > data.summary.total_cost ? (
+                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90" />
+                ) : (
+                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90" />
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* 金融×農業デザインのKPIカード（直近12カ月）with データ品質インジケーター */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
@@ -984,119 +1139,9 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* 🌱 土壌健康度・ROIサマリーカード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* 純利益サマリー */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-green-700 font-medium">💰 純利益（直近12カ月）</p>
-                  {data.dataQuality && (
-                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">
-                      {data.dataQuality.reliability === 'high' ? '実績' : 
-                       data.dataQuality.reliability === 'medium' ? '混合' : '推定'}
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-green-900">
-                      ¥{formatNumber((data.summary.total_revenue || 0) - (data.summary.total_cost || 0))}
-                    </span>
-                    {((data.summary.total_revenue || 0) - (data.summary.total_cost || 0)) >= 0 ? (
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                    )}
-                  </div>
-                  <p className="text-xs text-green-600 flex items-center mt-2">
-                    <DollarSign className="w-3 h-3 mr-1" />
-                    利益率: {formatNumber(data.summary.profit_margin || 0, 1)}%
-                  </p>
-                </div>
-              </div>
-              <div className="relative">
-                <DollarSign className="w-10 h-10 text-green-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">¥</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              <TrendingUp className="w-20 h-20 text-green-800" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ROIサマリー */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-100 border-purple-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-purple-700 font-medium">💰 投資収益率(ROI)サマリー</p>
-                  <Badge className="text-xs bg-purple-500 text-white px-2 py-0.5">直近12ヶ月</Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-purple-900">
-                      ROI: {data.summary.total_cost > 0 
-                        ? `${(((data.summary.total_revenue - data.summary.total_cost) / data.summary.total_cost) * 100).toFixed(1)}%`
-                        : 'N/A'}
-                    </span>
-                    {data.summary.total_revenue > data.summary.total_cost ? (
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                    )}
-                  </div>
-                  <div className="text-xs text-purple-600 space-y-1">
-                    <div className="flex justify-between">
-                      <span>総収益:</span>
-                      <span className="font-medium">
-                        {new Intl.NumberFormat('ja-JP', { 
-                          style: 'currency', 
-                          currency: 'JPY',
-                          minimumFractionDigits: 0
-                        }).format(data.summary.total_revenue)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>総コスト:</span>
-                      <span className="font-medium">
-                        {new Intl.NumberFormat('ja-JP', { 
-                          style: 'currency', 
-                          currency: 'JPY',
-                          minimumFractionDigits: 0
-                        }).format(data.summary.total_cost)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="relative">
-                <DollarSign className="w-10 h-10 text-purple-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">%</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              {data.summary.total_revenue > data.summary.total_cost ? (
-                <TrendingUp className="w-20 h-20 text-purple-800" />
-              ) : (
-                <TrendingDown className="w-20 h-20 text-purple-800" />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* メインコンテンツタブ - 金融系プロフェッショナルデザイン */}
       <Tabs defaultValue="performance" className="space-y-6">
-        <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-2 rounded-xl border border-gray-200 shadow-sm">
           <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-1">
             <TabsTrigger
               value="performance"
@@ -1158,7 +1203,6 @@ export default function AnalyticsPage() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 scale-x-0 group-data-[state=active]:scale-x-100 transition-transform duration-200" />
             </TabsTrigger>
           </TabsList>
-        </div>
 
         {/* パフォーマンスタブ */}
         <TabsContent value="performance" className="space-y-6">

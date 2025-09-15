@@ -28,12 +28,12 @@ import WorkReportEditModalFull from '@/components/work-report-edit-modal-full'
 import { WorkReportCard } from '@/components/work-report-card'
 import { CollapsibleSearchFilter } from '@/components/collapsible-search-filter'
 import FarmMapView from '@/components/farm-map-view'
-import { 
-  Calendar, 
-  Filter, 
-  Download, 
-  Plus, 
-  RefreshCw, 
+import {
+  Calendar,
+  Filter,
+  Download,
+  Plus,
+  RefreshCw,
   Settings,
   ChevronDown,
   ChevronUp,
@@ -48,6 +48,7 @@ import {
   Map,
   FileText,
   Trash2,
+  Info,
   AlertTriangle,
   MoreHorizontal,
   Edit,
@@ -1372,10 +1373,16 @@ export default function GanttPage() {
       const requestBody: any = { id: taskId }
 
       // 変更されたフィールドのみを含める
+      console.log('🔍 updates オブジェクト:', updates)
+      console.log('🔍 updates.progress:', updates.progress, 'type:', typeof updates.progress)
+
       if (updates.name !== undefined) requestBody.name = updates.name
       if (updates.start !== undefined) requestBody.start_date = updates.start
       if (updates.end !== undefined) requestBody.end_date = updates.end
-      if (updates.progress !== undefined) requestBody.progress = updates.progress
+      if (updates.progress !== undefined) {
+        requestBody.progress = updates.progress
+        console.log('✅ progress を requestBody に追加:', updates.progress)
+      }
       if (updates.status !== undefined) requestBody.status = updates.status
       if (updates.priority !== undefined) requestBody.priority = updates.priority
       if (updates.description !== undefined) requestBody.description = updates.description
@@ -1386,6 +1393,8 @@ export default function GanttPage() {
       }
 
       console.log('📤 送信する更新データ:', requestBody)
+      console.log('📤 requestBodyのキー:', Object.keys(requestBody))
+      console.log('📤 id以外のキー:', Object.keys(requestBody).filter(key => key !== 'id'))
 
       const response = await fetch('/api/gantt', {
         method: 'PUT',
@@ -1729,9 +1738,9 @@ export default function GanttPage() {
               className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 shadow-sm transition-all duration-200"
             >
               <Map className="w-4 h-4 mr-1" />
-              <span className="hidden xl:inline">地図上で栽培野菜計画登録</span>
-              <span className="hidden md:inline xl:hidden">地図計画登録</span>
-              <span className="md:hidden">地図</span>
+              <span className="hidden xl:inline">野菜を地図に登録</span>
+              <span className="hidden md:inline xl:hidden">野菜登録</span>
+              <span className="md:hidden">登録</span>
             </Button>
             <Button 
               variant="outline" 
@@ -1740,9 +1749,9 @@ export default function GanttPage() {
               className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300 shadow-sm transition-all duration-200"
             >
               <Plus className="w-4 h-4 mr-1" />
-              <span className="hidden xl:inline">栽培スケジュール・タスク登録</span>
-              <span className="hidden md:inline xl:hidden">タスク登録</span>
-              <span className="md:hidden">新規</span>
+              <span className="hidden xl:inline">タスクを計画</span>
+              <span className="hidden md:inline xl:hidden">タスク計画</span>
+              <span className="md:hidden">計画</span>
             </Button>
             <Button 
               variant="outline" 
@@ -1751,7 +1760,7 @@ export default function GanttPage() {
               className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300 shadow-sm transition-all duration-200"
             >
               <Calendar className="w-4 h-4 mr-1" />
-              <span className="hidden xl:inline">栽培作業記録・報告</span>
+              <span className="hidden xl:inline">作業を記録</span>
               <span className="hidden md:inline xl:hidden">作業記録</span>
               <span className="md:hidden">記録</span>
             </Button>
@@ -1782,6 +1791,48 @@ export default function GanttPage() {
         </div>
       </div>
 
+      {/* 簡易マニュアル */}
+      <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-blue-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Info className="w-5 h-5 text-blue-600" />
+            栽培管理の基本フロー
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">1</div>
+              <div>
+                <p className="font-semibold text-gray-800">野菜を登録</p>
+                <p className="text-sm text-gray-600 mt-1">地図上で栽培する野菜と場所を登録します</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">2</div>
+              <div>
+                <p className="font-semibold text-gray-800">タスクを計画</p>
+                <p className="text-sm text-gray-600 mt-1">野菜ごとの栽培スケジュールを設定します</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">3</div>
+              <div>
+                <p className="font-semibold text-gray-800">作業を記録</p>
+                <p className="text-sm text-gray-600 mt-1">実際の作業内容を日々記録します</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-purple-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">4</div>
+              <div>
+                <p className="font-semibold text-gray-800">データを分析</p>
+                <p className="text-sm text-gray-600 mt-1">データ分析ページで収益や作業効率を確認します</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* エラー表示 */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -1790,9 +1841,9 @@ export default function GanttPage() {
             <h3 className="text-sm font-medium text-red-800">エラーが発生しました</h3>
           </div>
           <p className="text-sm text-red-700 mt-1">{error}</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setError('')}
             className="mt-2 text-red-700 border-red-200 hover:bg-red-100"
           >
@@ -2228,104 +2279,175 @@ export default function GanttPage() {
           }, 100)
         }
       }}>
-        <DialogContent className="max-w-4xl bg-white shadow-xl border-0 rounded-xl">
+        <DialogContent className="min-w-[1000px] max-w-[1400px] w-[95vw] max-h-[85vh] bg-gradient-to-br from-green-50 via-white to-emerald-50 shadow-2xl border-0 rounded-2xl overflow-hidden">
           {selectedTask && (
             <>
-              <DialogHeader>
-                <DialogTitle>{selectedTask.name}</DialogTitle>
-                <DialogDescription>
-                  タスクの詳細情報と進捗を管理します
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">野菜情報</Label>
-                    <p className="text-sm text-gray-600">{selectedTask.vegetable.name}</p>
+              <DialogHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 -m-6 mb-4 rounded-t-2xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <DialogTitle className="text-xl font-bold">
+                        {selectedTask.name}
+                      </DialogTitle>
+                      <DialogDescription className="text-green-100 text-sm">
+                        栽培タスクの詳細情報と進捗管理
+                      </DialogDescription>
+                    </div>
                   </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">担当者</Label>
-                    <Select
-                      value={pendingTaskChanges?.assignedUser?.id ?? selectedTask.assignedUser?.id ?? 'unassigned'}
-                      onValueChange={(value) => {
-                        const newAssignee = value === 'unassigned' ? null : users.find(u => u.id === value)
-                        setPendingTaskChanges(prev => ({
-                          ...(prev || {}),
-                          assignedUser: newAssignee,
-                          assigned_user_id: newAssignee?.id || null
-                        }))
-                        setHasUnsavedChanges(true)
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="担当者を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">未割当</SelectItem>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">期間</Label>
-                    <p className="text-sm text-gray-600">
-                      {safeFormatDate(selectedTask.start, 'yyyy年MM月dd日')} 〜{' '}
-                      {safeFormatDate(selectedTask.end, 'yyyy年MM月dd日')}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">ステータス</Label>
-                    <Badge 
+                  <div className="bg-white/20 px-4 py-2 rounded-lg">
+                    <Badge
                       variant="secondary"
-                      style={{ backgroundColor: selectedTask.color, color: 'white' }}
-                      className="ml-2"
+                      className="text-white bg-white/30 border-white/40"
                     >
-                      {selectedTask.status === 'pending' && '未開始'}
-                      {selectedTask.status === 'in_progress' && '進行中'}
-                      {selectedTask.status === 'completed' && '完了'}
-                      {selectedTask.status === 'cancelled' && '中止'}
+                      {selectedTask.status === 'pending' && '🌱 未開始'}
+                      {selectedTask.status === 'in_progress' && '🌿 進行中'}
+                      {selectedTask.status === 'completed' && '🌾 完了'}
+                      {selectedTask.status === 'cancelled' && '❌ 中止'}
                     </Badge>
                   </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">優先度</Label>
-                    <Select
-                      value={pendingTaskChanges?.priority ?? selectedTask.priority ?? 'medium'}
-                      onValueChange={(value) => {
-                        setPendingTaskChanges(prev => ({
-                          ...(prev || {}),
-                          priority: value
-                        }))
-                        setHasUnsavedChanges(true)
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="優先度を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="high">高優先度</SelectItem>
-                        <SelectItem value="medium">中優先度</SelectItem>
-                        <SelectItem value="low">低優先度</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">進捗率</Label>
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl font-bold">{pendingTaskChanges?.progress ?? selectedTask.progress}%</span>
-                        <div className="flex items-center gap-2">
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 max-h-[calc(85vh-200px)] overflow-y-auto">
+                {/* 左側：基本情報 */}
+                <div className="lg:col-span-1 space-y-3">
+                  <Card className="border-green-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 py-2 px-4">
+                      <CardTitle className="text-sm font-semibold text-green-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        基本情報
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-3 px-3">
+                      <div className="bg-green-50 p-2 rounded-lg">
+                        <Label className="text-xs font-semibold text-green-700">🥬 野菜</Label>
+                        <p className="text-sm font-medium text-gray-800">{selectedTask.vegetable.name}</p>
+                        <p className="text-xs text-gray-600">{selectedTask.vegetable.variety}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-green-700">👤 担当者</Label>
+                        <Select
+                          value={pendingTaskChanges?.assignedUser?.id ?? selectedTask.assignedUser?.id ?? 'unassigned'}
+                          onValueChange={(value) => {
+                            const newAssignee = value === 'unassigned' ? null : users.find(u => u.id === value)
+                            setPendingTaskChanges(prev => ({
+                              ...(prev || {}),
+                              assignedUser: newAssignee,
+                              assigned_user_id: newAssignee?.id || null
+                            }))
+                            setHasUnsavedChanges(true)
+                          }}
+                        >
+                          <SelectTrigger className="w-full mt-1 h-8 text-sm border-green-200 focus:border-green-400">
+                            <SelectValue placeholder="担当者を選択" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">未割当</SelectItem>
+                            {users.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-green-700">⭐ 優先度</Label>
+                        <Select
+                          value={pendingTaskChanges?.priority ?? selectedTask.priority ?? 'medium'}
+                          onValueChange={(value) => {
+                            setPendingTaskChanges(prev => ({
+                              ...(prev || {}),
+                              priority: value
+                            }))
+                            setHasUnsavedChanges(true)
+                          }}
+                        >
+                          <SelectTrigger className="w-full mt-1 h-8 text-sm border-green-200 focus:border-green-400">
+                            <SelectValue placeholder="優先度を選択" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="high">🔴 高</SelectItem>
+                            <SelectItem value="medium">🟡 中</SelectItem>
+                            <SelectItem value="low">🔵 低</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* 中央：期間情報 */}
+                <div className="lg:col-span-1 space-y-3">
+                  <Card className="border-amber-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 py-2 px-4">
+                      <CardTitle className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        期間情報
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pt-3 px-3">
+                      <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
+                        <span className="text-xs text-amber-700">開始日</span>
+                        <span className="text-xs font-medium">{safeFormatDate(selectedTask.start, 'MM/dd')}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
+                        <span className="text-xs text-amber-700">終了日</span>
+                        <span className="text-xs font-medium">{safeFormatDate(selectedTask.end, 'MM/dd')}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
+                        <span className="text-xs text-orange-700">作業期間</span>
+                        <span className="text-xs font-bold text-orange-800">
+                          {differenceInDays(parseISO(selectedTask.end), parseISO(selectedTask.start)) + 1}日
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-red-50 rounded">
+                        <span className="text-xs text-red-700">残り日数</span>
+                        <span className="text-xs font-bold text-red-800">
+                          {Math.max(0, differenceInDays(parseISO(selectedTask.end), new Date()))}日
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* 右側：進捗管理 */}
+                <div className="lg:col-span-1 space-y-3">
+                  <Card className="border-blue-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 py-2 px-4">
+                      <CardTitle className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        進捗管理
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3 px-3">
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-2xl font-bold text-blue-800">
+                            {pendingTaskChanges?.progress ?? selectedTask.progress}%
+                          </div>
+                          <div className="text-xs text-gray-600 font-semibold">
+                            {(pendingTaskChanges?.progress ?? selectedTask.progress) === 0 && '未着手'}
+                            {(pendingTaskChanges?.progress ?? selectedTask.progress) > 0 && (pendingTaskChanges?.progress ?? selectedTask.progress) < 30 && '開始段階'}
+                            {(pendingTaskChanges?.progress ?? selectedTask.progress) >= 30 && (pendingTaskChanges?.progress ?? selectedTask.progress) < 70 && '作業中'}
+                            {(pendingTaskChanges?.progress ?? selectedTask.progress) >= 70 && (pendingTaskChanges?.progress ?? selectedTask.progress) < 100 && '仕上げ段階'}
+                            {(pendingTaskChanges?.progress ?? selectedTask.progress) === 100 && '完了'}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 justify-center mb-3">
                           <Button
                             size="sm"
                             variant="outline"
@@ -2338,59 +2460,11 @@ export default function GanttPage() {
                               }))
                               setHasUnsavedChanges(true)
                             }}
-                            disabled={selectedTask.progress <= 0}
-                            className="w-10 h-10 p-0"
+                            disabled={(pendingTaskChanges?.progress ?? selectedTask.progress) <= 0}
+                            className="w-9 h-9 p-0 rounded-full bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400"
                           >
-                            -10
+                            <span className="text-sm">－</span>
                           </Button>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            min="0"
-                            max="100"
-                            value={tempProgress[selectedTask.id] !== undefined ? tempProgress[selectedTask.id] : selectedTask.progress}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              // 数字以外を除去
-                              const numericValue = value.replace(/[^0-9]/g, '')
-                              // 空文字の場合は0として扱う
-                              const newProgress = numericValue === '' ? 0 : parseInt(numericValue, 10) || 0
-                              const clampedProgress = Math.min(100, Math.max(0, newProgress))
-                              setTempProgress(prev => ({ ...prev, [selectedTask.id]: clampedProgress }))
-                              handleProgressUpdate(selectedTask.id, clampedProgress, false)
-                            }}
-                            onFocus={(e) => {
-                              // フォーカス時に0の場合は選択状態にする
-                              if (e.target.value === '0') {
-                                e.target.select()
-                              }
-                            }}
-                            onBlur={(e) => {
-                              // フォーカスが外れたら保存
-                              // 空の場合は元の値に戻す
-                              const value = e.target.value
-                              let finalProgress
-                              if (value === '' || value === null || value === undefined) {
-                                finalProgress = selectedTask.progress // 元の値に戻す
-                              } else {
-                                finalProgress = tempProgress[selectedTask.id] !== undefined ? tempProgress[selectedTask.id] : selectedTask.progress
-                              }
-                              handleProgressUpdate(selectedTask.id, finalProgress, true)
-                              setTempProgress(prev => {
-                                const newTemp = { ...prev }
-                                delete newTemp[selectedTask.id]
-                                return newTemp
-                              })
-                            }}
-                            className="w-20 text-center px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            style={{
-                              // 先頭のゼロを視覚的に隠す
-                              MozAppearance: 'textfield',
-                              WebkitAppearance: 'none',
-                              appearance: 'none'
-                            }}
-                          />
                           <Button
                             size="sm"
                             variant="outline"
@@ -2403,60 +2477,68 @@ export default function GanttPage() {
                               }))
                               setHasUnsavedChanges(true)
                             }}
-                            disabled={selectedTask.progress >= 100}
-                            className="w-10 h-10 p-0"
+                            disabled={(pendingTaskChanges?.progress ?? selectedTask.progress) >= 100}
+                            className="w-9 h-9 p-0 rounded-full bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400"
                           >
-                            +10
+                            <span className="text-sm">＋</span>
                           </Button>
                         </div>
-                      </div>
-                      <div className="w-full h-3 bg-gray-200 rounded-full">
-                        <div
-                          className="h-3 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${pendingTaskChanges?.progress ?? selectedTask.progress}%`,
-                            backgroundColor: selectedTask.color
+
+                        {/* プログレスバー */}
+                        <div className="mb-3">
+                          <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                            <div
+                              className="h-full rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-1"
+                              style={{
+                                width: `${pendingTaskChanges?.progress ?? selectedTask.progress}%`,
+                                background: `linear-gradient(90deg,
+                                  ${(pendingTaskChanges?.progress ?? selectedTask.progress) < 30 ? '#ef4444' :
+                                    (pendingTaskChanges?.progress ?? selectedTask.progress) < 70 ? '#f59e0b' :
+                                    (pendingTaskChanges?.progress ?? selectedTask.progress) < 100 ? '#3b82f6' : '#10b981'} 0%,
+                                  ${(pendingTaskChanges?.progress ?? selectedTask.progress) < 30 ? '#dc2626' :
+                                    (pendingTaskChanges?.progress ?? selectedTask.progress) < 70 ? '#d97706' :
+                                    (pendingTaskChanges?.progress ?? selectedTask.progress) < 100 ? '#2563eb' : '#059669'} 100%)`
+                              }}
+                            >
+                              {(pendingTaskChanges?.progress ?? selectedTask.progress) > 15 && (
+                                <span className="text-white text-xs font-bold">
+                                  {pendingTaskChanges?.progress ?? selectedTask.progress}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* タスク完了ボタン */}
+                        <Button
+                          variant="default"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setPendingTaskChanges(prev => ({
+                              ...(prev || {}),
+                              progress: 100,
+                              status: 'completed'
+                            }))
+                            setHasUnsavedChanges(true)
                           }}
-                        />
+                          disabled={(pendingTaskChanges?.progress ?? selectedTask.progress) >= 100}
+                          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg disabled:opacity-50"
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            タスクを完了にする
+                          </span>
+                        </Button>
                       </div>
-                      {/* タスク完了ボタン */}
-                      <Button
-                        variant="default"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setPendingTaskChanges(prev => ({
-                            ...(prev || {}),
-                            progress: 100,
-                            status: 'completed'
-                          }))
-                          setHasUnsavedChanges(true)
-                        }}
-                        disabled={selectedTask.progress >= 100}
-                        className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        タスクを完全に完了する (100%)
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">作業日数</Label>
-                    <p className="text-sm text-gray-600">
-                      {differenceInDays(parseISO(selectedTask.end), parseISO(selectedTask.start)) + 1}日間
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">残り日数</Label>
-                    <p className="text-sm text-gray-600">
-                      {Math.max(0, differenceInDays(parseISO(selectedTask.end), new Date()))}日
-                    </p>
-                  </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-              
-              <DialogFooter>
+
+              <DialogFooter className="bg-gray-50 px-6 py-3 -m-6 mt-4 rounded-b-2xl border-t">
                 {hasUnsavedChanges && (
                   <Button
                     variant="default"
@@ -2503,23 +2585,37 @@ export default function GanttPage() {
                           console.log('⚠️ 更新データが空のため、送信をスキップ')
                         }
 
-                        // 更新後、pendingTaskChangesをリセット
+                        // 更新後、モーダルを閉じてページをリフレッシュ
                         setPendingTaskChanges(null)
                         setHasUnsavedChanges(false)
+                        setSelectedTask(null)
+                        setIsTaskModalOpen(false)
+
+                        // ページをリフレッシュ
+                        window.location.reload()
                       }
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-2 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg"
                   >
-                    編集を更新する
+                    <span className="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      編集を保存する
+                    </span>
                   </Button>
                 )}
-                <Button variant="outline" onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setSelectedTask(null)
-                  setPendingTaskChanges(null)
-                  setHasUnsavedChanges(false)
-                }}>
+                <Button
+                  variant="outline"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSelectedTask(null)
+                    setPendingTaskChanges(null)
+                    setHasUnsavedChanges(false)
+                  }}
+                  className="border-2 border-gray-300 hover:bg-gray-100 font-medium px-6 py-2 rounded-lg"
+                >
                   閉じる
                 </Button>
               </DialogFooter>

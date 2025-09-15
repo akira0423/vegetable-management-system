@@ -397,7 +397,19 @@ export default function PhotosPage() {
         try {
           if (storageResponse.ok) {
             const storageResult = await storageResponse.json()
-            if (storageResult.success) {
+            if (storageResult.success && storageResult.data) {
+              // category_usageが存在しない場合は初期化
+              if (!storageResult.data.category_usage) {
+                const workTypeUsage: { [key: string]: any } = {}
+                WORK_TYPE_CATEGORIES.forEach(workCategory => {
+                  workTypeUsage[workCategory.id] = {
+                    count: 0,
+                    bytes: 0,
+                    percentage: 0
+                  }
+                })
+                storageResult.data.category_usage = workTypeUsage
+              }
               storage = storageResult.data
             }
           }
@@ -717,7 +729,7 @@ export default function PhotosPage() {
         <div className="bg-white p-6 border-t border-green-200">
           <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-3">
             {WORK_TYPE_CATEGORIES.map(workCategory => {
-              const usage = storageInfo?.category_usage[workCategory.id]
+              const usage = storageInfo?.category_usage?.[workCategory.id]
               const limitGB = STORAGE_LIMITS[workCategory.id as keyof typeof STORAGE_LIMITS]?.monthly_gb || 1
               const usageGB = usage ? usage.bytes / (1024 * 1024 * 1024) : 0
               const percentage = usage ? Math.min((usageGB / limitGB) * 100, 100) : 0

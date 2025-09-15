@@ -366,12 +366,15 @@ export function GanttChart({
       dateFormat = 'MM/dd'
     }
 
+    // 全体幅を先に計算（processedTasksで使用するため）
+    const totalWidth = totalDays * dayWidth
+
     // Generate hierarchical date headers
     const dateHeaders = []
     const yearMonthHeaders = []
     const dayHeaders = []
     const weekdayHeaders = []
-    
+
     let lastYearMonth = null
     
     console.log('🔍 JST日付ヘッダー生成開始:', {
@@ -496,13 +499,22 @@ export function GanttChart({
         
         // If task extends beyond chart, clip the width
         const taskEndOffset = adjustedStartOffset + taskDuration - 1
+        const maxAvailableWidth = totalWidth - clippedLeft // 利用可能な最大幅を計算
+
         if (taskEndOffset >= totalDays) {
           const excessDays = taskEndOffset - totalDays + 1
           clippedWidth = clippedWidth - (excessDays * dayWidth)
         }
-        
-        // Ensure minimum width for visibility
-        clippedWidth = Math.max(20, clippedWidth)
+
+        // 幅を利用可能な範囲内にクランプ
+        clippedWidth = Math.min(clippedWidth, maxAvailableWidth)
+
+        // Ensure minimum width for visibility (but not if it would exceed boundaries)
+        if (clippedLeft + 20 <= totalWidth) {
+          clippedWidth = Math.max(20, clippedWidth)
+        } else {
+          clippedWidth = Math.max(0, clippedWidth) // 境界を超える場合は0も許可
+        }
         
         return {
           ...task,
@@ -587,7 +599,7 @@ export function GanttChart({
       weekdayHeaders: filteredWeekdayHeaders,
       processedTasks,
       processedReports,
-      totalWidth: totalDays * dayWidth
+      totalWidth
     }
   }, [hierarchicalTasks, workReports, startDate, endDate, viewUnit, selectedVegetable, selectedPriority, refreshTrigger])
   
@@ -833,15 +845,15 @@ export function GanttChart({
       <CardContent className="p-0">
         <div className="relative">
           {/* スクロール可能エリア */}
-          <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
+          <div className="overflow-x-auto overflow-y-auto max-h-[600px]" style={{ position: 'relative' }}>
             <div 
               className="relative min-h-[400px] bg-white"
               style={{ width: Math.max(1200, totalWidth + 420) }}
             >
               {/* Header - 階層化された固定ヘッダー */}
-              <div className="sticky top-0 z-40 bg-white border-b shadow-sm flex">
+              <div className="sticky top-0 z-50 bg-white border-b shadow-sm flex">
                 {/* タスク情報ヘッダー - 上下左右固定 */}
-                <div className="sticky top-0 left-0 z-50 bg-white border-r ">
+                <div className="sticky top-0 left-0 z-60 bg-white border-r ">
                   <div className="flex" style={{ height: viewUnit === 'day' ? '84px' : '68px' }}>
                     <div className="w-80 px-2 py-1 border-r border-gray-100 font-bold text-sm text-gray-800 flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-100">
                       野菜・タスク名 (階層表示)
@@ -865,7 +877,7 @@ export function GanttChart({
                 </div>
                 
                 {/* 時間軸ヘッダー - スクロール（3行構造） */}
-                <div className="flex-1 sticky top-0 relative bg-white overflow-hidden">
+                <div className="flex-1 sticky top-0 relative bg-white overflow-hidden" style={{ position: 'relative' }}>
                   {/* 年月ヘッダー */}
                   <div className="relative h-8 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100">
                     {yearMonthHeaders.map((yearMonthHeader, index) => (
@@ -943,7 +955,7 @@ export function GanttChart({
                       style={{ minHeight: viewUnit === 'day' ? 64 : 56 }}
                     >
                       {/* Task info - 固定列 */}
-                      <div className="sticky left-0 z-30 bg-white border-r ">
+                      <div className="sticky left-0 z-40 bg-white border-r ">
                         <div className="flex" style={{ height: viewUnit === 'day' ? '64px' : '56px' }}>
                           {/* 階層タスク名表示 */}
                           <div 
@@ -1077,14 +1089,14 @@ export function GanttChart({
                           {/* 担当者 */}
                           <div className="hidden lg:flex w-20 p-3 items-center justify-center">
                             <div className="text-xs text-gray-600 text-center truncate">
-                              {task.assignedUser?.name || '未割当'}
+                              {task.isVegetableHeader ? '' : (task.assignedUser?.name || '未割当')}
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Timeline - スクロールエリア */}
-                      <div className="flex-1 relative bg-white z-10">
+                      {/* Timeline - スクロールエリア（オーバーフロークリップ適用） */}
+                      <div className="flex-1 relative bg-white z-0 overflow-hidden">
                         {/* Grid lines with weekend highlighting */}
                         {Array.from({ length: Math.ceil(totalWidth / dayWidth) + 1 }).map((_, dayIndex) => {
                           const currentDay = addDays(chartData.chartStart, dayIndex)
@@ -1124,10 +1136,11 @@ export function GanttChart({
                         {task.isVegetableHeader ? (
                           // 野菜ヘッダーのバー表示
                           <div
-                            className="absolute top-2 h-12 rounded-lg flex items-center px-4 text-white text-sm font-bold shadow-lg border-2 border-white/30 select-none"
+                            className="absolute top-2 h-12 rounded-lg flex items-center px-4 text-white text-sm font-bold shadow-lg border-2 border-white/30 select-none z-0"
                             style={{
                               left: 0,
-                              width: totalWidth,
+                              width: Math.min(totalWidth, totalWidth), // 表示幅を制限
+                              maxWidth: '100%', // 親要素を超えないように
                               backgroundColor: '#10b981',
                               background: 'linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)',
                               userSelect: 'none'
@@ -1139,7 +1152,7 @@ export function GanttChart({
                               className="absolute top-0 left-0 h-full bg-white/20 rounded-l-lg"
                               style={{ width: `${task.progress}%` }}
                             />
-                            <div className="relative z-10 flex items-center justify-between w-full">
+                            <div className="relative z-0 flex items-center justify-between w-full">
                               <span className="font-bold text-white">
                                 🥬 {task.vegetableGroup?.vegetable.name}
                               </span>
@@ -1151,7 +1164,7 @@ export function GanttChart({
                         ) : (
                           // 通常タスクのバー表示
                           <div
-                            className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30 select-none"
+                            className="absolute top-3 h-10 rounded-lg flex items-center px-3 text-white text-sm font-medium shadow-lg cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 border border-white/30 select-none z-0"
                             style={{
                               left: task.left,
                               width: Math.max(task.width, 40),
@@ -1174,7 +1187,7 @@ export function GanttChart({
                               className="absolute top-0 left-0 h-full bg-white/25 rounded-l-lg"
                               style={{ width: `${task.progress}%` }}
                             />
-                            <span className="relative z-10 truncate font-semibold select-none" style={{ userSelect: 'none' }}>
+                            <span className="relative z-0 truncate font-semibold select-none" style={{ userSelect: 'none' }}>
                               {task.progress}%
                             </span>
                           </div>
@@ -1221,7 +1234,7 @@ export function GanttChart({
               return (
                 <div
                   key={`report-${report.id}-${index}`}
-                  className="absolute z-30"
+                  className="absolute z-20"
                   style={{ 
                     left: FIXED_COLUMNS_WIDTH + report.position,
                     top: verticalPosition
@@ -1290,7 +1303,7 @@ export function GanttChart({
                   
                   return (
                     <div
-                      className="absolute bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none shadow-lg"
+                      className="absolute bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none shadow-lg"
                       style={{ 
                         left: todayPosition,
                         top: headerHeight + 'px'

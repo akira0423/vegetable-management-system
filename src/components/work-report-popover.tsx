@@ -248,13 +248,13 @@ export function WorkReportPopover({ report, children, onEdit, onView }: WorkRepo
                 <Eye className="w-4 h-4" />
                 詳細表示
               </Button>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={handleEdit}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <Edit className="w-4 h-4" />
-                編集
+                <Edit className="w-4 h-4 text-white" />
+                <span className="text-white">編集</span>
               </Button>
             </div>
           </CardContent>

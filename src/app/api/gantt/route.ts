@@ -479,11 +479,15 @@ export async function PUT(request: NextRequest) {
     }
 
     console.log('🔧 PUT /api/gantt - 更新データ:', updateData)
+    console.log('🔧 PUT /api/gantt - 更新データのキー:', Object.keys(updateData))
     console.log('🔧 PUT /api/gantt - タスクID:', id)
+    console.log('🔧 PUT /api/gantt - 受信したbodyの全内容:', body)
 
     // 更新データが空の場合はエラーを返す
     if (Object.keys(updateData).length === 0) {
       console.log('⚠️ 更新データが空です')
+      console.log('⚠️ 受信したbody:', JSON.stringify(body))
+      console.log('⚠️ progressの値:', body.progress, 'type:', typeof body.progress)
       return NextResponse.json({ error: 'No data to update' }, { status: 400 })
     }
 
