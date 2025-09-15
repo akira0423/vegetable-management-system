@@ -166,6 +166,8 @@ export default function GanttPage() {
   // タスク詳細モーダル
   const [selectedTask, setSelectedTask] = useState<GanttTask | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [pendingTaskChanges, setPendingTaskChanges] = useState<Partial<GanttTask> | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
   // 実績記録モーダル管理
   const [selectedWorkReport, setSelectedWorkReport] = useState<any>(null)
@@ -262,6 +264,9 @@ export default function GanttPage() {
   useEffect(() => {
     if (selectedTask) {
       setIsTaskModalOpen(true)
+      // モーダルを開いた時に編集状態をリセット
+      setPendingTaskChanges(null)
+      setHasUnsavedChanges(false)
     } else {
       setIsTaskModalOpen(false)
     }
@@ -2232,12 +2237,15 @@ export default function GanttPage() {
                   <div>
                     <Label className="text-sm font-medium">担当者</Label>
                     <Select
-                      value={selectedTask.assignedUser?.id || 'unassigned'}
+                      value={pendingTaskChanges?.assignedUser?.id ?? selectedTask.assignedUser?.id ?? 'unassigned'}
                       onValueChange={(value) => {
                         const newAssignee = value === 'unassigned' ? null : users.find(u => u.id === value)
-                        const updatedTask = { ...selectedTask, assignedUser: newAssignee, assigned_user_id: newAssignee?.id || null }
-                        setSelectedTask(updatedTask)
-                        handleUpdateTask(selectedTask.id, { assigned_user_id: newAssignee?.id || null })
+                        setPendingTaskChanges(prev => ({
+                          ...prev,
+                          assignedUser: newAssignee,
+                          assigned_user_id: newAssignee?.id || null
+                        }))
+                        setHasUnsavedChanges(true)
                       }}
                     >
                       <SelectTrigger className="w-full">
@@ -2279,11 +2287,13 @@ export default function GanttPage() {
                   <div>
                     <Label className="text-sm font-medium">優先度</Label>
                     <Select
-                      value={selectedTask.priority || 'medium'}
+                      value={pendingTaskChanges?.priority ?? selectedTask.priority ?? 'medium'}
                       onValueChange={(value) => {
-                        const updatedTask = { ...selectedTask, priority: value }
-                        setSelectedTask(updatedTask)
-                        handleUpdateTask(selectedTask.id, { priority: value })
+                        setPendingTaskChanges(prev => ({
+                          ...prev,
+                          priority: value
+                        }))
+                        setHasUnsavedChanges(true)
                       }}
                     >
                       <SelectTrigger className="w-full">
@@ -2303,14 +2313,19 @@ export default function GanttPage() {
                     <Label className="text-sm font-medium">進捗率</Label>
                     <div className="mt-2">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl font-bold">{selectedTask.progress}%</span>
+                        <span className="text-2xl font-bold">{pendingTaskChanges?.progress ?? selectedTask.progress}%</span>
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const newProgress = Math.max(0, selectedTask.progress - 10)
-                              handleProgressUpdate(selectedTask.id, newProgress, true)
+                              const currentProgress = pendingTaskChanges?.progress ?? selectedTask.progress
+                              const newProgress = Math.max(0, currentProgress - 10)
+                              setPendingTaskChanges(prev => ({
+                                ...prev,
+                                progress: newProgress
+                              }))
+                              setHasUnsavedChanges(true)
                             }}
                             disabled={selectedTask.progress <= 0}
                             className="w-10 h-10 p-0"
@@ -2369,8 +2384,13 @@ export default function GanttPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const newProgress = Math.min(100, selectedTask.progress + 10)
-                              handleProgressUpdate(selectedTask.id, newProgress, true)
+                              const currentProgress = pendingTaskChanges?.progress ?? selectedTask.progress
+                              const newProgress = Math.min(100, currentProgress + 10)
+                              setPendingTaskChanges(prev => ({
+                                ...prev,
+                                progress: newProgress
+                              }))
+                              setHasUnsavedChanges(true)
                             }}
                             disabled={selectedTask.progress >= 100}
                             className="w-10 h-10 p-0"
@@ -2383,7 +2403,7 @@ export default function GanttPage() {
                         <div
                           className="h-3 rounded-full transition-all duration-300"
                           style={{
-                            width: `${selectedTask.progress}%`,
+                            width: `${pendingTaskChanges?.progress ?? selectedTask.progress}%`,
                             backgroundColor: selectedTask.color
                           }}
                         />
@@ -2394,9 +2414,12 @@ export default function GanttPage() {
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          if (selectedTask.progress < 100) {
-                            handleProgressUpdate(selectedTask.id, 100, true)
-                          }
+                          setPendingTaskChanges(prev => ({
+                            ...prev,
+                            progress: 100,
+                            status: 'completed'
+                          }))
+                          setHasUnsavedChanges(true)
                         }}
                         disabled={selectedTask.progress >= 100}
                         className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
@@ -2423,10 +2446,46 @@ export default function GanttPage() {
               </div>
               
               <DialogFooter>
+                {hasUnsavedChanges && (
+                  <Button
+                    variant="default"
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      if (selectedTask && pendingTaskChanges) {
+                        // 全ての変更を一度に送信
+                        const updates: any = {}
+
+                        if (pendingTaskChanges.assigned_user_id !== undefined) {
+                          updates.assigned_user_id = pendingTaskChanges.assigned_user_id
+                        }
+                        if (pendingTaskChanges.priority !== undefined) {
+                          updates.priority = pendingTaskChanges.priority
+                        }
+                        if (pendingTaskChanges.progress !== undefined) {
+                          updates.progress = pendingTaskChanges.progress
+                        }
+                        if (pendingTaskChanges.status !== undefined) {
+                          updates.status = pendingTaskChanges.status
+                        }
+
+                        await handleUpdateTask(selectedTask.id, updates)
+
+                        // 更新後、pendingTaskChangesをリセット
+                        setPendingTaskChanges(null)
+                        setHasUnsavedChanges(false)
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    編集を更新する
+                  </Button>
+                )}
                 <Button variant="outline" onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
                   setSelectedTask(null)
+                  setPendingTaskChanges(null)
+                  setHasUnsavedChanges(false)
                 }}>
                   閉じる
                 </Button>
