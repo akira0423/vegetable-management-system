@@ -1368,22 +1368,31 @@ export default function GanttPage() {
     ))
 
     try {
+      // 送信するデータを構築（undefinedのフィールドは除外）
+      const requestBody: any = { id: taskId }
+
+      // 変更されたフィールドのみを含める
+      if (updates.name !== undefined) requestBody.name = updates.name
+      if (updates.start !== undefined) requestBody.start_date = updates.start
+      if (updates.end !== undefined) requestBody.end_date = updates.end
+      if (updates.progress !== undefined) requestBody.progress = updates.progress
+      if (updates.status !== undefined) requestBody.status = updates.status
+      if (updates.priority !== undefined) requestBody.priority = updates.priority
+      if (updates.description !== undefined) requestBody.description = updates.description
+      if (updates.assigned_user_id !== undefined) {
+        requestBody.assigned_user_id = updates.assigned_user_id
+      } else if (updates.assignedUser !== undefined) {
+        requestBody.assigned_user_id = updates.assignedUser?.id || null
+      }
+
+      console.log('📤 送信する更新データ:', requestBody)
+
       const response = await fetch('/api/gantt', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: taskId,
-          name: updates.name,
-          start_date: updates.start,
-          end_date: updates.end,
-          progress: updates.progress,
-          status: updates.status,
-          priority: updates.priority,
-          description: updates.description,
-          assigned_user_id: updates.assigned_user_id !== undefined ? updates.assigned_user_id : updates.assignedUser?.id
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!response.ok) {
@@ -2483,10 +2492,15 @@ export default function GanttPage() {
                         }
 
                         console.log('📝 最終的な更新データ:', updates)
+                        console.log('📝 更新データのキー:', Object.keys(updates))
+                        console.log('📝 更新データの数:', Object.keys(updates).length)
 
                         // 更新データが空でない場合のみ送信
                         if (Object.keys(updates).length > 0) {
+                          console.log('✅ handleUpdateTaskを呼び出します')
                           await handleUpdateTask(selectedTask.id, updates)
+                        } else {
+                          console.log('⚠️ 更新データが空のため、送信をスキップ')
                         }
 
                         // 更新後、pendingTaskChangesをリセット
