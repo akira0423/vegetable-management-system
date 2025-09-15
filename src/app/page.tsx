@@ -32,7 +32,7 @@ export default function Home() {
           </nav>
 
           <Link href="/login">
-            <Button variant="default" className="bg-green-600 hover:bg-green-700">
+            <Button variant="default" className="bg-green-600 hover:bg-green-700 text-white">
               会員ログイン
             </Button>
           </Link>
@@ -54,7 +54,7 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/login">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700">
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white">
                 システムにログイン
               </Button>
             </Link>
