@@ -186,124 +186,7 @@ export default function AnalyticsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  // サンプルデータ
-  const sampleData: AnalyticsData = {
-    summary: {
-      total_revenue: 1250000,
-      total_cost: 780000,
-      profit_margin: 37.6,
-      total_harvest: 2840,
-      total_work_hours: 456.5,
-      avg_yield_per_sqm: 8.5,
-      active_plots: 12,
-      completed_harvests: 8,
-      efficiency_score: 87
-    },
-    harvest_analysis: [
-      { label: '6月', value: 320, color: 'bg-green-500' },
-      { label: '7月', value: 480, color: 'bg-green-600' },
-      { label: '8月', value: 650, color: 'bg-green-700' },
-      { label: '9月', value: 590, color: 'bg-green-600' },
-      { label: '10月', value: 420, color: 'bg-green-500' },
-      { label: '11月', value: 380, color: 'bg-green-400' }
-    ],
-    cost_analysis: [
-      { label: '種苗費', value: 180000, color: 'bg-blue-500' },
-      { label: '肥料費', value: 220000, color: 'bg-blue-600' },
-      { label: '農薬費', value: 95000, color: 'bg-blue-400' },
-      { label: '人件費', value: 285000, color: 'bg-blue-700' }
-    ],
-    efficiency_trends: [
-      { label: '6月', value: 78 },
-      { label: '7月', value: 82 },
-      { label: '8月', value: 85 },
-      { label: '9月', value: 87 },
-      { label: '10月', value: 89 },
-      { label: '11月', value: 87 }
-    ],
-    seasonal_performance: [
-      { label: '春', value: 2.1, color: 'bg-pink-500' },
-      { label: '夏', value: 3.8, color: 'bg-red-500' },
-      { label: '秋', value: 3.2, color: 'bg-orange-500' },
-      { label: '冬', value: 1.9, color: 'bg-blue-500' }
-    ],
-    vegetable_performance: [
-      {
-        name: 'トマト',
-        variety: '桃太郎',
-        plot_size: 100,
-        harvest_amount: 850,
-        revenue: 425000,
-        cost: 180000,
-        profit: 245000,
-        yield_per_sqm: 8.5,
-        roi: 136.1,
-        status: 'excellent'
-      },
-      {
-        name: 'レタス',
-        variety: 'グリーンリーフ',
-        plot_size: 50,
-        harvest_amount: 320,
-        revenue: 192000,
-        cost: 85000,
-        profit: 107000,
-        yield_per_sqm: 6.4,
-        roi: 125.9,
-        status: 'excellent'
-      },
-      {
-        name: 'キュウリ',
-        variety: '夏すずみ',
-        plot_size: 80,
-        harvest_amount: 640,
-        revenue: 256000,
-        cost: 125000,
-        profit: 131000,
-        yield_per_sqm: 8.0,
-        roi: 104.8,
-        status: 'good'
-      },
-      {
-        name: 'ナス',
-        variety: '千両',
-        plot_size: 60,
-        harvest_amount: 380,
-        revenue: 190000,
-        cost: 110000,
-        profit: 80000,
-        yield_per_sqm: 6.3,
-        roi: 72.7,
-        status: 'average'
-      }
-    ],
-    recent_activities: [
-      {
-        id: '1',
-        type: 'harvest',
-        title: 'トマト大豊作',
-        description: 'A区画-1のトマト（桃太郎）が予想を20%上回る収穫量',
-        value: 850,
-        timestamp: '2024-08-09T10:00:00Z'
-      },
-      {
-        id: '2',
-        type: 'efficiency',
-        title: '作業効率向上',
-        description: '前月比で作業効率が5%改善しました',
-        value: 87,
-        timestamp: '2024-08-08T15:30:00Z'
-      },
-      {
-        id: '3',
-        type: 'cost',
-        title: 'コスト削減達成',
-        description: '肥料費を前月比12%削減できました',
-        value: 220000,
-        timestamp: '2024-08-07T09:15:00Z'
-      }
-    ]
-  }
+  // サンプルデータは削除済み - 実データのみを使用
 
   // 認証情報の取得
   useEffect(() => {
@@ -354,7 +237,7 @@ export default function AnalyticsPage() {
         summary: {
           ...data.summary,
           total_revenue: data.summary.total_revenue + (updateData.data.expected_revenue || 0),
-          total_cost: data.summary.total_cost + (updateData.data.estimated_cost || 0),
+          total_cost: data.summary.total_cost,
           total_harvest: data.summary.total_harvest + (updateData.data.harvest_amount || 0)
         },
         recent_activities: [
@@ -363,7 +246,7 @@ export default function AnalyticsPage() {
             type: updateData.data.work_type === 'harvesting' ? 'harvest' as const : 'cost' as const,
             title: `新しい${updateData.data.work_type}作業が完了`,
             description: updateData.data.work_notes || '作業が追加されました',
-            value: updateData.data.expected_revenue || updateData.data.estimated_cost || updateData.data.harvest_amount,
+            value: updateData.data.expected_revenue || updateData.data.harvest_amount || 0,
             timestamp: updateData.timestamp
           },
           ...data.recent_activities.slice(0, 4) // 最新5件まで保持
@@ -494,8 +377,9 @@ export default function AnalyticsPage() {
         })
         
         const analyticsFromReports = generateDetailedAnalyticsFromReports(last12MonthsReports, filteredVegetables)
-        const mergedData = mergeAnalyticsData(sampleData, analyticsFromReports)
-        setData(mergedData)
+        // サンプルデータは使用せず、実データのみを使用
+        const realData = createRealAnalyticsData(analyticsFromReports)
+        setData(realData)
       } else {
         // データがない場合は null を設定（空状態表示用）
         setData(null)
@@ -673,11 +557,11 @@ export default function AnalyticsPage() {
       .filter(r => r.harvest_amount)
       .reduce((sum, report) => sum + report.harvest_amount, 0)
 
-    // 総作業時間の計算（人時：work_duration(分) または duration_hours(時) × worker_count）
+    // 総作業時間の計算（人時：work_duration(分) × worker_count）
     const totalWorkHours = reports
       .reduce((sum, report) => {
-        // work_duration（分）を優先、なければduration_hoursを使用
-        const minutes = report.work_duration || (report.duration_hours ? report.duration_hours * 60 : 0) || (report.work_hours ? report.work_hours * 60 : 0)
+        // work_duration（分単位）を使用、なければ0
+        const minutes = report.work_duration || 0
         const workers = report.worker_count || 1
         return sum + (minutes * workers) / 60 // 時間単位に変換
       }, 0)
@@ -724,6 +608,69 @@ export default function AnalyticsPage() {
       profitMargin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
       recentActivities,
       dataQuality
+    }
+  }
+
+  // 実データのみから分析データを作成
+  const createRealAnalyticsData = (reportsData: any): AnalyticsData => {
+    // 月別収穫量データ
+    const harvestAnalysis = Object.keys(reportsData.harvestByMonth || {}).length > 0
+      ? Object.entries(reportsData.harvestByMonth).map(([month, amount]) => ({
+          label: month,
+          value: Math.round((amount as number) * 10) / 10,
+          color: 'bg-green-600'
+        }))
+      : []
+
+    // コスト分析データ
+    const costAnalysis = Object.keys(reportsData.costByType || {}).length > 0
+      ? Object.entries(reportsData.costByType).map(([type, amount]) => ({
+          label: type,
+          value: Math.round(amount as number),
+          color: 'bg-blue-600'
+        }))
+      : []
+
+    // 作業頻度データ
+    const workFrequencyData = Object.keys(reportsData.workFrequency || {}).length > 0
+      ? Object.entries(reportsData.workFrequency).map(([type, count]) => ({
+          label: type,
+          value: count as number,
+          color: 'bg-purple-600'
+        }))
+      : []
+
+    // サマリー情報（実データのみ）
+    const summary = {
+      total_revenue: Math.round(reportsData.totalRevenue || 0),
+      total_cost: Math.round(reportsData.totalCost || 0),
+      profit_margin: Math.round((reportsData.profitMargin || 0) * 10) / 10,
+      total_harvest: Math.round((reportsData.totalHarvest || 0) * 10) / 10,
+      total_work_hours: Math.round((reportsData.totalWorkHours || 0) * 10) / 10,
+      avg_yield_per_sqm: reportsData.totalHarvest && reportsData.totalHarvest > 0
+        ? Math.round((reportsData.totalHarvest / 300) * 10) / 10
+        : 0,
+      active_plots: reportsData.activePlots || 0,
+      completed_harvests: reportsData.completedHarvests || 0,
+      efficiency_score: Math.min(100, Math.max(0,
+        Math.round(75 + (reportsData.profitMargin || 0) / 5)
+      ))
+    }
+
+    return {
+      summary,
+      dataQuality: reportsData.dataQuality || {
+        incomeSource: 'none',
+        expenseSource: 'none',
+        reliability: 'low'
+      },
+      harvest_analysis: harvestAnalysis,
+      cost_analysis: costAnalysis,
+      efficiency_trends: [], // 実データから生成される場合のみ設定
+      seasonal_performance: [], // 実データから生成される場合のみ設定
+      vegetable_performance: reportsData.vegetablePerformance || [],
+      recent_activities: reportsData.recentActivities || [],
+      work_frequency: workFrequencyData
     }
   }
 

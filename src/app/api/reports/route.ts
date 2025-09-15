@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
 
     // 削除された野菜に関連する作業記録を除外
     const filteredData = data?.filter(report => report.vegetables !== null) || []
-    
+
     console.log('📊 Reports API - 野菜フィルタ後のレポート数:', filteredData.length)
 
     return NextResponse.json({
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
       harvest_unit: body.harvest_unit || null,
       harvest_quality: body.harvest_quality || null,
       expected_price: body.expected_price || null,
-      
+
       // 売上データはnotesフィールドに統合保存するため、ここでは削除
       
       // 作業者情報

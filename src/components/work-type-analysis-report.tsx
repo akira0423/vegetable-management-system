@@ -65,21 +65,27 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
   const [data, setData] = useState<GroupedVegetableData[]>([])
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(() => {
-    const year = new Date().getFullYear()
-    return `${year}-01-01`
+    // 直近12カ月（総支出計算と同じ期間）
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setFullYear(startDate.getFullYear() - 1)
+    return startDate.toISOString().split('T')[0]
   })
   const [endDate, setEndDate] = useState(() => {
-    const year = new Date().getFullYear()
-    return `${year}-12-31`
+    // 現在日付
+    return new Date().toISOString().split('T')[0]
   })
   // 一時的な日付選択用（確定前）
   const [tempStartDate, setTempStartDate] = useState(() => {
-    const year = new Date().getFullYear()
-    return `${year}-01-01`
+    // 直近12カ月（総支出計算と同じ期間）
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setFullYear(startDate.getFullYear() - 1)
+    return startDate.toISOString().split('T')[0]
   })
   const [tempEndDate, setTempEndDate] = useState(() => {
-    const year = new Date().getFullYear()
-    return `${year}-12-31`
+    // 現在日付
+    return new Date().toISOString().split('T')[0]
   })
   const [sortBy, setSortBy] = useState('totalRevenue')
   const [sortOrder, setSortOrder] = useState('desc')
@@ -381,14 +387,10 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
               </div>
               <div>
                 <CardTitle className="text-xl font-bold">
-                  🌱 作業種類別統合パフォーマンスレポート
+                  🌱 作業別収支分析レポート
                 </CardTitle>
-                <p className="text-green-100 text-sm">Agricultural Performance Intelligence Report</p>
+                <p className="text-green-100 text-sm">Work Type Performance Report</p>
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-              <div className="text-sm font-medium">統合分析システム</div>
             </div>
           </div>
         </CardHeader>
@@ -455,9 +457,9 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
                   </Select>
                 </div>
               </div>
-              <Button onClick={fetchWorkAnalysisData} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={fetchWorkAnalysisData} className="bg-green-600 hover:bg-green-700 text-white">
                 <RefreshCw className="w-4 h-4 mr-2" />
-                更新
+                <span className="text-white">更新</span>
               </Button>
             </div>
             <div className="mt-3 text-xs text-gray-500">

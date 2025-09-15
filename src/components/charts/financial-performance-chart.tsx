@@ -1580,10 +1580,6 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-              <div className="text-sm font-medium">総合財務分析システム</div>
-            </div>
           </div>
         </CardHeader>
         
@@ -2200,10 +2196,6 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
                       </h2>
                       <p className="text-blue-100">財務パフォーマンス詳細分析レポート</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-blue-100 uppercase tracking-wider">AgriTech Pro</div>
-                    <div className="text-lg font-semibold">総合財務分析システム</div>
                   </div>
                 </div>
               </div>

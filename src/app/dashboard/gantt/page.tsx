@@ -124,9 +124,10 @@ const getWorkTypeLabel = (workType: string) => {
 export default function GanttPage() {
   // プロフェッショナルUI機能
   const { toast } = useToast()
-  
+
   const [tasks, setTasks] = useState<GanttTask[]>([])
   const [vegetables, setVegetables] = useState<Vegetable[]>([])
+  const [users, setUsers] = useState<{id: string, name: string}[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -306,6 +307,9 @@ export default function GanttPage() {
   // フィルター展開状態
   const [isFilterExpanded, setIsFilterExpanded] = useState(false)
   const [activeFilterCount, setActiveFilterCount] = useState(0)
+
+  // 各野菜セクションの展開状態（デフォルトは全て展開）
+  const [expandedVegetables, setExpandedVegetables] = useState<Set<string>>(new Set())
   
   // 検索フィルター状態
   const [filteredVegetableData, setFilteredVegetableData] = useState<{
@@ -582,16 +586,18 @@ export default function GanttPage() {
       
       console.log('🔍 fetchDataWithTaskDateRange - APIリクエスト:', `/api/gantt?${params.toString()}`)
 
-      // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
-      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+      // ガントチャートデータ、作業レポートデータ、野菜データ、ユーザーデータを並行取得
+      const [ganttResponse, reportsResponse, vegetablesResponse, usersResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`),
         fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true&limit=999999`),  // 実質無制限
-        fetch(`/api/vegetables?company_id=${companyId}`) // 最新の野菜データを直接取得
+        fetch(`/api/vegetables?company_id=${companyId}`), // 最新の野菜データを直接取得
+        fetch(`/api/users?company_id=${companyId}`) // ユーザーデータを取得
       ])
 
       const ganttResult = await ganttResponse.json()
       let reportsResult = { success: false, data: [] }
       let vegetablesResult = { success: false, data: [] }
+      let usersResult = { success: false, users: [] }
       
       if (reportsResponse.ok) {
         reportsResult = await reportsResponse.json()
@@ -599,6 +605,35 @@ export default function GanttPage() {
       
       if (vegetablesResponse.ok) {
         vegetablesResult = await vegetablesResponse.json()
+      }
+
+      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      if (usersResponse.ok) {
+        usersResult = await usersResponse.json()
+        console.log('👥 取得したユーザーデータ:', usersResult)
+        console.log('👥 ユーザーデータの構造:', {
+          success: usersResult.success,
+          dataLength: usersResult.data?.length,
+          firstUser: usersResult.data?.[0]
+        })
+        if (usersResult.success && usersResult.data) {
+          const formattedUsers = usersResult.data.map((u: any) => ({
+            id: u.id,
+            name: u.full_name || u.email || '名前未設定'
+          }))
+          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          setUsers(formattedUsers)
+        } else {
+          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+        }
+      } else {
+        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        try {
+          const errorText = await usersResponse.text()
+          console.error('❌ エラー詳細:', errorText)
+        } catch (e) {
+          console.error('❌ エラーテキスト取得失敗:', e)
+        }
       }
 
       console.log('🔍 fetchDataWithTaskDateRange - APIレスポンス:', {
@@ -693,15 +728,20 @@ export default function GanttPage() {
         'Content-Type': 'application/json'
       }
 
-      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+      console.log('🔍 ユーザーAPI呼び出し準備 - URL:', `/api/users?company_id=${companyId}`)
+      console.log('🔍 認証ヘッダー存在確認:', !!session?.access_token)
+
+      const [ganttResponse, reportsResponse, vegetablesResponse, usersResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`, { headers: authHeaders }),
         fetch(`/api/reports?company_id=${companyId}&start_date=${start}&end_date=${end}&active_only=true&limit=999999`, { headers: authHeaders }),  // 実質無制限
-        fetch(`/api/vegetables?company_id=${companyId}`, { headers: authHeaders }) // 最新の野菜データを直接取得
+        fetch(`/api/vegetables?company_id=${companyId}`, { headers: authHeaders }), // 最新の野菜データを直接取得
+        fetch(`/api/users?company_id=${companyId}`, { headers: authHeaders }) // ユーザーデータを取得
       ])
 
       const ganttResult = await ganttResponse.json()
       let reportsResult = { success: false, data: [] }
       let vegetablesResult = { success: false, data: [] }
+      let usersResult = { success: false, users: [] }
       
       if (reportsResponse.ok) {
         reportsResult = await reportsResponse.json()
@@ -709,6 +749,35 @@ export default function GanttPage() {
       
       if (vegetablesResponse.ok) {
         vegetablesResult = await vegetablesResponse.json()
+      }
+
+      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      if (usersResponse.ok) {
+        usersResult = await usersResponse.json()
+        console.log('👥 取得したユーザーデータ:', usersResult)
+        console.log('👥 ユーザーデータの構造:', {
+          success: usersResult.success,
+          dataLength: usersResult.data?.length,
+          firstUser: usersResult.data?.[0]
+        })
+        if (usersResult.success && usersResult.data) {
+          const formattedUsers = usersResult.data.map((u: any) => ({
+            id: u.id,
+            name: u.full_name || u.email || '名前未設定'
+          }))
+          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          setUsers(formattedUsers)
+        } else {
+          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+        }
+      } else {
+        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        try {
+          const errorText = await usersResponse.text()
+          console.error('❌ エラー詳細:', errorText)
+        } catch (e) {
+          console.error('❌ エラーテキスト取得失敗:', e)
+        }
       }
 
       // タスクデータの設定（実データのみ）
@@ -726,13 +795,19 @@ export default function GanttPage() {
       if (vegetablesResult.success && vegetablesResult.data) {
         console.log('🔍 fetchData - 取得された野菜数:', vegetablesResult.data.length)
         console.log('🔍 fetchData - 野菜詳細:', vegetablesResult.data.map((v: any) => ({ id: v.id, name: v.name, company_id: v.company_id })))
-        setVegetables(vegetablesResult.data.map((v: any) => ({
+        const vegetableData = vegetablesResult.data.map((v: any) => ({
           id: v.id,
           name: v.name,
           variety: v.variety_name,
           status: v.status,
           area_size: v.area_size || 0
-        })))
+        }))
+        setVegetables(vegetableData)
+
+        // 初回ロード時は全ての野菜を展開状態にする
+        if (expandedVegetables.size === 0) {
+          setExpandedVegetables(new Set(vegetableData.map(v => v.id)))
+        }
       } else {
         console.log('❌ fetchData - 野菜API エラー:', vegetablesResult.error)
         setVegetables([])
@@ -818,15 +893,17 @@ export default function GanttPage() {
       params.append('active_only', 'true')
       
       // データを並行取得
-      const [ganttResponse, reportsResponse, vegetablesResponse] = await Promise.all([
+      const [ganttResponse, reportsResponse, vegetablesResponse, usersResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`),
         fetch(`/api/reports?company_id=${companyId}&start_date=${startStr}&end_date=${endStr}&active_only=true`),
-        fetch(`/api/vegetables?company_id=${companyId}`)
+        fetch(`/api/vegetables?company_id=${companyId}`),
+        fetch(`/api/users?company_id=${companyId}`) // ユーザーデータを取得
       ])
 
       const ganttResult = await ganttResponse.json()
       let reportsResult = { success: false, data: [] }
       let vegetablesResult = { success: false, data: [] }
+      let usersResult = { success: false, users: [] }
       
       if (reportsResponse.ok) {
         reportsResult = await reportsResponse.json()
@@ -834,6 +911,35 @@ export default function GanttPage() {
       
       if (vegetablesResponse.ok) {
         vegetablesResult = await vegetablesResponse.json()
+      }
+
+      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      if (usersResponse.ok) {
+        usersResult = await usersResponse.json()
+        console.log('👥 取得したユーザーデータ:', usersResult)
+        console.log('👥 ユーザーデータの構造:', {
+          success: usersResult.success,
+          dataLength: usersResult.data?.length,
+          firstUser: usersResult.data?.[0]
+        })
+        if (usersResult.success && usersResult.data) {
+          const formattedUsers = usersResult.data.map((u: any) => ({
+            id: u.id,
+            name: u.full_name || u.email || '名前未設定'
+          }))
+          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          setUsers(formattedUsers)
+        } else {
+          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+        }
+      } else {
+        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        try {
+          const errorText = await usersResponse.text()
+          console.error('❌ エラー詳細:', errorText)
+        } catch (e) {
+          console.error('❌ エラーテキスト取得失敗:', e)
+        }
       }
 
       // 取得したデータでUIを更新
@@ -1159,21 +1265,47 @@ export default function GanttPage() {
     }
   }
 
-  const handleProgressUpdate = async (taskId: string, newProgress: number) => {
+  // 進捗率更新用の一時的な値を管理
+  const [tempProgress, setTempProgress] = useState<{[key: string]: number}>({})
+  const [progressUpdateTimeout, setProgressUpdateTimeout] = useState<NodeJS.Timeout | null>(null)
+
+  const handleProgressUpdate = async (taskId: string, newProgress: number, immediate: boolean = false) => {
     // 楽観的更新: 即座にUIを更新
     const oldTasks = tasks
-    const newStatus = newProgress === 100 ? 'completed' : 
+    const newStatus = newProgress === 100 ? 'completed' :
                      newProgress > 0 ? 'in_progress' : 'pending'
-    
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, 
-            progress: newProgress, 
+
+    setTasks(prev => prev.map(task =>
+      task.id === taskId
+        ? { ...task,
+            progress: newProgress,
             status: newStatus,
             color: STATUS_COLORS[newStatus]
           }
         : task
     ))
+
+    // タスク詳細モーダルが開いている場合は、そのデータも更新
+    if (selectedTask && selectedTask.id === taskId) {
+      setSelectedTask(prev => prev ? { ...prev, progress: newProgress, status: newStatus, color: STATUS_COLORS[newStatus] } : null)
+    }
+
+    // ボタンクリックまたはimmediateフラグがある場合は即座に保存
+    if (immediate) {
+      await saveProgressToDatabase(taskId, newProgress, newStatus, oldTasks)
+    } else {
+      // デバウンス処理: 500ms待ってから保存
+      if (progressUpdateTimeout) {
+        clearTimeout(progressUpdateTimeout)
+      }
+      const timeout = setTimeout(async () => {
+        await saveProgressToDatabase(taskId, newProgress, newStatus, oldTasks)
+      }, 500)
+      setProgressUpdateTimeout(timeout)
+    }
+  }
+
+  const saveProgressToDatabase = async (taskId: string, newProgress: number, newStatus: string, oldTasks: any[]) => {
 
     try {
       // データベースを更新
@@ -1203,7 +1335,10 @@ export default function GanttPage() {
       if (updatedTask) {
         await syncTaskToAnalytics({...updatedTask, progress: newProgress, status: newStatus})
       }
-      
+
+      // 成功時のフィードバック
+      console.log(`✅ タスク進捗を${newProgress}%に更新しました`)
+
     } catch (error) {
       console.error('進捗更新エラー:', error)
       // ロールバック
@@ -1240,7 +1375,7 @@ export default function GanttPage() {
           end_date: updates.end,
           priority: updates.priority,
           description: updates.description,
-          assigned_user_id: updates.assignedUser?.id
+          assigned_user_id: updates.assigned_user_id !== undefined ? updates.assigned_user_id : updates.assignedUser?.id
         })
       })
 
@@ -1650,138 +1785,6 @@ export default function GanttPage() {
         </div>
       )}
 
-      {/* 📊 野菜管理統計カード */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-700 font-medium">管理中野菜</p>
-                <p className="text-2xl font-bold text-green-800">
-                  {vegetables.length}
-                </p>
-                <p className="text-xs text-green-600 mt-1">登録済み野菜数</p>
-              </div>
-              <div className="bg-green-500 p-3 rounded-full">
-                <Sprout className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-700 font-medium">総栽培面積</p>
-                <p className="text-2xl font-bold text-blue-800">
-                  {vegetables.reduce((sum, v) => sum + (v.area_size || 0), 0).toFixed(1)}㎡
-                </p>
-                <p className="text-xs text-blue-600 mt-1">全区画合計</p>
-              </div>
-              <div className="bg-blue-500 p-3 rounded-full">
-                <MapPin className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-yellow-700 font-medium">進行中タスク</p>
-                <p className="text-2xl font-bold text-yellow-800">
-                  {tasks.filter(t => t.status === 'in_progress').length}
-                </p>
-                <p className="text-xs text-yellow-600 mt-1">実行中作業</p>
-              </div>
-              <div className="bg-yellow-500 p-3 rounded-full">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-700 font-medium">総作業時間</p>
-                <p className="text-2xl font-bold text-purple-800">
-                  {(() => {
-                    const totalMinutes = workReports.reduce((sum: number, report: any) => {
-                      // work_duration（分）を優先、なければduration_hours（時間）を分に変換
-                      const minutes = report.work_duration || (report.duration_hours ? report.duration_hours * 60 : 0)
-                      const workers = report.worker_count || 1
-                      return sum + (minutes * workers)
-                    }, 0)
-
-                    // 60分以上なら時間表示、未満なら分表示
-                    if (totalMinutes >= 60) {
-                      return `${(totalMinutes / 60).toFixed(1)}h`
-                    } else {
-                      return `${totalMinutes}分`
-                    }
-                  })()}
-                </p>
-                <p className="text-xs text-purple-600 mt-1">累計作業時間（人時）</p>
-              </div>
-              <div className="bg-purple-500 p-3 rounded-full">
-                <Clock className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-700 font-medium">過去収穫量</p>
-                <p className="text-2xl font-bold text-orange-800">
-                  {workReports.reduce((sum: number, report: any) => 
-                    sum + (report.work_type === 'harvesting' ? (report.harvest_amount || 0) : 0), 0
-                  ).toFixed(1)}kg
-                </p>
-                <p className="text-xs text-orange-600 mt-1">総収穫実績</p>
-              </div>
-              <div className="bg-orange-500 p-3 rounded-full">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-emerald-700 font-medium">売上高</p>
-                <p className="text-2xl font-bold text-emerald-800">
-                  ¥{workReports.reduce((sum: number, report: any) => {
-                    // notesから売上データを解析
-                    let revenue = 0
-                    if (report.notes) {
-                      try {
-                        const notesData = JSON.parse(report.notes)
-                        revenue = notesData.sales_amount || notesData.expected_revenue || 0
-                      } catch (e) {
-                        // JSON解析失敗時は0
-                      }
-                    }
-                    return sum + (report.sales_amount || report.expected_revenue || revenue)
-                  }, 0).toLocaleString()}
-                </p>
-                <p className="text-xs text-emerald-600 mt-1">総売上実績</p>
-              </div>
-              <div className="bg-emerald-500 p-3 rounded-full">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
 
       {/* 栽培野菜管理チャート */}
@@ -1938,17 +1941,42 @@ export default function GanttPage() {
           displayVegetables.map(vegetable => {
             const vegetableTasks = displayTasks.filter(task => task.vegetable?.id === vegetable.id)
             const vegetableReports = displayReports.filter((report: any) => report.vegetable_id === vegetable.id)
-            
+            const isExpanded = expandedVegetables.has(vegetable.id)
+
             // データがない野菜はスキップ
             if (vegetableTasks.length === 0 && vegetableReports.length === 0) {
               return null
             }
 
+            const toggleExpanded = () => {
+              const newExpanded = new Set(expandedVegetables)
+              if (isExpanded) {
+                newExpanded.delete(vegetable.id)
+              } else {
+                newExpanded.add(vegetable.id)
+              }
+              setExpandedVegetables(newExpanded)
+            }
+
           return (
             <Card key={vegetable.id} className="shadow-sm">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 border-b">
+              <CardHeader
+                className="bg-gradient-to-r from-green-50 to-blue-50 border-b cursor-pointer hover:from-green-100 hover:to-blue-100 transition-colors"
+                onClick={toggleExpanded}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-1 h-auto"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleExpanded()
+                      }}
+                    >
+                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </Button>
                     <div className="bg-green-500 p-2 rounded-full">
                       <Sprout className="w-5 h-5 text-white" />
                     </div>
@@ -1970,8 +1998,9 @@ export default function GanttPage() {
                 </div>
               </CardHeader>
               
-              <CardContent className="p-0">
-                <div className="grid grid-cols-1 xl:grid-cols-2">
+              {isExpanded && (
+                <CardContent className="p-0">
+                  <div className="grid grid-cols-1 xl:grid-cols-2">
                   {/* 左側: 計画タスク */}
                   <div className="border-r border-gray-200 bg-blue-50/30">
                     <div className="bg-blue-100/50 px-4 py-3 border-b">
@@ -2159,6 +2188,7 @@ export default function GanttPage() {
                   </div>
                 </div>
               </CardContent>
+              )}
             </Card>
           )
         }))}
@@ -2201,9 +2231,27 @@ export default function GanttPage() {
                   
                   <div>
                     <Label className="text-sm font-medium">担当者</Label>
-                    <p className="text-sm text-gray-600">
-                      {selectedTask.assignedUser?.name || '未割当'}
-                    </p>
+                    <Select
+                      value={selectedTask.assignedUser?.id || 'unassigned'}
+                      onValueChange={(value) => {
+                        const newAssignee = value === 'unassigned' ? null : users.find(u => u.id === value)
+                        const updatedTask = { ...selectedTask, assignedUser: newAssignee, assigned_user_id: newAssignee?.id || null }
+                        setSelectedTask(updatedTask)
+                        handleUpdateTask(selectedTask.id, { assigned_user_id: newAssignee?.id || null })
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="担当者を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">未割当</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>
@@ -2230,11 +2278,23 @@ export default function GanttPage() {
                   
                   <div>
                     <Label className="text-sm font-medium">優先度</Label>
-                    <Badge variant="outline" className="ml-2">
-                      {selectedTask.priority === 'high' && '高優先度'}
-                      {selectedTask.priority === 'medium' && '中優先度'}
-                      {selectedTask.priority === 'low' && '低優先度'}
-                    </Badge>
+                    <Select
+                      value={selectedTask.priority || 'medium'}
+                      onValueChange={(value) => {
+                        const updatedTask = { ...selectedTask, priority: value }
+                        setSelectedTask(updatedTask)
+                        handleUpdateTask(selectedTask.id, { priority: value })
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="優先度を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">高優先度</SelectItem>
+                        <SelectItem value="medium">中優先度</SelectItem>
+                        <SelectItem value="low">低優先度</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
@@ -2244,27 +2304,105 @@ export default function GanttPage() {
                     <div className="mt-2">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-2xl font-bold">{selectedTask.progress}%</span>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={selectedTask.progress}
-                          onChange={(e) => {
-                            const newProgress = parseInt(e.target.value) || 0
-                            handleProgressUpdate(selectedTask.id, Math.min(100, Math.max(0, newProgress)))
-                          }}
-                          className="w-20 text-right"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const newProgress = Math.max(0, selectedTask.progress - 10)
+                              handleProgressUpdate(selectedTask.id, newProgress, true)
+                            }}
+                            disabled={selectedTask.progress <= 0}
+                            className="w-10 h-10 p-0"
+                          >
+                            -10
+                          </Button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            min="0"
+                            max="100"
+                            value={tempProgress[selectedTask.id] !== undefined ? tempProgress[selectedTask.id] : selectedTask.progress}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // 数字以外を除去
+                              const numericValue = value.replace(/[^0-9]/g, '')
+                              // 空文字の場合は0として扱う
+                              const newProgress = numericValue === '' ? 0 : parseInt(numericValue, 10) || 0
+                              const clampedProgress = Math.min(100, Math.max(0, newProgress))
+                              setTempProgress(prev => ({ ...prev, [selectedTask.id]: clampedProgress }))
+                              handleProgressUpdate(selectedTask.id, clampedProgress, false)
+                            }}
+                            onFocus={(e) => {
+                              // フォーカス時に0の場合は選択状態にする
+                              if (e.target.value === '0') {
+                                e.target.select()
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // フォーカスが外れたら保存
+                              // 空の場合は元の値に戻す
+                              const value = e.target.value
+                              let finalProgress
+                              if (value === '' || value === null || value === undefined) {
+                                finalProgress = selectedTask.progress // 元の値に戻す
+                              } else {
+                                finalProgress = tempProgress[selectedTask.id] !== undefined ? tempProgress[selectedTask.id] : selectedTask.progress
+                              }
+                              handleProgressUpdate(selectedTask.id, finalProgress, true)
+                              setTempProgress(prev => {
+                                const newTemp = { ...prev }
+                                delete newTemp[selectedTask.id]
+                                return newTemp
+                              })
+                            }}
+                            className="w-20 text-center px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            style={{
+                              // 先頭のゼロを視覚的に隠す
+                              MozAppearance: 'textfield',
+                              WebkitAppearance: 'none',
+                              appearance: 'none'
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const newProgress = Math.min(100, selectedTask.progress + 10)
+                              handleProgressUpdate(selectedTask.id, newProgress, true)
+                            }}
+                            disabled={selectedTask.progress >= 100}
+                            className="w-10 h-10 p-0"
+                          >
+                            +10
+                          </Button>
+                        </div>
                       </div>
                       <div className="w-full h-3 bg-gray-200 rounded-full">
-                        <div 
+                        <div
                           className="h-3 rounded-full transition-all duration-300"
-                          style={{ 
+                          style={{
                             width: `${selectedTask.progress}%`,
                             backgroundColor: selectedTask.color
                           }}
                         />
                       </div>
+                      {/* タスク完了ボタン */}
+                      <Button
+                        variant="default"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (selectedTask.progress < 100) {
+                            handleProgressUpdate(selectedTask.id, 100, true)
+                          }
+                        }}
+                        disabled={selectedTask.progress >= 100}
+                        className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        タスクを完全に完了する (100%)
+                      </Button>
                     </div>
                   </div>
                   
@@ -2291,18 +2429,6 @@ export default function GanttPage() {
                   setSelectedTask(null)
                 }}>
                   閉じる
-                </Button>
-                <Button 
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (selectedTask.progress < 100) {
-                      handleProgressUpdate(selectedTask.id, selectedTask.progress + 10)
-                    }
-                  }}
-                  disabled={selectedTask.progress >= 100}
-                >
-                  進捗+10%
                 </Button>
               </DialogFooter>
             </>

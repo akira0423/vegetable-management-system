@@ -58,3 +58,6 @@ simple-*.js
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Test data directory - exclude from production
+/src/test-data/

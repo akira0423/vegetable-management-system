@@ -435,7 +435,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     }, 0)
     const avgEfficiency = workReports.reduce((sum: number, r: any) => {
       const revenue = (r.harvest_amount || 0) * (r.expected_price || 0)
-      const cost = r.estimated_cost || (r.duration_hours || 2) * 1000 // 時給1000円想定
+      const cost = (r.duration_hours || 2) * 1000 // 時給1000円想定
       return sum + (cost > 0 ? revenue / cost : 0)
     }, 0) / workReports.length
 
@@ -558,7 +558,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
           }, 0)
           
           // コスト計算（会計データも考慮）
-          const directCosts = typeReports.reduce((sum: number, r: any) => sum + (r.estimated_cost || (r.duration_hours || 2) * 1000), 0)
+          const directCosts = typeReports.reduce((sum: number, r: any) => sum + ((r.duration_hours || 2) * 1000), 0)
           const accountingCosts = typeReports.reduce((sum: number, r: any) => {
             if (r.work_report_accounting && Array.isArray(r.work_report_accounting)) {
               return sum + r.work_report_accounting.reduce((accSum: number, acc: any) => accSum + (acc.amount || 0), 0)
@@ -593,7 +593,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
               revenue_generated: workType === 'harvesting' ? 
                 (r.harvest_amount || 0) * (r.expected_price || 0) : 
                 (r.expected_revenue || 0),
-              cost_incurred: Math.max(r.estimated_cost || (r.duration_hours || 2) * 1000, 
+              cost_incurred: Math.max((r.duration_hours || 2) * 1000,
                 (r.work_report_accounting?.reduce((sum: number, acc: any) => sum + (acc.amount || 0), 0)) || 0),
               efficiency_rating: efficiencyScore > 80 ? 'excellent' as const : 
                                efficiencyScore > 60 ? 'good' as const : 
@@ -1420,16 +1420,12 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
               </div>
               <div>
                 <CardTitle className="text-xl font-bold">
-                  🤖 AI予測作業時間分析
+                  ⏰ 月次作業時間分析
                 </CardTitle>
                 <p className="text-green-100 text-sm">
                   AI-Powered Work Hours & ROI Analysis
                 </p>
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-              <div className="text-sm font-medium">労働効率最適化システム</div>
             </div>
           </div>
         </CardHeader>
@@ -1904,10 +1900,6 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
                   </h2>
                   <p className="text-indigo-100 text-sm">AI予測作業時間詳細分析レポート</p>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-indigo-100 uppercase tracking-wider">AgriTech Pro</div>
-                <div className="text-lg font-semibold">労働効率最適化システム</div>
               </div>
             </div>
           </div>

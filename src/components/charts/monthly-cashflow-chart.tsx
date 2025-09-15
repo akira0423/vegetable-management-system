@@ -558,9 +558,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
             }
           }
           
-          // 支出の計算（会計支出を優先、なければ推定コスト）
-          const directCosts = typeReports.reduce((sum: number, r: any) => sum + (r.estimated_cost || 0), 0)
-          const totalExpense = accountingExpense > 0 ? accountingExpense : directCosts
+          // 支出の計算（会計データのみ使用）
+          const totalExpense = accountingExpense
           
           workTypes[workType] = {
             income,
@@ -662,14 +661,14 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
             income = typeReports.reduce((sum: number, r: any) => sum + (r.expected_revenue || 0), 0)
           }
           
-          const directCosts = typeReports.reduce((sum: number, r: any) => sum + (r.estimated_cost || 0), 0)
+          // 前年の支出計算（会計データのみ使用）
           const accountingCosts = typeReports.reduce((sum: number, r: any) => {
             if (r.work_report_accounting && Array.isArray(r.work_report_accounting)) {
               return sum + r.work_report_accounting.reduce((accSum: number, acc: any) => accSum + (acc.amount || 0), 0)
             }
             return sum
           }, 0)
-          const totalExpense = directCosts + accountingCosts
+          const totalExpense = accountingCosts
           
           workTypes[workType] = {
             income,
@@ -795,20 +794,23 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       type: 'line' as const,
       label: '📈 純損益推移',
       data: cashflowData.map(d => d.monthly_total),
-      borderColor: '#dc2626', // 赤色の線
-      backgroundColor: 'rgba(220, 38, 38, 0.1)',
-      borderWidth: 4, // 少し太くして視認性向上
-      pointRadius: 8, // ポイントを大きくして見やすく
+      borderColor: '#ef4444', // より明るい赤色の線
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      borderWidth: 2, // 細い線
+      pointRadius: 5, // ポイントを小さく
       pointBackgroundColor: '#ffffff',
-      pointBorderColor: '#dc2626',
-      pointBorderWidth: 3,
+      pointBorderColor: '#ef4444',
+      pointBorderWidth: 2,
       fill: false,
       tension: 0.3, // カーブを滑らかに
       yAxisID: 'y', // 左軸を使用
       order: 0, // 最上面に表示（数値が小さいほど前面）
-      pointHoverRadius: 10, // ホバー時のポイント拡大
-      pointHoverBorderWidth: 4,
-      pointHitRadius: 15 // クリック・ホバー判定エリアを拡大
+      pointHoverRadius: 8, // ホバー時のポイント拡大
+      pointHoverBorderWidth: 3,
+      pointHitRadius: 15, // クリック・ホバー判定エリアを拡大
+      borderDash: [3, 6], // 点線パターン
+      borderCapStyle: 'round' as const,
+      borderJoinStyle: 'round' as const
     }
 
     // 累積損益線グラフ（右Y軸）- 条件付きで表示
@@ -840,13 +842,13 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         type: 'line' as const,
         label: lineLabel,
         data: cumulativeData,
-        borderColor: lineColor,
+        borderColor: cumulativeType === 'expense' ? '#ef4444' : lineColor, // 支出線は明るい赤
         backgroundColor: `${lineColor}20`,
-        borderWidth: 3,
-        pointRadius: 7, // ポイントを大きくして見やすく
+        borderWidth: cumulativeType === 'expense' ? 1.5 : 3, // 支出線はかなり細く
+        pointRadius: cumulativeType === 'expense' ? 4 : 7, // 支出線のポイントは小さく
         pointBackgroundColor: '#ffffff',
-        pointBorderColor: lineColor,
-        pointBorderWidth: 2,
+        pointBorderColor: cumulativeType === 'expense' ? '#ef4444' : lineColor,
+        pointBorderWidth: cumulativeType === 'expense' ? 1.5 : 2,
         fill: false,
         tension: 0.4,
         yAxisID: 'y1', // 右Y軸を使用
@@ -854,7 +856,9 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
         pointHoverRadius: 9,
         pointHoverBorderWidth: 3,
         pointHitRadius: 12, // クリック・ホバー判定エリアを拡大
-        borderDash: cumulativeType !== 'profit' ? [5, 5] : [], // 損益以外は点線
+        borderDash: cumulativeType === 'expense' ? [2, 8] : cumulativeType !== 'profit' ? [5, 5] : [], // 支出線はより明確な点線
+        borderCapStyle: 'round' as const,
+        borderJoinStyle: 'round' as const,
       })
     }
 
@@ -1427,10 +1431,6 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
                   Monthly Cashflow Trend Analysis
                 </p>
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-green-100 uppercase tracking-wider">AgriFinance Pro</div>
-              <div className="text-sm font-medium">資金流動分析システム</div>
             </div>
           </div>
         </CardHeader>

@@ -630,9 +630,9 @@ export function GanttChart({
                   <BarChart3 className="w-6 h-6" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
+                  <CardTitle className="text-xl font-bold">📊 作業スケジュール管理</CardTitle>
                   <p className="text-green-100 text-sm">
-                    階層表示・フィルタリング・期間設定を統合管理
+                    野菜別の作業計画と進捗状況を時系列で表示
                   </p>
                 </div>
               </div>
@@ -747,9 +747,9 @@ export function GanttChart({
                   <BarChart3 className="w-6 h-6" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-bold">🗓️ 野菜別ガントチャート & 表示コントロール</CardTitle>
+                  <CardTitle className="text-xl font-bold">📊 作業スケジュール管理</CardTitle>
                   <p className="text-green-100 text-sm">
-                    階層表示・フィルタリング・期間設定を統合管理
+                    野菜別の作業計画と進捗状況を時系列で表示
                   </p>
                 </div>
               </div>
@@ -943,7 +943,7 @@ export function GanttChart({
                       style={{ minHeight: viewUnit === 'day' ? 64 : 56 }}
                     >
                       {/* Task info - 固定列 */}
-                      <div className="sticky left-0 z-20 bg-white/95 border-r ">
+                      <div className="sticky left-0 z-30 bg-white border-r ">
                         <div className="flex" style={{ height: viewUnit === 'day' ? '64px' : '56px' }}>
                           {/* 階層タスク名表示 */}
                           <div 
@@ -1084,7 +1084,7 @@ export function GanttChart({
                       </div>
 
                       {/* Timeline - スクロールエリア */}
-                      <div className="flex-1 relative bg-white">
+                      <div className="flex-1 relative bg-white z-10">
                         {/* Grid lines with weekend highlighting */}
                         {Array.from({ length: Math.ceil(totalWidth / dayWidth) + 1 }).map((_, dayIndex) => {
                           const currentDay = addDays(chartData.chartStart, dayIndex)

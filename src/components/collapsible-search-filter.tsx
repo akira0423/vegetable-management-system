@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { 
+import {
   Filter,
   Calendar,
   Sprout,
@@ -14,7 +14,9 @@ import {
   BarChart3,
   RotateCcw,
   Clock,
-  CalendarRange
+  CalendarRange,
+  Check,
+  Settings
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -409,27 +411,31 @@ export function CollapsibleSearchFilter({
                 </Button>
               </div>
               <div className="flex flex-wrap gap-1">
-                {vegetables.map(vegetable => (
-                  <Button
-                    key={vegetable.id}
-                    variant={filters.selectedVegetables.includes(vegetable.id) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleVegetableToggle(vegetable.id, !filters.selectedVegetables.includes(vegetable.id))}
-                    className={`
-                      h-7 px-2 text-xs transition-all duration-150
-                      ${filters.selectedVegetables.includes(vegetable.id)
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                        : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                      }
-                    `}
-                  >
-                    {vegetable.name}
-                  </Button>
-                ))}
+                {vegetables.map(vegetable => {
+                  const isSelected = filters.selectedVegetables.includes(vegetable.id)
+                  return (
+                    <Button
+                      key={vegetable.id}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleVegetableToggle(vegetable.id, !isSelected)}
+                      className={`
+                        h-7 px-2 text-xs transition-all duration-150 flex items-center gap-1
+                        ${isSelected
+                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
+                          : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                        }
+                      `}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                      {vegetable.name}
+                    </Button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* 期間・表示設定 */}
+            {/* 期間・作業種類設定 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* 期間選択 */}
               <div className="bg-green-50/50 rounded-lg p-3 border border-green-200/50">
@@ -440,7 +446,6 @@ export function CollapsibleSearchFilter({
                 
                 {/* プリセット期間 */}
                 <div className="mb-3">
-                  <label className="text-xs text-green-700 font-medium mb-1 block">プリセット期間</label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
@@ -488,7 +493,6 @@ export function CollapsibleSearchFilter({
                 
                 {/* カスタム期間 */}
                 <div className="space-y-2">
-                  <label className="text-xs text-green-700 font-medium block">または カスタム期間</label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <Input
@@ -572,70 +576,36 @@ export function CollapsibleSearchFilter({
                 </div>
               </div>
 
-              {/* 表示設定 */}
+              {/* 作業種類 - 期間設定の右側に配置 */}
               <div className="bg-green-50/50 rounded-lg p-3 border border-green-200/50">
-                <h4 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
                   <Filter className="w-4 h-4" />
-                  表示設定
+                  作業種類
                 </h4>
-                <div className="space-y-2">
-                  <Button
-                    variant={filters.showPlanned ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilters(prev => ({ ...prev, showPlanned: !prev.showPlanned }))}
-                    className={`
-                      w-full justify-start h-7 text-xs
-                      ${filters.showPlanned
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                        : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                      }
-                    `}
-                  >
-                    計画タスク
-                  </Button>
-                  <Button
-                    variant={filters.showCompleted ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilters(prev => ({ ...prev, showCompleted: !prev.showCompleted }))}
-                    className={`
-                      w-full justify-start h-7 text-xs
-                      ${filters.showCompleted
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                        : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                      }
-                    `}
-                  >
-                    実績記録
-                  </Button>
+                <div className="grid grid-cols-3 gap-1">
+                  {workTypeOptions.map(option => {
+                    const isSelected = filters.workType === option.value
+                    return (
+                      <Button
+                        key={option.value}
+                        size="sm"
+                        variant={isSelected ? "default" : "outline"}
+                        onClick={() => setFilters(prev => ({ ...prev, workType: option.value }))}
+                        className={`
+                          h-8 px-1 text-xs transition-all duration-150 flex items-center justify-center gap-1
+                          ${isSelected
+                            ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
+                            : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
+                          }
+                        `}
+                      >
+                        {isSelected && <Check className="w-3 h-3" />}
+                        <span>{option.icon}</span>
+                        <span className="font-medium">{option.label.substring(2)}</span>
+                      </Button>
+                    )
+                  })}
                 </div>
-              </div>
-            </div>
-
-            {/* 作業種類 */}
-            <div className="bg-green-50/50 rounded-lg p-3 border border-green-200/50">
-              <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                作業種類
-              </h4>
-              <div className="grid grid-cols-3 gap-1">
-                {workTypeOptions.map(option => (
-                  <Button
-                    key={option.value}
-                    size="sm"
-                    variant={filters.workType === option.value ? "default" : "outline"}
-                    onClick={() => setFilters(prev => ({ ...prev, workType: option.value }))}
-                    className={`
-                      h-8 px-2 text-xs transition-all duration-150
-                      ${filters.workType === option.value
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                        : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                      }
-                    `}
-                  >
-                    <span className="mr-1">{option.icon}</span>
-                    <span className="font-medium">{option.label.substring(2)}</span>
-                  </Button>
-                ))}
               </div>
             </div>
 
@@ -659,7 +629,7 @@ export function CollapsibleSearchFilter({
                   onClick={() => onToggleExpanded(false)}
                   variant="default"
                   size="sm"
-                  className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
+                  className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
                 >
                   閉じる
                 </Button>

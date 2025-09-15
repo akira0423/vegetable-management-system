@@ -84,8 +84,8 @@ export async function PUT(
       
       // 作業情報
       work_duration: body.work_duration || null,
-      // work_durationからduration_hoursを自動計算
-      duration_hours: body.work_duration ? (body.work_duration / 60) : body.duration_hours || null,
+      // work_durationからduration_hoursを自動計算（互換性のため維持）
+      duration_hours: body.work_duration ? (body.work_duration / 60) : null,
       worker_count: body.worker_count || null,
       
       // 収穫情報

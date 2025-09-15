@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,14 +68,42 @@ interface AssignedUser {
   isNone: boolean
 }
 
-const assignedUsers: AssignedUser[] = [
-  { id: 'none', name: '👤 担当者なし', isNone: true },
-  { id: 'd0efa1ac-7e7e-420b-b147-dabdf01454b7', name: '👨‍🌾 田中太郎', isNone: false },
-  { id: 'a1b2c3d4-5e6f-7890-1234-567890abcdef', name: '👩‍🌾 佐藤花子', isNone: false },
-  { id: 'b2c3d4e5-6f78-9012-3456-789abcdef012', name: '👨‍🌾 山田次郎', isNone: false }
-]
-
 export default function NewTaskForm({ vegetables, onSubmit, onCancel, isLoading = false }: NewTaskFormProps) {
+  const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([
+    { id: 'none', name: '👤 担当者なし', isNone: true }
+  ])
+
+  // ユーザーデータを取得
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const userResponse = await fetch('/api/auth/user')
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          if (userData.success && userData.user?.company_id) {
+            const usersResponse = await fetch(`/api/users?company_id=${userData.user.company_id}`)
+            if (usersResponse.ok) {
+              const usersData = await usersResponse.json()
+              if (usersData.users) {
+                const formattedUsers = usersData.users.map((u: any) => ({
+                  id: u.id,
+                  name: u.full_name || u.email || '名前未設定',
+                  isNone: false
+                }))
+                setAssignedUsers([
+                  { id: 'none', name: '👤 担当者なし', isNone: true },
+                  ...formattedUsers
+                ])
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('ユーザー取得エラー:', error)
+      }
+    }
+    fetchUsers()
+  }, [])
   const [formData, setFormData] = useState({
     workType: 'inspection' as string, // より実用的な初期値
     description: '',

@@ -369,7 +369,8 @@ export async function PUT(request: NextRequest) {
   try {
     // 認証済みクライアントを使用（セキュリティ強化）
     const supabase = await createClient()
-    
+    const serviceSupabase = await createServiceClient()
+
     // ユーザー認証確認
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -379,7 +380,9 @@ export async function PUT(request: NextRequest) {
       )
     }
     const body = await request.json()
-    
+
+    console.log('🔧 PUT /api/gantt - リクエストボディ:', body)
+
     const {
       id,
       name,
@@ -430,7 +433,33 @@ export async function PUT(request: NextRequest) {
     if (status !== undefined) updateData.status = status
     if (priority !== undefined) updateData.priority = priority
     if (description !== undefined) updateData.description = description
-    // if (assigned_user_id !== undefined) updateData.assigned_to = assigned_user_id // カラムが存在しないためコメントアウト
+
+    // assigned_user_idの処理: nullまたは有効なUUIDのみ許可
+    if (assigned_user_id !== undefined) {
+      if (assigned_user_id === null) {
+        // NULLは許可（未割当）
+        updateData.assigned_to = null
+      } else if (assigned_user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assigned_user_id)) {
+        // 有効なUUIDの場合、ユーザーが存在するか確認 (serviceSupabaseを使用してRLSをバイパス)
+        const { data: userExists } = await serviceSupabase
+          .from('users')
+          .select('id')
+          .eq('id', assigned_user_id)
+          .single()
+
+        if (userExists) {
+          updateData.assigned_to = assigned_user_id
+          console.log('✅ ユーザー存在確認: OK', assigned_user_id)
+        } else {
+          console.log('⚠️ ユーザーが存在しません:', assigned_user_id)
+        }
+      } else {
+        console.log('⚠️ 無効なassigned_user_id形式:', assigned_user_id)
+      }
+    }
+
+    console.log('🔧 PUT /api/gantt - 更新データ:', updateData)
+    console.log('🔧 PUT /api/gantt - タスクID:', id)
 
     const { data: task, error } = await supabase
       .from('growing_tasks')
@@ -456,8 +485,15 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
+      console.error('🔴 Database error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+      console.error('🔴 Failed update data:', updateData)
+      console.error('🔴 Task ID:', id)
+      return NextResponse.json({ error: `Failed to update task: ${error.message}` }, { status: 500 })
     }
 
     const ganttTask = {
