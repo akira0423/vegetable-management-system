@@ -1378,6 +1378,8 @@ export default function GanttPage() {
           name: updates.name,
           start_date: updates.start,
           end_date: updates.end,
+          progress: updates.progress,
+          status: updates.status,
           priority: updates.priority,
           description: updates.description,
           assigned_user_id: updates.assigned_user_id !== undefined ? updates.assigned_user_id : updates.assignedUser?.id
@@ -2455,24 +2457,32 @@ export default function GanttPage() {
                         // 全ての変更を一度に送信
                         const updates: any = {}
 
+                        // デバッグ: pendingTaskChangesの内容を確認
+                        console.log('🔍 pendingTaskChanges内容:', pendingTaskChanges)
+                        console.log('🔍 pendingTaskChangesのキー:', Object.keys(pendingTaskChanges))
+
                         // assigned_user_idを直接チェック
                         if ('assigned_user_id' in pendingTaskChanges) {
                           updates.assigned_user_id = pendingTaskChanges.assigned_user_id
+                          console.log('✅ assigned_user_idを追加:', pendingTaskChanges.assigned_user_id)
                         }
                         // priorityをチェック
                         if ('priority' in pendingTaskChanges) {
                           updates.priority = pendingTaskChanges.priority
+                          console.log('✅ priorityを追加:', pendingTaskChanges.priority)
                         }
                         // progressをチェック
                         if ('progress' in pendingTaskChanges) {
                           updates.progress = pendingTaskChanges.progress
+                          console.log('✅ progressを追加:', pendingTaskChanges.progress)
                         }
                         // statusをチェック
                         if ('status' in pendingTaskChanges) {
                           updates.status = pendingTaskChanges.status
+                          console.log('✅ statusを追加:', pendingTaskChanges.status)
                         }
 
-                        console.log('📝 更新データ:', updates, 'pendingTaskChanges:', pendingTaskChanges)
+                        console.log('📝 最終的な更新データ:', updates)
 
                         // 更新データが空でない場合のみ送信
                         if (Object.keys(updates).length > 0) {
