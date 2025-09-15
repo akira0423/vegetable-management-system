@@ -481,6 +481,29 @@ export async function PUT(request: NextRequest) {
     console.log('🔧 PUT /api/gantt - 更新データ:', updateData)
     console.log('🔧 PUT /api/gantt - タスクID:', id)
 
+    // 更新データが空の場合はエラーを返す
+    if (Object.keys(updateData).length === 0) {
+      console.log('⚠️ 更新データが空です')
+      return NextResponse.json({ error: 'No data to update' }, { status: 400 })
+    }
+
+    // まず、タスクが実際に存在するか確認（削除されていないか）
+    const { data: taskExists, error: checkError } = await supabase
+      .from('growing_tasks')
+      .select('id, deleted_at')
+      .eq('id', id)
+      .single()
+
+    if (checkError || !taskExists) {
+      console.error('🔴 タスクが見つかりません:', { id, checkError })
+      return NextResponse.json({ error: 'Task not found in database' }, { status: 404 })
+    }
+
+    if (taskExists.deleted_at) {
+      console.error('🔴 タスクは削除されています:', { id, deleted_at: taskExists.deleted_at })
+      return NextResponse.json({ error: 'Task has been deleted' }, { status: 410 })
+    }
+
     const { data: task, error } = await supabase
       .from('growing_tasks')
       .update(updateData)
