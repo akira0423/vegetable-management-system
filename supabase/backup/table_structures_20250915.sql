@@ -1,0 +1,172 @@
+-- ====================================================================
+-- Supabase データベース構造バックアップ
+-- 作成日: 2025年9月15日
+-- ====================================================================
+
+-- 重要: このファイルは現在のテーブル構造の記録です
+-- 実際のバックアップはSupabase Dashboardから行ってください
+
+-- ====================================================================
+-- テーブル: companies
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.companies (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     name VARCHAR(255) NOT NULL,
+--     description TEXT,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     deleted_at TIMESTAMP WITH TIME ZONE
+-- );
+
+-- ====================================================================
+-- テーブル: vegetables
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.vegetables (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+--     name VARCHAR(255) NOT NULL,
+--     variety_name VARCHAR(255),
+--     plot_name VARCHAR(255),
+--     planting_date DATE,
+--     expected_harvest_date DATE,
+--     notes TEXT,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     deleted_at TIMESTAMP WITH TIME ZONE
+-- );
+
+-- ====================================================================
+-- テーブル: work_reports
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.work_reports (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+--     vegetable_id UUID REFERENCES vegetables(id) ON DELETE SET NULL,
+--     work_type VARCHAR(50) NOT NULL,
+--     description TEXT,
+--     work_date DATE NOT NULL,
+--     start_time TIME,
+--     end_time TIME,
+--     duration_hours NUMERIC(5,2),
+--     work_duration INTEGER, -- 作業時間（分）
+--     worker_count INTEGER DEFAULT 1,
+--     weather VARCHAR(50),
+--     temperature NUMERIC(5,2),
+--     humidity NUMERIC(5,2),
+--     harvest_amount NUMERIC(10,2),
+--     harvest_unit VARCHAR(50),
+--     harvest_quality VARCHAR(50),
+--     expected_price NUMERIC(10,2),
+--     expected_revenue NUMERIC(10,2),
+--     notes TEXT,
+--     created_by UUID,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     deleted_at TIMESTAMP WITH TIME ZONE,
+--     -- 土壌分析関連フィールド
+--     soil_ph NUMERIC(4,2),
+--     soil_ec NUMERIC(10,2),
+--     phosphorus_absorption NUMERIC(10,2),
+--     cec NUMERIC(10,2),
+--     base_saturation NUMERIC(5,2),
+--     exchangeable_calcium NUMERIC(10,2),
+--     exchangeable_magnesium NUMERIC(10,2),
+--     exchangeable_potassium NUMERIC(10,2),
+--     humus_content NUMERIC(5,2),
+--     available_phosphorus NUMERIC(10,2),
+--     available_silica NUMERIC(10,2),
+--     ammonium_nitrogen NUMERIC(10,2),
+--     nitrate_nitrogen NUMERIC(10,2),
+--     soil_notes TEXT
+-- );
+
+-- ====================================================================
+-- テーブル: accounting_items
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.accounting_items (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+--     code VARCHAR(20),
+--     name VARCHAR(255) NOT NULL,
+--     type VARCHAR(20) NOT NULL CHECK (type IN ('income', 'expense')),
+--     category VARCHAR(100),
+--     cost_type VARCHAR(20) CHECK (cost_type IN ('fixed', 'variable')),
+--     is_default BOOLEAN DEFAULT false,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     deleted_at TIMESTAMP WITH TIME ZONE
+-- );
+
+-- ====================================================================
+-- テーブル: work_report_accounting
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.work_report_accounting (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     work_report_id UUID NOT NULL REFERENCES work_reports(id) ON DELETE CASCADE,
+--     accounting_item_id UUID REFERENCES accounting_items(id) ON DELETE SET NULL,
+--     amount NUMERIC(12,2) NOT NULL,
+--     custom_item_name VARCHAR(255),
+--     notes TEXT,
+--     is_ai_recommended BOOLEAN DEFAULT false,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+-- );
+
+-- ====================================================================
+-- テーブル: soil_analyses
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.soil_analyses (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+--     vegetable_id UUID REFERENCES vegetables(id) ON DELETE SET NULL,
+--     analysis_date DATE NOT NULL,
+--     ph NUMERIC(4,2),
+--     ec NUMERIC(10,2),
+--     phosphorus_absorption NUMERIC(10,2),
+--     cec NUMERIC(10,2),
+--     base_saturation NUMERIC(5,2),
+--     exchangeable_calcium NUMERIC(10,2),
+--     exchangeable_magnesium NUMERIC(10,2),
+--     exchangeable_potassium NUMERIC(10,2),
+--     humus_content NUMERIC(5,2),
+--     available_phosphorus NUMERIC(10,2),
+--     available_silica NUMERIC(10,2),
+--     ammonium_nitrogen NUMERIC(10,2),
+--     nitrate_nitrogen NUMERIC(10,2),
+--     notes TEXT,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     deleted_at TIMESTAMP WITH TIME ZONE
+-- );
+
+-- ====================================================================
+-- テーブル: user_company_memberships
+-- ====================================================================
+-- CREATE TABLE IF NOT EXISTS public.user_company_memberships (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id UUID NOT NULL,
+--     company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+--     role VARCHAR(50) DEFAULT 'member',
+--     joined_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+--     UNIQUE(user_id, company_id)
+-- );
+
+-- ====================================================================
+-- インデックス
+-- ====================================================================
+-- CREATE INDEX idx_work_reports_company_id ON work_reports(company_id);
+-- CREATE INDEX idx_work_reports_vegetable_id ON work_reports(vegetable_id);
+-- CREATE INDEX idx_work_reports_work_date ON work_reports(work_date);
+-- CREATE INDEX idx_work_reports_work_type ON work_reports(work_type);
+-- CREATE INDEX idx_vegetables_company_id ON vegetables(company_id);
+-- CREATE INDEX idx_accounting_items_company_id ON accounting_items(company_id);
+-- CREATE INDEX idx_work_report_accounting_work_report_id ON work_report_accounting(work_report_id);
+-- CREATE INDEX idx_soil_analyses_company_id ON soil_analyses(company_id);
+
+-- ====================================================================
+-- RLS (Row Level Security) ポリシー
+-- ====================================================================
+-- 注: 実際のRLSポリシーはSupabase Dashboardで確認してください
+-- 各テーブルにはユーザーの所属企業に基づくアクセス制御が設定されています
