@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         priority,
         task_type,
         description,
+        assigned_to,
         created_at,
         updated_at,
         vegetables:vegetable_id (
@@ -73,6 +74,11 @@ export async function GET(request: NextRequest) {
           plot_name,
           status,
           deleted_at
+        ),
+        assignedUser:users!growing_tasks_assigned_to_fkey (
+          id,
+          full_name,
+          email
         )
       `)
       .eq('company_id', companyId) // 作業記録と同じ直接フィルタリング
@@ -154,7 +160,11 @@ export async function GET(request: NextRequest) {
           name: task.vegetables?.name || '不明',
           variety: task.vegetables?.variety_name || ''
         },
-        assignedUser: null, // assigned_toカラムが存在しないためnullに設定
+        assignedUser: task.assignedUser ? {
+          id: task.assignedUser.id,
+          name: task.assignedUser.full_name || task.assignedUser.email,
+          email: task.assignedUser.email
+        } : null
         description: task.description,
         workType: task.task_type,
         color: getStatusColor(task.status)
@@ -315,6 +325,7 @@ export async function POST(request: NextRequest) {
         priority,
         task_type,
         description,
+        assigned_to,
         created_at,
         updated_at,
         vegetables:vegetable_id (
@@ -324,6 +335,11 @@ export async function POST(request: NextRequest) {
           plot_name,
           status,
           deleted_at
+        ),
+        assignedUser:users!growing_tasks_assigned_to_fkey (
+          id,
+          full_name,
+          email
         )
       `)
       .single()
@@ -347,7 +363,11 @@ export async function POST(request: NextRequest) {
         name: task.vegetables?.name || '不明',
         variety: task.vegetables?.variety_name || ''
       },
-      assignedUser: null, // assigned_toカラムが存在しないためnullに設定
+      assignedUser: task.assignedUser ? {
+        id: task.assignedUser.id,
+        name: task.assignedUser.full_name || task.assignedUser.email,
+        email: task.assignedUser.email
+      } : null
       color: getStatusColor(task.status)
     }
 
@@ -475,11 +495,17 @@ export async function PUT(request: NextRequest) {
         priority,
         task_type,
         description,
+        assigned_to,
         vegetable:vegetables(
           id,
           name,
           variety_name,
           deleted_at
+        ),
+        assignedUser:users!growing_tasks_assigned_to_fkey (
+          id,
+          full_name,
+          email
         )
       `)
       .single()
@@ -509,7 +535,11 @@ export async function PUT(request: NextRequest) {
         name: task.vegetable.name,
         variety: task.vegetable.variety_name
       },
-      assignedUser: null, // assigned_toカラムが存在しないためnullに設定
+      assignedUser: task.assignedUser ? {
+        id: task.assignedUser.id,
+        name: task.assignedUser.full_name || task.assignedUser.email,
+        email: task.assignedUser.email
+      } : null,
       color: getStatusColor(task.status)
     }
 
