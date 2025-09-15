@@ -2241,7 +2241,7 @@ export default function GanttPage() {
                       onValueChange={(value) => {
                         const newAssignee = value === 'unassigned' ? null : users.find(u => u.id === value)
                         setPendingTaskChanges(prev => ({
-                          ...prev,
+                          ...(prev || {}),
                           assignedUser: newAssignee,
                           assigned_user_id: newAssignee?.id || null
                         }))
@@ -2290,7 +2290,7 @@ export default function GanttPage() {
                       value={pendingTaskChanges?.priority ?? selectedTask.priority ?? 'medium'}
                       onValueChange={(value) => {
                         setPendingTaskChanges(prev => ({
-                          ...prev,
+                          ...(prev || {}),
                           priority: value
                         }))
                         setHasUnsavedChanges(true)
@@ -2322,7 +2322,7 @@ export default function GanttPage() {
                               const currentProgress = pendingTaskChanges?.progress ?? selectedTask.progress
                               const newProgress = Math.max(0, currentProgress - 10)
                               setPendingTaskChanges(prev => ({
-                                ...prev,
+                                ...(prev || {}),
                                 progress: newProgress
                               }))
                               setHasUnsavedChanges(true)
@@ -2387,7 +2387,7 @@ export default function GanttPage() {
                               const currentProgress = pendingTaskChanges?.progress ?? selectedTask.progress
                               const newProgress = Math.min(100, currentProgress + 10)
                               setPendingTaskChanges(prev => ({
-                                ...prev,
+                                ...(prev || {}),
                                 progress: newProgress
                               }))
                               setHasUnsavedChanges(true)
@@ -2415,7 +2415,7 @@ export default function GanttPage() {
                           e.preventDefault()
                           e.stopPropagation()
                           setPendingTaskChanges(prev => ({
-                            ...prev,
+                            ...(prev || {}),
                             progress: 100,
                             status: 'completed'
                           }))
@@ -2455,20 +2455,29 @@ export default function GanttPage() {
                         // 全ての変更を一度に送信
                         const updates: any = {}
 
-                        if (pendingTaskChanges.assigned_user_id !== undefined) {
+                        // assigned_user_idを直接チェック
+                        if ('assigned_user_id' in pendingTaskChanges) {
                           updates.assigned_user_id = pendingTaskChanges.assigned_user_id
                         }
-                        if (pendingTaskChanges.priority !== undefined) {
+                        // priorityをチェック
+                        if ('priority' in pendingTaskChanges) {
                           updates.priority = pendingTaskChanges.priority
                         }
-                        if (pendingTaskChanges.progress !== undefined) {
+                        // progressをチェック
+                        if ('progress' in pendingTaskChanges) {
                           updates.progress = pendingTaskChanges.progress
                         }
-                        if (pendingTaskChanges.status !== undefined) {
+                        // statusをチェック
+                        if ('status' in pendingTaskChanges) {
                           updates.status = pendingTaskChanges.status
                         }
 
-                        await handleUpdateTask(selectedTask.id, updates)
+                        console.log('📝 更新データ:', updates, 'pendingTaskChanges:', pendingTaskChanges)
+
+                        // 更新データが空でない場合のみ送信
+                        if (Object.keys(updates).length > 0) {
+                          await handleUpdateTask(selectedTask.id, updates)
+                        }
 
                         // 更新後、pendingTaskChangesをリセット
                         setPendingTaskChanges(null)
