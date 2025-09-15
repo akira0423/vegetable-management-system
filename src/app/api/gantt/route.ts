@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
           id: task.assignedUser.id,
           name: task.assignedUser.full_name || task.assignedUser.email,
           email: task.assignedUser.email
-        } : null
+        } : null,
         description: task.description,
         workType: task.task_type,
         color: getStatusColor(task.status)
@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
         id: task.assignedUser.id,
         name: task.assignedUser.full_name || task.assignedUser.email,
         email: task.assignedUser.email
-      } : null
+      } : null,
       color: getStatusColor(task.status)
     }
 
