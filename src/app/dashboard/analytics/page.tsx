@@ -349,13 +349,13 @@ export default function AnalyticsPage() {
       // 選択された野菜によるフィルタリング
       let filteredWorkReports = workReports
       let filteredVegetables = vegetables
-      
+
       if (selectedVegetable !== 'all') {
         const selectedVegId = selectedVegetable
         filteredWorkReports = workReports.filter((report: any) => report.vegetable_id === selectedVegId)
         filteredVegetables = vegetables && vegetables.length > 0 ? vegetables.filter((veg: any) => veg.id === selectedVegId) : []
       }
-      
+
       console.log('🔍 Analytics: フィルター後のデータ', {
         選択野菜: selectedVegetable,
         フィルター後作業レポート数: filteredWorkReports.length,

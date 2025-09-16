@@ -460,72 +460,100 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
         <CardContent className="p-6">
           {/* フィルターコントロール */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-              <div className="flex-1 space-y-2">
+            <div className="space-y-3">
+              {/* ラベル行 - 集計期間設定のみ */}
+              <div className="flex items-center mb-2">
                 <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   集計期間設定
                 </label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="date"
-                    value={tempStartDate}
-                    onChange={(e) => setTempStartDate(e.target.value)}
-                    className="w-40"
-                  />
-                  <span className="text-gray-500">～</span>
-                  <Input
-                    type="date"
-                    value={tempEndDate}
-                    onChange={(e) => setTempEndDate(e.target.value)}
-                    className="w-40"
-                  />
-                  <Button
-                    onClick={applyDateFilter}
-                    size="sm"
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 border border-green-700/20"
-                  >
-                    <Calendar className="w-3 h-3 mr-1" />
-                    適用
-                  </Button>
-                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  <Filter className="w-4 h-4" />
-                  ソート設定
-                </label>
-                <div className="flex gap-2">
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="totalRevenue">総収入</SelectItem>
-                      <SelectItem value="totalCost">総支出</SelectItem>
-                      <SelectItem value="count">実施回数</SelectItem>
-                      <SelectItem value="totalHours">総作業時間</SelectItem>
-                      <SelectItem value="plotSize">栟培面積</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortOrder} onValueChange={setSortOrder}>
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">降順</SelectItem>
-                      <SelectItem value="asc">昇順</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+              {/* コントロール行 - すべてのボタンとプルダウンを一行に */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* 期間設定 */}
+                <Input
+                  type="date"
+                  value={tempStartDate}
+                  onChange={(e) => setTempStartDate(e.target.value)}
+                  className="w-40"
+                />
+                <span className="text-gray-500">～</span>
+                <Input
+                  type="date"
+                  value={tempEndDate}
+                  onChange={(e) => setTempEndDate(e.target.value)}
+                  className="w-40"
+                />
+                <Button
+                  onClick={applyDateFilter}
+                  size="sm"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 border border-green-700/20"
+                >
+                  <Calendar className="w-3 h-3 mr-1" />
+                  適用
+                </Button>
+
+                {/* 区切り線 */}
+                <div className="hidden lg:block w-px h-8 bg-gray-300 mx-2" />
+
+                {/* 展開コントロール */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExpandedVegetables(new Set(data.map(d => d.vegetableId)))}
+                  className="bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 border-emerald-300 text-emerald-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center"
+                >
+                  <span className="text-base mr-1">🌱</span>
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                  すべて展開
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExpandedVegetables(new Set())}
+                  className="bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border-amber-300 text-amber-700 font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center"
+                >
+                  <span className="text-base mr-1">📊</span>
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                  コンパクト表示
+                </Button>
+
+                {/* 区切り線 */}
+                <div className="hidden lg:block w-px h-8 bg-gray-300 mx-2" />
+
+                {/* ソートプルダウン */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="totalRevenue">総収入</SelectItem>
+                    <SelectItem value="totalCost">総支出</SelectItem>
+                    <SelectItem value="count">実施回数</SelectItem>
+                    <SelectItem value="totalHours">総作業時間</SelectItem>
+                    <SelectItem value="plotSize">栽培面積</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">降順</SelectItem>
+                    <SelectItem value="asc">昇順</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Button onClick={fetchWorkAnalysisData} className="bg-green-600 hover:bg-green-700 text-white">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                <span className="text-white">更新</span>
-              </Button>
-            </div>
-            <div className="mt-3 text-xs text-gray-500">
-              最終更新: {lastUpdated.toLocaleString('ja-JP')}
+
+              {/* 最終更新時刻 */}
+              <div className="text-xs text-gray-500 mt-3">
+                最終更新: {lastUpdated.toLocaleString('ja-JP')}
+              </div>
             </div>
           </div>
 
@@ -666,28 +694,6 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
               <Leaf className="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <p>指定期間内にデータがありません</p>
               <p className="text-sm">期間を調整するか、作業記録を追加してください</p>
-            </div>
-          )}
-          
-          {/* 展開コントロール */}
-          {data.length > 0 && (
-            <div className="mt-4 flex justify-center gap-3">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setExpandedVegetables(new Set(data.map(d => d.vegetableId)))}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                すべて展開
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setExpandedVegetables(new Set())}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                すべて折りたたみ
-              </Button>
             </div>
           )}
 

@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogPortal, DialogO
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils/index'
-import { CalendarIcon, Clock, TrendingUp, TrendingDown, Eye, X, Zap, Target, Award, ChevronRight, Sprout, AlertCircle } from 'lucide-react'
+import { CalendarIcon, Clock, TrendingUp, TrendingDown, Eye, X, Zap, Target, Award, ChevronRight, Sprout, AlertCircle, Check } from 'lucide-react'
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
@@ -352,6 +352,18 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
   const [isWorkTypeTotalsOpen, setIsWorkTypeTotalsOpen] = useState(true)
   const [demoLimitModalOpen, setDemoLimitModalOpen] = useState(false)
 
+  // 作業種別の表示/非表示を管理
+  const [visibleWorkTypes, setVisibleWorkTypes] = useState<{[key: string]: boolean}>({
+    seeding: true,
+    planting: true,
+    fertilizing: true,
+    watering: true,
+    weeding: true,
+    pruning: true,
+    harvesting: true,
+    other: true
+  })
+
   const [weatherDisplayOptions, setWeatherDisplayOptions] = useState<WeatherDisplayOptions>({
     showTemperature: false,
     showHumidity: false
@@ -360,6 +372,23 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
   const chartRef = useRef<ChartJS<'bar'>>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [chartDimensions, setChartDimensions] = useState({ left: 0, right: 0, width: 0 })
+
+  // 作業種別の表示/非表示をトグル
+  const toggleWorkType = useCallback((workType: string) => {
+    setVisibleWorkTypes(prev => ({
+      ...prev,
+      [workType]: !prev[workType]
+    }))
+  }, [])
+
+  // 全選択/全解除
+  const toggleAllWorkTypes = useCallback((visible: boolean) => {
+    const newState: {[key: string]: boolean} = {}
+    Object.keys(WORK_TYPE_COLORS).forEach(key => {
+      newState[key] = visible
+    })
+    setVisibleWorkTypes(newState)
+  }, [])
 
   // レスポンシブ寸法計算
   const calculateResponsiveDimensions = useCallback((period: number, containerWidth: number): ResponsiveDimensions => {
@@ -521,7 +550,11 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
 
     // 作業種別ごとのデータセット
     workTypes.forEach((workType, index) => {
+      // 非表示の作業種別はデータを0にする
+      const isVisible = visibleWorkTypes[workType]
+
       const data = workHoursData.map(d => {
+        if (!isVisible) return 0
         const workTypeData = d.work_types[workType]
         return workTypeData ? workTypeData.total_hours / yAxisRange.unitDivisor : 0
       })
@@ -529,11 +562,16 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
       datasets.push({
         label: WORK_TYPE_LABELS[workType as keyof typeof WORK_TYPE_LABELS] || workType,
         data,
-        backgroundColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderColor: WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS],
-        borderWidth: 1,
+        backgroundColor: isVisible
+          ? WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS]
+          : 'transparent',
+        borderColor: isVisible
+          ? WORK_TYPE_COLORS[workType as keyof typeof WORK_TYPE_COLORS]
+          : 'transparent',
+        borderWidth: isVisible ? 1 : 0,
         stack: 'stack0',
-        order: index + 1
+        order: index + 1,
+        hidden: !isVisible
       })
     })
 
@@ -541,7 +579,13 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
     if (showCumulativeWorkTime) {
       let cumulativeHours = 0
       const cumulativeData = workHoursData.map(d => {
-        const monthlyTotal = Object.values(d.work_types).reduce((sum, workType) => sum + (workType.total_hours || 0), 0)
+        // 表示されている作業種別のみを累積に含める
+        const monthlyTotal = Object.keys(d.work_types).reduce((sum, workType) => {
+          if (visibleWorkTypes[workType]) {
+            return sum + (d.work_types[workType]?.total_hours || 0)
+          }
+          return sum
+        }, 0)
         cumulativeHours += monthlyTotal
         return cumulativeHours / cumulativeYAxisRange.unitDivisor
       })
@@ -609,7 +653,7 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
       labels: monthLabels,
       datasets
     }
-  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange])
+  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange, visibleWorkTypes])
 
   // チャートオプション
   const chartOptions: ChartOptions<'bar'> = useMemo(() => {
@@ -1104,33 +1148,80 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
                   <span className="font-medium text-gray-700">作業種別凡例・期間合計</span>
                 </div>
                 <Badge variant="secondary">
-                  {Object.keys(WORK_TYPE_LABELS).length}種類
+                  {Object.values(visibleWorkTypes).filter(v => v).length}/{Object.keys(WORK_TYPE_LABELS).length}種類
                 </Badge>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                {Object.entries(WORK_TYPE_LABELS).map(([key, label]) => {
-                  const totalHours = workHoursData.reduce((sum, d) => {
-                    const workType = d.work_types[key]
-                    return sum + (workType ? workType.total_hours : 0)
-                  }, 0)
+              <div className="space-y-3 mt-3">
+                {/* 全選択/全解除ボタン */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAllWorkTypes(true)}
+                    className="text-xs"
+                  >
+                    すべて選択
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAllWorkTypes(false)}
+                    className="text-xs"
+                  >
+                    すべて解除
+                  </Button>
+                </div>
 
-                  return (
-                    <div key={key} className="flex items-center gap-2 p-2 bg-white rounded-lg border">
+                {/* 凡例項目 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(WORK_TYPE_LABELS).map(([key, label]) => {
+                    const isVisible = visibleWorkTypes[key]
+                    const totalHours = workHoursData.reduce((sum, d) => {
+                      const workType = d.work_types[key]
+                      return sum + (workType ? workType.total_hours : 0)
+                    }, 0)
+
+                    return (
                       <div
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: WORK_TYPE_COLORS[key as keyof typeof WORK_TYPE_COLORS] }}
-                      />
-                      <div className="flex-1">
-                        <div className="text-xs font-medium text-gray-700">{label}</div>
-                        <div className="text-xs text-gray-500">
-                          {totalHours.toFixed(0)}h
+                        key={key}
+                        className={`flex items-center gap-2 p-2 bg-white rounded-lg border cursor-pointer transition-all ${
+                          isVisible
+                            ? 'hover:bg-gray-50 border-gray-200'
+                            : 'opacity-50 hover:bg-gray-100 border-gray-300'
+                        }`}
+                        onClick={() => toggleWorkType(key)}
+                      >
+                        <div className="relative">
+                          <div
+                            className="w-4 h-4 rounded"
+                            style={{
+                              backgroundColor: isVisible
+                                ? WORK_TYPE_COLORS[key as keyof typeof WORK_TYPE_COLORS]
+                                : '#d1d5db'
+                            }}
+                          />
+                          {isVisible && (
+                            <Check className="absolute -top-1 -right-1 w-3 h-3 text-white bg-green-600 rounded-full p-0.5" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className={`text-xs font-medium ${
+                            isVisible ? 'text-gray-700' : 'text-gray-400 line-through'
+                          }`}>
+                            {label}
+                          </div>
+                          <div className={`text-xs ${
+                            isVisible ? 'text-gray-500' : 'text-gray-400'
+                          }`}>
+                            {totalHours.toFixed(0)}h
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             </CollapsibleContent>
           </Collapsible>

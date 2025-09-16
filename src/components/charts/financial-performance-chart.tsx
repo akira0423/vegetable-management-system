@@ -618,36 +618,71 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     }
   }, [companyId, startMonth, displayPeriod, processRealAccountingItems, processEstimatedAccountingItems])
 
-  // 累積データ計算機能（すべての月を含む）
-  const calculateCumulativeData = useCallback((categoryData: { [month: string]: CategoryData }, dataKeys: string[]) => {
+  // 累積データ計算機能（選択された項目のみを含む）
+  const calculateCumulativeData = useCallback((
+    categoryData: { [month: string]: CategoryData },
+    dataKeys: string[],
+    visibleItems: { [key: string]: boolean }
+  ) => {
     const cumulativeData: { [month: string]: { profit: number, income: number, expense: number } } = {}
-    
+
     let cumulativeProfit = 0
     let cumulativeIncome = 0
     let cumulativeExpense = 0
-    
+
     dataKeys.forEach(dataKey => {
       const monthData = categoryData[dataKey]
-      
-      // 月次収入・支出を計算（データがない月は0として扱う）
-      const monthlyIncome = monthData ? monthData.income.reduce((sum, item) => sum + item.value, 0) : 0
-      const monthlyVariableCosts = monthData ? monthData.variable_costs.reduce((sum, item) => sum + item.value, 0) : 0
-      const monthlyFixedCosts = monthData ? monthData.fixed_costs.reduce((sum, item) => sum + item.value, 0) : 0
-      const monthlyExpense = monthlyVariableCosts + monthlyFixedCosts
+
+      // 表示中の項目のみを集計
+      let monthlyIncome = 0
+      let monthlyExpense = 0
+
+      if (monthData) {
+        // 収入項目（表示中のもののみ）
+        // visibleItemsが空の場合は全て表示とみなす
+        monthlyIncome = monthData.income.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        // 変動費項目（表示中のもののみ）
+        const monthlyVariableCosts = monthData.variable_costs.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        // 固定費項目（表示中のもののみ）
+        const monthlyFixedCosts = monthData.fixed_costs.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        monthlyExpense = monthlyVariableCosts + monthlyFixedCosts
+      }
+
       const monthlyProfit = monthlyIncome - monthlyExpense
-      
+
       // 累積値を更新
       cumulativeIncome += monthlyIncome
       cumulativeExpense += monthlyExpense
       cumulativeProfit += monthlyProfit
-      
+
       cumulativeData[dataKey] = {
         profit: cumulativeProfit,
         income: cumulativeIncome,
         expense: cumulativeExpense
       }
     })
-    
+
     return cumulativeData
   }, [])
 
@@ -988,29 +1023,40 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     // 累積損益線データセット（右Y軸用）
     const cumulativeDatasets = []
     if (showCumulativeLine && categoryData) {
-      // インデックスベースのデータキーを使用
-      const cumulativeData = calculateCumulativeData(categoryData, dataKeysByIndex)
-      
+      // インデックスベースのデータキーを使用（visibleItemsを渡す）
+      const cumulativeData = calculateCumulativeData(categoryData, dataKeysByIndex, visibleItems)
+
+      // 表示中の項目数をカウント
+      const visibleIncomeCount = Object.entries(visibleItems).filter(([key, visible]) => {
+        const item = allAvailableItems[key]
+        return visible && item?.category === 'income'
+      }).length
+
+      const visibleExpenseCount = Object.entries(visibleItems).filter(([key, visible]) => {
+        const item = allAvailableItems[key]
+        return visible && (item?.category === 'variable_costs' || item?.category === 'fixed_costs')
+      }).length
+
       let lineData: number[]
       let lineColor: string
       let lineLabel: string
-      
+
       switch (cumulativeType) {
         case 'profit':
           lineData = dataKeysByIndex.map(dataKey => cumulativeData[dataKey]?.profit || 0)
           lineColor = '#059669' // エメラルド色
-          lineLabel = '📈 累積損益'
+          lineLabel = `📈 累積損益（収入${visibleIncomeCount}項目-支出${visibleExpenseCount}項目）`
           break
         case 'income':
           lineData = dataKeysByIndex.map(dataKey => cumulativeData[dataKey]?.income || 0)
           lineColor = '#0284c7' // 青色
-          lineLabel = '💰 累積収入'
+          lineLabel = `💰 累積収入（${visibleIncomeCount}項目）`
           break
         case 'expense':
           // 累積支出はマイナス値として表示（月次キャッシュフローと同様）
           lineData = dataKeysByIndex.map(dataKey => -(cumulativeData[dataKey]?.expense || 0))
           lineColor = '#dc2626' // 赤色
-          lineLabel = '💸 累積支出'
+          lineLabel = `💸 累積支出（${visibleExpenseCount}項目）`
           break
       }
       
@@ -1041,7 +1087,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       yearLabels, // 年ラベルをデータに含める
       dataKeysByIndex // データキー配列も含める
     }
-  }, [categoryData, selectedCategories, visibleItems, expandedOthers, showCumulativeLine, cumulativeType, calculateCumulativeData, startMonth, displayPeriod])
+  }, [categoryData, selectedCategories, visibleItems, expandedOthers, showCumulativeLine, cumulativeType, calculateCumulativeData, startMonth, displayPeriod, allAvailableItems])
 
   // Y軸範囲を計算
   const yAxisRange = useMemo(() => calculateYAxisRange(categoryData), [categoryData, calculateYAxisRange])
@@ -1049,11 +1095,11 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // 累積データの範囲を計算（モードに応じて切り替え）
   const cumulativeRange = useMemo(() => {
     if (!showCumulativeLine || !categoryData) return { min: 0, max: 0 }
-    
+
     // 常に最適化モード：プリセット最適化方式（業界標準）
-    
+
     const dataKeys = Object.keys(categoryData).sort()
-    const cumulativeData = calculateCumulativeData(categoryData, dataKeys)
+    const cumulativeData = calculateCumulativeData(categoryData, dataKeys, visibleItems)
     
     const allCumulativeValues: number[] = []
     Object.values(cumulativeData).forEach((data: any) => {
@@ -1219,7 +1265,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       max: symmetricMax,
       stepSize: stepSize
     }
-  }, [showCumulativeLine, categoryData, cumulativeType, calculateCumulativeData, yAxisRange])
+  }, [showCumulativeLine, categoryData, cumulativeType, calculateCumulativeData, yAxisRange, visibleItems])
 
   // チャートオプション（カテゴリ別積み上げ棒グラフ用）
   const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
@@ -1499,7 +1545,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
             // 線グラフがホバーされている場合は累積情報を追加
             const hoveredDataset = context[0].dataset
             if (hoveredDataset && hoveredDataset.type === 'line') {
-              const cumulativeData = calculateCumulativeData(categoryData, chartData?.dataKeysByIndex || [])
+              const cumulativeData = calculateCumulativeData(categoryData, chartData?.dataKeysByIndex || [], visibleItems)
               const currentCumulative = cumulativeData[dataKey]
               if (currentCumulative) {
                 result.push('', '【累積データ】')

@@ -287,6 +287,9 @@ export default function FinancialPerformanceChartDemoEnhanced() {
   const [visibleItems, setVisibleItems] = useState<{ [key: string]: boolean }>({})
   const [allAvailableItems, setAllAvailableItems] = useState<{ [key: string]: LegendItemInfo }>({})
 
+  // 累積損益線の制御状態
+  const [showCumulativeLine, setShowCumulativeLine] = useState(true)
+  const [cumulativeType, setCumulativeType] = useState<'profit' | 'income' | 'expense'>('profit')
 
   // フィルターセクション展開状態
   const [filterSectionExpanded, setFilterSectionExpanded] = useState({
@@ -352,6 +355,73 @@ export default function FinancialPerformanceChartDemoEnhanced() {
     }
   }
 
+  // 累積データ計算機能（選択された項目のみを含む）
+  const calculateCumulativeData = useCallback((
+    categoryData: { [month: string]: CategoryData },
+    dataKeys: string[],
+    visibleItems: { [key: string]: boolean }
+  ) => {
+    const cumulativeData: { [month: string]: { profit: number, income: number, expense: number } } = {}
+
+    let cumulativeProfit = 0
+    let cumulativeIncome = 0
+    let cumulativeExpense = 0
+
+    dataKeys.forEach(dataKey => {
+      const monthData = categoryData[dataKey]
+
+      // 表示中の項目のみを集計
+      let monthlyIncome = 0
+      let monthlyExpense = 0
+
+      if (monthData) {
+        // 収入項目（表示中のもののみ）
+        // visibleItemsが空の場合は全て表示とみなす
+        monthlyIncome = monthData.income.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        // 変動費項目（表示中のもののみ）
+        const monthlyVariableCosts = monthData.variable_costs.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        // 固定費項目（表示中のもののみ）
+        const monthlyFixedCosts = monthData.fixed_costs.reduce((sum, item) => {
+          const isVisible = Object.keys(visibleItems).length === 0 ? true : visibleItems[item.id]
+          if (isVisible) {
+            return sum + item.value
+          }
+          return sum
+        }, 0)
+
+        monthlyExpense = monthlyVariableCosts + monthlyFixedCosts
+      }
+
+      const monthlyProfit = monthlyIncome - monthlyExpense
+
+      // 累積値を更新
+      cumulativeIncome += monthlyIncome
+      cumulativeExpense += monthlyExpense
+      cumulativeProfit += monthlyProfit
+
+      cumulativeData[dataKey] = {
+        profit: cumulativeProfit,
+        income: cumulativeIncome,
+        expense: cumulativeExpense
+      }
+    })
+
+    return cumulativeData
+  }, [])
 
   // Chart.js用データセット作成
   const chartData = useMemo(() => {
@@ -428,11 +498,73 @@ export default function FinancialPerformanceChartDemoEnhanced() {
     }
 
 
+    // 累積損益線データセット（右Y軸用）
+    if (showCumulativeLine && categoryData) {
+      const dataKeys = labels.map((_, index) => financialData[index].month)
+      const cumulativeData = calculateCumulativeData(categoryData, dataKeys, visibleItems)
+
+      // 表示中の項目数をカウント
+      const visibleIncomeCount = Object.entries(visibleItems).filter(([key, visible]) => {
+        const item = allAvailableItems[key]
+        return visible && item?.category === 'income'
+      }).length
+
+      const visibleExpenseCount = Object.entries(visibleItems).filter(([key, visible]) => {
+        const item = allAvailableItems[key]
+        return visible && (item?.category === 'variable_costs' || item?.category === 'fixed_costs')
+      }).length
+
+      let lineData: number[]
+      let lineColor: string
+      let lineLabel: string
+
+      switch (cumulativeType) {
+        case 'profit':
+          lineData = dataKeys.map(dataKey => cumulativeData[dataKey]?.profit || 0)
+          lineColor = '#059669'
+          lineLabel = `📈 累積損益（収入${visibleIncomeCount}項目-支出${visibleExpenseCount}項目）`
+          break
+        case 'income':
+          lineData = dataKeys.map(dataKey => cumulativeData[dataKey]?.income || 0)
+          lineColor = '#0284c7'
+          lineLabel = `💰 累積収入（${visibleIncomeCount}項目）`
+          break
+        case 'expense':
+          lineData = dataKeys.map(dataKey => -(cumulativeData[dataKey]?.expense || 0))
+          lineColor = '#dc2626'
+          lineLabel = `💸 累積支出（${visibleExpenseCount}項目）`
+          break
+        default:
+          lineData = []
+          lineColor = '#059669'
+          lineLabel = ''
+      }
+
+      datasets.push({
+        type: 'line' as const,
+        label: lineLabel,
+        data: lineData,
+        borderColor: lineColor,
+        backgroundColor: `${lineColor}20`,
+        borderWidth: 3,
+        pointRadius: 5,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: lineColor,
+        pointBorderWidth: 2,
+        fill: false,
+        tension: 0.2,
+        yAxisID: 'y1',
+        order: -1,
+        pointHoverRadius: 7,
+        pointHoverBorderWidth: 3
+      })
+    }
+
     return { labels, datasets }
-  }, [financialData, displayOptions, selectedCategories, visibleItems, allAvailableItems, categoryData])
+  }, [financialData, displayOptions, selectedCategories, visibleItems, allAvailableItems, categoryData, showCumulativeLine, cumulativeType, calculateCumulativeData])
 
   // Chart.jsオプション
-  const chartOptions: ChartOptions<'bar'> = {
+  const chartOptions: ChartOptions<'bar'> = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     onClick: handleChartClick,
@@ -462,6 +594,29 @@ export default function FinancialPerformanceChartDemoEnhanced() {
         ticks: {
           callback: (value) => `¥${Number(value).toLocaleString()}`
         }
+      },
+      // 右Y軸（累積損益用）
+      y1: {
+        type: 'linear' as const,
+        position: 'right' as const,
+        display: showCumulativeLine,
+        grid: {
+          drawOnChartArea: false
+        },
+        ticks: {
+          callback: (value) => `¥${Number(value).toLocaleString()}`
+        },
+        title: {
+          display: true,
+          text: cumulativeType === 'profit' ? '累積損益' :
+                cumulativeType === 'income' ? '累積収入' : '累積支出',
+          color: cumulativeType === 'profit' ? '#059669' :
+                 cumulativeType === 'income' ? '#0284c7' : '#dc2626',
+          font: {
+            size: 14,
+            weight: '700'
+          }
+        }
       }
     },
     plugins: {
@@ -478,7 +633,7 @@ export default function FinancialPerformanceChartDemoEnhanced() {
         }
       }
     }
-  }
+  }), [displayPeriod, showCumulativeLine, cumulativeType, handleChartClick])
 
   if (loading) {
     return (
@@ -736,6 +891,80 @@ export default function FinancialPerformanceChartDemoEnhanced() {
                           全解除
                         </Button>
                       </div>
+                    </div>
+
+                    {/* 右側：累積損益線制御 */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">📈 累積損益線制御</label>
+                        <span className="text-xs text-gray-500">（右Y軸表示）</span>
+                      </div>
+
+                      <div className="flex gap-2 items-center flex-wrap">
+                        {/* 累積線ON/OFFトグル */}
+                        <Button
+                          variant={showCumulativeLine ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setShowCumulativeLine(!showCumulativeLine)}
+                          className={`text-xs h-8 px-4 ${
+                            showCumulativeLine
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'text-gray-600 hover:bg-emerald-50 border-emerald-200'
+                          }`}
+                        >
+                          📊 累積線 {showCumulativeLine ? '✓' : ''}
+                        </Button>
+
+                        {/* 累積線種別選択（累積線がONの時のみ表示） */}
+                        {showCumulativeLine && (
+                          <>
+                            <Button
+                              variant={cumulativeType === 'profit' ? 'default' : 'ghost'}
+                              size="sm"
+                              onClick={() => setCumulativeType('profit')}
+                              className={`text-xs h-8 px-3 ${
+                                cumulativeType === 'profit'
+                                  ? 'bg-emerald-600 text-white shadow-sm'
+                                  : 'text-emerald-600 hover:bg-emerald-50'
+                              }`}
+                            >
+                              損益
+                            </Button>
+                            <Button
+                              variant={cumulativeType === 'income' ? 'default' : 'ghost'}
+                              size="sm"
+                              onClick={() => setCumulativeType('income')}
+                              className={`text-xs h-8 px-3 ${
+                                cumulativeType === 'income'
+                                  ? 'bg-blue-600 text-white shadow-sm'
+                                  : 'text-blue-600 hover:bg-blue-50'
+                              }`}
+                            >
+                              収入
+                            </Button>
+                            <Button
+                              variant={cumulativeType === 'expense' ? 'default' : 'ghost'}
+                              size="sm"
+                              onClick={() => setCumulativeType('expense')}
+                              className={`text-xs h-8 px-3 ${
+                                cumulativeType === 'expense'
+                                  ? 'bg-red-600 text-white shadow-sm'
+                                  : 'text-red-600 hover:bg-red-50'
+                              }`}
+                            >
+                              支出
+                            </Button>
+                          </>
+                        )}
+                      </div>
+
+                      {showCumulativeLine && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          {cumulativeType === 'profit' && '📈 選択中の収入項目から支出項目を差し引いた累積値を表示'}
+                          {cumulativeType === 'income' && '💰 選択中の収入項目の累積合計を表示'}
+                          {cumulativeType === 'expense' && '💸 選択中の支出項目の累積合計を表示'}
+                        </div>
+                      )}
                     </div>
 
                   </div>
