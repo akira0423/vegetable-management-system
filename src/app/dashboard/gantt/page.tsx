@@ -135,6 +135,9 @@ export default function GanttPage() {
   // Supabaseクライアントの初期化
   const supabase = createClient()
   
+  // タブ状態
+  const [activeTab, setActiveTab] = useState<'gantt' | 'list'>('gantt')
+
   // フィルター状態
   const [selectedVegetable, setSelectedVegetable] = useState<string>('all')
   const [selectedPriority, setSelectedPriority] = useState<string>('all')
@@ -270,10 +273,7 @@ export default function GanttPage() {
       setIsTaskModalOpen(false)
     }
   }, [selectedTask])
-  
-  // タブ状態管理
-  const [activeTab, setActiveTab] = useState('filters')
-  
+
   // 新規タスク作成モーダル
   const [showNewTaskModal, setShowNewTaskModal] = useState(false)
   
@@ -1850,7 +1850,21 @@ export default function GanttPage() {
         </div>
       )}
 
+      {/* メインコンテンツ（タブ表示） */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'gantt' | 'list')} className="space-y-4">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="gantt" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            ガントチャート
+          </TabsTrigger>
+          <TabsTrigger value="list" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            計画・実績一覧
+          </TabsTrigger>
+        </TabsList>
 
+        {/* ガントチャートタブ */}
+        <TabsContent value="gantt" className="space-y-0">
 
       {/* 栽培野菜管理チャート */}
       {ganttTasks.length > 0 || ganttVegetables.length > 0 ? (
@@ -1913,8 +1927,11 @@ export default function GanttPage() {
         </Card>
       )}
 
-      {/* 野菜別 計画タスク・実績記録 */}
-      <div className="space-y-6">
+        </TabsContent>
+
+        {/* 計画・実績一覧タブ */}
+        <TabsContent value="list" className="space-y-0">
+          <div className="space-y-6">
         {/* ガントチャートと同じ緑色ヘッダーデザイン */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg p-4">
           <div className="flex items-center gap-3">
@@ -2257,7 +2274,9 @@ export default function GanttPage() {
             </Card>
           )
         }))}
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* タスク詳細モーダル */}
       <Dialog open={isTaskModalOpen} onOpenChange={(open) => {

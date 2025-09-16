@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sprout, Users, BarChart3, Shield, Calendar, Camera, Map } from "lucide-react"
+import { Sprout, Users, BarChart3, Shield, Calendar, Camera, Map, GanttChart } from "lucide-react"
 import DemoFarmMapView from '@/components/demo/farm-map-view'
 
 export default function Home() {
@@ -140,7 +140,7 @@ export default function Home() {
           </div>
 
           {/* デモ機能ボタン */}
-          <div className="mt-12 text-center">
+          <div className="mt-12 text-center space-y-6">
             <Card className="max-w-2xl mx-auto border-2 border-green-500 bg-green-50">
               <CardHeader>
                 <Map className="h-12 w-12 text-green-600 mb-4 mx-auto" />
@@ -158,6 +158,27 @@ export default function Home() {
                   <Map className="mr-2 h-5 w-5" />
                   デモ機能を体験する
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="max-w-2xl mx-auto border-2 border-blue-500 bg-blue-50">
+              <CardHeader>
+                <GanttChart className="h-12 w-12 text-blue-600 mb-4 mx-auto" />
+                <CardTitle className="text-2xl">栽培野菜スケジュール管理</CardTitle>
+                <CardDescription className="text-base">
+                  栽培野菜の進行状況をカレンダー・ガントチャート形式で統合管理するデモ機能です
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/gantt-demo">
+                  <Button
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <GanttChart className="mr-2 h-5 w-5" />
+                    デモ機能を体験する
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

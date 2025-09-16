@@ -105,18 +105,18 @@ export function CollapsibleSearchFilter({
     showPlanned: true,
     showCompleted: true
   })
-  
+
   // カスタム期間用の状態
   const [showCustomPeriod, setShowCustomPeriod] = useState(false)
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
-  
+
   // 最近使用した期間（LocalStorageから取得）
   const [recentPeriods, setRecentPeriods] = useState<RecentPeriod[]>([])
-  
+
   // LocalStorageから最近使用した期間を読み込み
   useEffect(() => {
-    const stored = localStorage.getItem('recentPeriods')
+    const stored = localStorage.getItem('demo_recentPeriods')
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
@@ -126,14 +126,14 @@ export function CollapsibleSearchFilter({
       }
     }
   }, [])
-  
+
   // カスタム期間を保存
   const saveRecentPeriod = useCallback((start: string, end: string) => {
     const formatDate = (date: string) => {
       const d = new Date(date)
       return `${d.getMonth() + 1}/${d.getDate()}`
     }
-    
+
     const newPeriod: RecentPeriod = {
       id: `${start}_${end}`,
       label: `${formatDate(start)}〜${formatDate(end)}`,
@@ -141,13 +141,13 @@ export function CollapsibleSearchFilter({
       end,
       usedAt: new Date().toISOString()
     }
-    
+
     // 重複を除外して追加
     const updated = [newPeriod, ...recentPeriods.filter(p => p.id !== newPeriod.id)].slice(0, 3)
     setRecentPeriods(updated)
-    localStorage.setItem('recentPeriods', JSON.stringify(updated))
+    localStorage.setItem('demo_recentPeriods', JSON.stringify(updated))
   }, [recentPeriods])
-  
+
   // アクティブフィルター数の計算
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -162,7 +162,7 @@ export function CollapsibleSearchFilter({
   const getPeriodFilter = useCallback(() => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    
+
     switch (filters.period) {
       case 'today':
         return {
@@ -194,7 +194,6 @@ export function CollapsibleSearchFilter({
         }
         return null
       case 'recent':
-        // 最近使用した期間の場合
         if (filters.customPeriod) {
           return {
             start: new Date(filters.customPeriod.start),
@@ -209,7 +208,7 @@ export function CollapsibleSearchFilter({
 
   // フィルター処理
   const applyFilters = useMemo(() => {
-    const hasActiveFilters = 
+    const hasActiveFilters =
       (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
       filters.workType !== 'all' ||
       filters.period !== 'all' ||
@@ -228,7 +227,7 @@ export function CollapsibleSearchFilter({
     let filteredTasks = [...tasks]
     let filteredReports = [...workReports]
 
-    // 野菜フィルター（空の場合は全野菜が選択されているとみなす）
+    // 野菜フィルター
     if (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) {
       const selectedIds = filters.selectedVegetables
       filteredVegetables = filteredVegetables.filter(veg => selectedIds.includes(veg.id))
@@ -267,7 +266,7 @@ export function CollapsibleSearchFilter({
     const periodFilter = getPeriodFilter()
     if (periodFilter) {
       filteredTasks = filteredTasks.filter(task => {
-        const taskDate = new Date(task.start)
+        const taskDate = new Date(task.start_date)
         return taskDate >= periodFilter.start && taskDate <= periodFilter.end
       })
       filteredReports = filteredReports.filter(report => {
@@ -301,8 +300,8 @@ export function CollapsibleSearchFilter({
   // 結果サマリー生成
   const resultSummary = useMemo(() => {
     const { filteredTasks, filteredReports } = applyFilters
-    
-    const hasActiveFilters = 
+
+    const hasActiveFilters =
       (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
       filters.workType !== 'all' ||
       filters.period !== 'all' ||
@@ -312,14 +311,14 @@ export function CollapsibleSearchFilter({
     if (!hasActiveFilters) {
       return `全データ表示 - 計画${filteredTasks.length}件・実績${filteredReports.length}件`
     }
-    
-    const selectedVegetableNames = filters.selectedVegetables.length > 0 
+
+    const selectedVegetableNames = filters.selectedVegetables.length > 0
       ? vegetables.filter(v => filters.selectedVegetables.includes(v.id)).map(v => v.name).join('・')
       : '全野菜'
-    
+
     const workTypeName = workTypeOptions.find(w => w.value === filters.workType)?.label.substring(2) || '全作業'
     const periodName = periodOptions.find(p => p.value === filters.period)?.label || ''
-    
+
     return `${selectedVegetableNames}の${workTypeName} (${periodName}) - 計画${filteredTasks.length}件・実績${filteredReports.length}件`
   }, [filters.selectedVegetables, filters.workType, filters.period, applyFilters, vegetables, filters.showPlanned, filters.showCompleted])
 
@@ -332,7 +331,7 @@ export function CollapsibleSearchFilter({
         filteredTasks,
         filteredReports,
         resultSummary,
-        hasActiveFilters: 
+        hasActiveFilters:
           (filters.selectedVegetables.length > 0 && filters.selectedVegetables.length < vegetables.length) ||
           filters.workType !== 'all' ||
           filters.period !== 'all' ||
@@ -354,15 +353,13 @@ export function CollapsibleSearchFilter({
     vegetables.length
   ])
 
-  // 野菜データが初期化された時のみ全選択に設定（その後は維持）
+  // 野菜データが初期化された時のみ全選択に設定
   useEffect(() => {
     if (vegetables.length > 0) {
       setFilters(prev => {
-        // 既に選択があるか、野菜数が変わっていない場合は更新しない
         if (prev.selectedVegetables.length > 0) {
           return prev
         }
-        // 初回のみ全選択に設定
         return {
           ...prev,
           selectedVegetables: vegetables.map(v => v.id)
@@ -395,6 +392,37 @@ export function CollapsibleSearchFilter({
       showPlanned: true,
       showCompleted: true
     })
+    setCustomStart('')
+    setCustomEnd('')
+  }
+
+  const handleCustomPeriodApply = () => {
+    if (customStart && customEnd) {
+      setFilters(prev => ({
+        ...prev,
+        period: 'custom',
+        customPeriod: {
+          start: customStart,
+          end: customEnd
+        }
+      }))
+      saveRecentPeriod(customStart, customEnd)
+      alert('デモ版のため、期間フィルターは表示のみです')
+    }
+  }
+
+  const handleRecentPeriodClick = (period: RecentPeriod) => {
+    setCustomStart(period.start)
+    setCustomEnd(period.end)
+    setFilters(prev => ({
+      ...prev,
+      period: 'custom',
+      customPeriod: {
+        start: period.start,
+        end: period.end
+      }
+    }))
+    alert('デモ版のため、期間フィルターは表示のみです')
   }
 
   return (
@@ -452,14 +480,14 @@ export function CollapsibleSearchFilter({
                   <Calendar className="w-4 h-4" />
                   期間設定
                 </h4>
-                
+
                 {/* プリセット期間 */}
                 <div className="mb-3">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="w-full justify-between bg-white hover:bg-green-50 border-green-200 text-green-700 h-8 text-xs"
                       >
                         <span className="flex items-center gap-1">
@@ -484,7 +512,6 @@ export function CollapsibleSearchFilter({
                           key={option.value}
                           onClick={() => {
                             setFilters(prev => ({ ...prev, period: option.value }))
-                            // プリセット選択時はカスタム期間をクリア
                             setCustomStart('')
                             setCustomEnd('')
                           }}
@@ -499,7 +526,7 @@ export function CollapsibleSearchFilter({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                
+
                 {/* カスタム期間 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -507,76 +534,46 @@ export function CollapsibleSearchFilter({
                       <Input
                         type="date"
                         value={customStart}
-                        onChange={(e) => {
-                          const newStart = e.target.value
-                          setCustomStart(newStart)
-                          // 両方の日付が設定されたら自動的にフィルター適用
-                          if (newStart && customEnd && newStart <= customEnd) {
-                            setFilters(prev => ({
-                              ...prev,
-                              period: 'custom',
-                              customPeriod: { start: newStart, end: customEnd }
-                            }))
-                            saveRecentPeriod(newStart, customEnd)
-                          }
-                        }}
-                        className="h-8 text-xs bg-white border-green-200 focus:ring-green-500"
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="h-7 text-xs bg-white border-green-200"
                         placeholder="開始日"
                       />
                     </div>
-                    <span className="text-xs text-green-600 font-medium">〜</span>
+                    <span className="text-xs text-gray-500">〜</span>
                     <div className="flex-1">
                       <Input
                         type="date"
                         value={customEnd}
-                        onChange={(e) => {
-                          const newEnd = e.target.value
-                          setCustomEnd(newEnd)
-                          // 両方の日付が設定されたら自動的にフィルター適用
-                          if (customStart && newEnd && customStart <= newEnd) {
-                            setFilters(prev => ({
-                              ...prev,
-                              period: 'custom',
-                              customPeriod: { start: customStart, end: newEnd }
-                            }))
-                            saveRecentPeriod(customStart, newEnd)
-                          }
-                        }}
-                        min={customStart} // 開始日以降のみ選択可能
-                        className="h-8 text-xs bg-white border-green-200 focus:ring-green-500"
+                        onChange={(e) => setCustomEnd(e.target.value)}
+                        className="h-7 text-xs bg-white border-green-200"
                         placeholder="終了日"
                       />
                     </div>
+                    <Button
+                      size="sm"
+                      onClick={handleCustomPeriodApply}
+                      disabled={!customStart || !customEnd}
+                      className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      適用
+                    </Button>
                   </div>
-                  {/* 日付エラー表示 */}
-                  {customStart && customEnd && customStart > customEnd && (
-                    <p className="text-xs text-red-600 mt-1">開始日は終了日より前に設定してください</p>
-                  )}
+
                   {/* 最近使用した期間 */}
                   {recentPeriods.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        最近使用した期間
-                      </p>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-gray-600">最近使用した期間</Label>
                       <div className="flex flex-wrap gap-1">
-                        {recentPeriods.map(recent => (
+                        {recentPeriods.map(period => (
                           <Button
-                            key={recent.id}
+                            key={period.id}
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setCustomStart(recent.start)
-                              setCustomEnd(recent.end)
-                              setFilters(prev => ({
-                                ...prev,
-                                period: 'custom',
-                                customPeriod: { start: recent.start, end: recent.end }
-                              }))
-                            }}
-                            className="h-6 px-2 text-xs bg-white hover:bg-green-50 border-green-200 text-green-700"
+                            onClick={() => handleRecentPeriodClick(period)}
+                            className="h-6 px-2 text-xs bg-white hover:bg-green-50 border-green-200"
                           >
-                            {recent.label}
+                            <Clock className="w-3 h-3 mr-1" />
+                            {period.label}
                           </Button>
                         ))}
                       </div>
@@ -585,64 +582,83 @@ export function CollapsibleSearchFilter({
                 </div>
               </div>
 
-              {/* 作業種類 - 期間設定の右側に配置 */}
+              {/* 作業種類選択 */}
               <div className="bg-green-50/50 rounded-lg p-3 border border-green-200/50">
                 <h4 className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
-                  <Filter className="w-4 h-4" />
+                  <Settings className="w-4 h-4" />
                   作業種類
                 </h4>
-                <div className="grid grid-cols-3 gap-1">
-                  {workTypeOptions.map(option => {
-                    const isSelected = filters.workType === option.value
-                    return (
-                      <Button
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-between bg-white hover:bg-green-50 border-green-200 text-green-700 h-8 text-xs"
+                    >
+                      <span className="flex items-center gap-1">
+                        {workTypeOptions.find(w => w.value === filters.workType)?.icon}
+                        {workTypeOptions.find(w => w.value === filters.workType)?.label.substring(2) || '選択'}
+                      </span>
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-full bg-white border border-green-200 shadow-md">
+                    {workTypeOptions.map(option => (
+                      <DropdownMenuItem
                         key={option.value}
-                        size="sm"
-                        variant={isSelected ? "default" : "outline"}
                         onClick={() => setFilters(prev => ({ ...prev, workType: option.value }))}
-                        className={`
-                          h-8 px-1 text-xs transition-all duration-150 flex items-center justify-center gap-1
-                          ${isSelected
-                            ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
-                            : 'bg-white hover:bg-green-50 text-green-700 border-green-200'
-                          }
-                        `}
+                        className="text-xs py-2 hover:bg-green-50"
                       >
-                        {isSelected && <Check className="w-3 h-3" />}
-                        <span>{option.icon}</span>
-                        <span className="font-medium">{option.label.substring(2)}</span>
-                      </Button>
-                    )
-                  })}
+                        <span className="flex items-center gap-2">
+                          <span>{option.icon}</span>
+                          <span>{option.label.substring(2)}</span>
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* 表示設定 */}
+                <div className="mt-3 space-y-1">
+                  <h5 className="text-xs font-medium text-green-700">表示設定</h5>
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filters.showPlanned}
+                        onChange={(e) => setFilters(prev => ({ ...prev, showPlanned: e.target.checked }))}
+                        className="w-3 h-3 text-green-600 border-green-300 rounded focus:ring-green-500"
+                      />
+                      <span className="text-xs text-gray-700">計画を表示</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filters.showCompleted}
+                        onChange={(e) => setFilters(prev => ({ ...prev, showCompleted: e.target.checked }))}
+                        className="w-3 h-3 text-green-600 border-green-300 rounded focus:ring-green-500"
+                      />
+                      <span className="text-xs text-gray-700">実績を表示</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* アクションバー */}
-            <div className="flex items-center justify-between pt-3 border-t border-green-200/50">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-800">{resultSummary}</span>
+            {/* フィルター結果サマリーとリセット */}
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-gray-600">
+                {resultSummary}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleReset}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-3 text-xs text-gray-600 hover:text-gray-800 border-green-200 hover:bg-green-50"
-                >
-                  <RotateCcw className="w-3 h-3 mr-1" />
-                  リセット
-                </Button>
-                <Button
-                  onClick={() => onToggleExpanded(false)}
-                  variant="default"
-                  size="sm"
-                  className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
-                >
-                  閉じる
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="h-7 px-3 text-xs bg-white hover:bg-red-50 border-red-200 text-red-600"
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                リセット
+              </Button>
             </div>
           </CardContent>
         </Card>
