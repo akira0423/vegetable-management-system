@@ -883,9 +883,10 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* 野菜登録情報サマリーカード - 4列レイアウトに統一 */}
+      {/* 上段: 基本情報カード - 4列レイアウト */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+        {/* 1. 登録野菜数 */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="relative z-10">
@@ -900,8 +901,8 @@ export default function AnalyticsPage() {
                 </p>
               </div>
               <div className="relative">
-                <Sprout className="w-10 h-10 text-green-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                <Sprout className="w-10 h-10 text-green-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
                   <span className="text-xs text-white font-bold">{availableVegetables.length}</span>
                 </div>
               </div>
@@ -909,7 +910,8 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-sky-100 border-blue-200">
+        {/* 2. 総栽培面積 */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-sky-100 border-blue-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="relative z-10">
@@ -933,8 +935,8 @@ export default function AnalyticsPage() {
                 </p>
               </div>
               <div className="relative">
-                <MapPin className="w-10 h-10 text-blue-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                <MapPin className="w-10 h-10 text-blue-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
                   <span className="text-xs text-white font-bold">㎡</span>
                 </div>
               </div>
@@ -942,15 +944,134 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* 純利益カード（2段目から1段目に移動） */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+        {/* 3. 総収穫量（直近12カ月） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-100 border-blue-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <p className="text-sm text-blue-700 font-medium mb-2">総収穫量（直近12カ月）</p>
+                <p className="text-2xl font-bold text-blue-900">{formatNumber(data.summary.total_harvest, 0)}kg</p>
+                <p className="text-xs text-blue-600 flex items-center mt-2">
+                  <Sprout className="w-3 h-3 mr-1" />
+                  平均 {formatNumber(data.summary.avg_yield_per_sqm)}kg/㎡
+                </p>
+              </div>
+              <div className="relative">
+                <Sprout className="w-10 h-10 text-blue-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
+                  <span className="text-xs text-white font-bold">kg</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20">
+              <Award className="w-20 h-20 text-blue-800" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 4. 総作業時間（直近12カ月） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <p className="text-sm text-amber-700 font-medium mb-2">総作業時間（直近12カ月）</p>
+                <p className="text-2xl font-bold text-amber-900">{formatNumber(data.summary.total_work_hours, 1)}h</p>
+                <p className="text-xs text-amber-600 flex items-center mt-2">
+                  <Clock className="w-3 h-3 mr-1" />
+                  人時ベース
+                </p>
+              </div>
+              <div className="relative">
+                <Clock className="w-10 h-10 text-amber-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
+                  <span className="text-xs text-white font-bold">h</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20">
+              <Activity className="w-20 h-20 text-amber-800" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 下段: 金融KPIカード - 4列レイアウト */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 5. 総収入（直近12カ月） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-green-700 font-medium">純利益</p>
+                  <p className="text-sm text-emerald-700 font-medium">総収入（直近12カ月）</p>
+                  {data.dataQuality?.incomeSource === 'accounting' && (
+                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
+                  )}
+                  {data.dataQuality?.incomeSource === 'estimated' && (
+                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
+                  )}
+                </div>
+                <p className="text-2xl font-bold text-emerald-900">{formatCurrency(data.summary.total_revenue)}</p>
+                <p className="text-xs text-emerald-600 flex items-center mt-2">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  {data.dataQuality?.incomeSource === 'accounting' ? '会計連携済' : 'ハーベスト推定'}
+                </p>
+              </div>
+              <div className="relative">
+                <DollarSign className="w-10 h-10 text-emerald-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
+                  <span className="text-xs text-white font-bold">¥</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20">
+              <Sprout className="w-20 h-20 text-green-800" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 6. 総支出（直近12カ月） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-red-50 to-orange-100 border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-red-700 font-medium">総支出（直近12カ月）</p>
+                  {data.dataQuality?.expenseSource === 'accounting' && (
+                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
+                  )}
+                  {data.dataQuality?.expenseSource === 'estimated' && (
+                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
+                  )}
+                </div>
+                <p className="text-2xl font-bold text-red-900">{formatCurrency(data.summary.total_cost)}</p>
+                <p className="text-xs text-red-600 flex items-center mt-2">
+                  <TrendingDown className="w-3 h-3 mr-1" />
+                  {data.dataQuality?.expenseSource === 'accounting' ? '会計連携済' : '作業時間推定'}
+                </p>
+              </div>
+              <div className="relative">
+                <DollarSign className="w-10 h-10 text-red-600 opacity-90 transform rotate-180 transition-transform duration-300 group-hover:rotate-[192deg] group-hover:scale-110" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
+                  <span className="text-xs text-white font-bold">-</span>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20">
+              <Target className="w-20 h-20 text-red-800" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 7. 純利益 */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-sky-100 border-blue-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-blue-700 font-medium">純利益</p>
                   {data?.dataQuality && (
-                    <Badge className="text-xs bg-green-500 text-white px-1 py-0">
+                    <Badge className="text-xs bg-blue-500 text-white px-1 py-0">
                       {data.dataQuality.reliability === 'high' ? '実' :
                        data.dataQuality.reliability === 'medium' ? '混' : '推'}
                     </Badge>
@@ -958,11 +1079,11 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-green-900">
+                    <span className="text-2xl font-bold text-blue-900">
                       ¥{data ? formatNumber((data.summary.total_revenue || 0) - (data.summary.total_cost || 0)) : '0'}
                     </span>
                   </div>
-                  <p className="text-xs text-green-600 flex items-center">
+                  <p className="text-xs text-blue-600 flex items-center">
                     <DollarSign className="w-3 h-3 mr-1" />
                     利益率: {data ? formatNumber(data.summary.profit_margin || 0, 1) : '0'}%
                   </p>
@@ -970,17 +1091,17 @@ export default function AnalyticsPage() {
               </div>
               <div className="relative">
                 {data && ((data.summary.total_revenue || 0) - (data.summary.total_cost || 0)) >= 0 ? (
-                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90" />
+                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
                 ) : (
-                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90" />
+                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
                 )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* ROIカード（2段目から1段目に移動） */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-100 border-purple-200">
+        {/* 8. 投資収益率（ROI） */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-100 border-purple-200 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:-translate-y-1 group">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="relative z-10">
@@ -1014,126 +1135,11 @@ export default function AnalyticsPage() {
               </div>
               <div className="relative">
                 {data && data.summary.total_revenue > data.summary.total_cost ? (
-                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90" />
+                  <TrendingUp className="w-10 h-10 text-green-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
                 ) : (
-                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90" />
+                  <TrendingDown className="w-10 h-10 text-red-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 金融×農業デザインのKPIカード（直近12カ月）with データ品質インジケーター */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-emerald-700 font-medium">総収入（直近12カ月）</p>
-                  {data.dataQuality?.incomeSource === 'accounting' && (
-                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
-                  )}
-                  {data.dataQuality?.incomeSource === 'estimated' && (
-                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
-                  )}
-                </div>
-                <p className="text-2xl font-bold text-emerald-900">{formatCurrency(data.summary.total_revenue)}</p>
-                <p className="text-xs text-emerald-600 flex items-center mt-2">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  {data.dataQuality?.incomeSource === 'accounting' ? '会計連携済' : 'ハーベスト推定'}
-                </p>
-              </div>
-              <div className="relative">
-                <DollarSign className="w-10 h-10 text-emerald-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">¥</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              <Sprout className="w-20 h-20 text-green-800" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden bg-gradient-to-br from-red-50 to-orange-100 border-red-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm text-red-700 font-medium">総支出（直近12カ月）</p>
-                  {data.dataQuality?.expenseSource === 'accounting' && (
-                    <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
-                  )}
-                  {data.dataQuality?.expenseSource === 'estimated' && (
-                    <Badge className="text-xs bg-yellow-500 text-white px-2 py-0.5">推定</Badge>
-                  )}
-                </div>
-                <p className="text-2xl font-bold text-red-900">{formatCurrency(data.summary.total_cost)}</p>
-                <p className="text-xs text-red-600 flex items-center mt-2">
-                  <TrendingDown className="w-3 h-3 mr-1" />
-                  {data.dataQuality?.expenseSource === 'accounting' ? '会計連携済' : '作業時間推定'}
-                </p>
-              </div>
-              <div className="relative">
-                <DollarSign className="w-10 h-10 text-red-600 opacity-90 transform rotate-180" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">-</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              <Target className="w-20 h-20 text-red-800" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-100 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <p className="text-sm text-blue-700 font-medium mb-2">総収穫量（直近12カ月）</p>
-                <p className="text-2xl font-bold text-blue-900">{formatNumber(data.summary.total_harvest, 0)}kg</p>
-                <p className="text-xs text-blue-600 flex items-center mt-2">
-                  <Sprout className="w-3 h-3 mr-1" />
-                  平均 {formatNumber(data.summary.avg_yield_per_sqm)}kg/㎡
-                </p>
-              </div>
-              <div className="relative">
-                <Sprout className="w-10 h-10 text-blue-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">kg</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              <Award className="w-20 h-20 text-blue-800" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="relative z-10">
-                <p className="text-sm text-amber-700 font-medium mb-2">総作業時間（直近12カ月）</p>
-                <p className="text-2xl font-bold text-amber-900">{formatNumber(data.summary.total_work_hours, 1)}h</p>
-                <p className="text-xs text-amber-600 flex items-center mt-2">
-                  <Clock className="w-3 h-3 mr-1" />
-                  人時ベース
-                </p>
-              </div>
-              <div className="relative">
-                <Clock className="w-10 h-10 text-amber-600 opacity-90" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">h</span>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-0 right-0 opacity-10">
-              <Activity className="w-20 h-20 text-amber-800" />
             </div>
           </CardContent>
         </Card>
