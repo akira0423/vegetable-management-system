@@ -30,6 +30,8 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { GanttChart } from '@/components/charts/gantt-chart'
+import NewTaskForm from '@/components/forms/NewTaskForm'
+import WorkReportFormDemoV2 from '@/components/demo/work-report-form-demo-v2'
 import { CollapsibleSearchFilter } from '@/components/demo/collapsible-search-filter'
 import { WorkReportCard } from '@/components/work-report-card'
 import DemoFarmMapView from '@/components/demo/farm-map-view'
@@ -146,9 +148,11 @@ export default function GanttDemoPage() {
 
   // 新規タスク作成モーダル
   const [showNewTaskModal, setShowNewTaskModal] = useState(false)
+  const [isCreatingTask, setIsCreatingTask] = useState(false)
 
   // 作業記録モーダル
   const [showWorkReportForm, setShowWorkReportForm] = useState(false)
+  const [isCreatingReport, setIsCreatingReport] = useState(false)
 
   // デモ警告ダイアログ
   const [demoWarning, setDemoWarning] = useState<{
@@ -300,6 +304,26 @@ export default function GanttDemoPage() {
 
   // 新規タスク作成（デモ版）
   const handleNewTask = () => {
+    // デモ版でも本番と同じモーダルを表示
+    setShowNewTaskModal(true)
+  }
+
+  // 作業記録（デモ版）
+  const handleWorkReport = () => {
+    // デモ版でも本番と同じモーダルを表示
+    setShowWorkReportForm(true)
+  }
+
+  // 地図で登録（デモ版）
+  const handleMapRegistration = () => {
+    // デモ農地管理ビューを表示
+    setShowDemoFarmMap(true)
+  }
+
+  // タスク作成ハンドラー（デモ版）
+  const handleCreateTask = async (data: any) => {
+    // デモ版では保存せず、制限メッセージを表示
+    setShowNewTaskModal(false)
     setDemoWarning({
       show: true,
       title: 'デモ版の制限',
@@ -307,19 +331,15 @@ export default function GanttDemoPage() {
     })
   }
 
-  // 作業記録（デモ版）
-  const handleWorkReport = () => {
+  // 作業記録作成ハンドラー（デモ版）
+  const handleCreateWorkReport = async (data: any) => {
+    // デモ版では保存せず、制限メッセージを表示
+    setShowWorkReportForm(false)
     setDemoWarning({
       show: true,
       title: 'デモ版の制限',
       message: 'デモ版では作業記録の登録はできません。実際の機能は会員登録後にご利用いただけます。'
     })
-  }
-
-  // 地図で登録（デモ版）
-  const handleMapRegistration = () => {
-    // デモ農地管理ビューを表示
-    setShowDemoFarmMap(true)
   }
 
   // 削除処理（デモ版）
@@ -438,45 +458,66 @@ export default function GanttDemoPage() {
                 野菜別の栽培タスクと作業実績を統合管理
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleMapRegistration}
-                className="bg-green-600 text-white hover:bg-green-700"
-              >
-                <Map className="h-4 w-4 mr-2" />
-                野菜を地図に登録
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleNewTask}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                タスクを計画
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleWorkReport}
-                className="bg-orange-500 text-white hover:bg-orange-600"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                作業を記録
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExport}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                エクスポート
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                更新
-              </Button>
+            <div className="flex items-center gap-4">
+              {/* 作業登録グループ */}
+              <div className="flex items-center gap-2 bg-white rounded-lg p-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMapRegistration}
+                  className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 shadow-sm transition-all duration-200"
+                >
+                  <Map className="w-4 h-4 mr-1" />
+                  <span className="hidden xl:inline">野菜を地図に登録</span>
+                  <span className="hidden md:inline xl:hidden">野菜登録</span>
+                  <span className="md:hidden">登録</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNewTask}
+                  className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300 shadow-sm transition-all duration-200"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  <span className="hidden xl:inline">タスクを計画</span>
+                  <span className="hidden md:inline xl:hidden">タスク計画</span>
+                  <span className="md:hidden">計画</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleWorkReport}
+                  className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300 shadow-sm transition-all duration-200"
+                >
+                  <Calendar className="w-4 h-4 mr-1" />
+                  <span className="hidden xl:inline">作業を記録</span>
+                  <span className="hidden md:inline xl:hidden">作業記録</span>
+                  <span className="md:hidden">記録</span>
+                </Button>
+              </div>
+
+              {/* データ操作グループ */}
+              <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExport}
+                  className="text-green-700 hover:text-green-800 hover:bg-green-100 transition-all duration-200"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  <span className="hidden md:inline">エクスポート</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="text-blue-700 hover:text-blue-800 hover:bg-blue-100 transition-all duration-200"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden md:inline">更新</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1148,6 +1189,27 @@ export default function GanttDemoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 新規タスク作成モーダル */}
+      <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
+        <DialogContent className="max-w-[95vw] xl:max-w-[1000px] max-h-[95vh] p-0 bg-white overflow-hidden shadow-2xl border-0 rounded-xl">
+          <DialogTitle className="sr-only">新規栽培スケジュール・タスク作成</DialogTitle>
+          <NewTaskForm
+            vegetables={vegetables}
+            onSubmit={handleCreateTask}
+            onCancel={() => setShowNewTaskModal(false)}
+            isLoading={isCreatingTask}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* 作業記録モーダル - 新しいデモ版フォームを使用 */}
+      <WorkReportFormDemoV2
+        open={showWorkReportForm}
+        onOpenChange={setShowWorkReportForm}
+        vegetables={vegetables}
+        onSubmit={handleCreateWorkReport}
+      />
 
       {/* デモ版警告ダイアログ */}
       <Dialog open={demoWarning.show} onOpenChange={(show) => setDemoWarning({...demoWarning, show})}>
