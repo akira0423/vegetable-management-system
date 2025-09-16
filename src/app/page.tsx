@@ -181,6 +181,27 @@ export default function Home() {
                 </Link>
               </CardContent>
             </Card>
+
+            <Card className="max-w-2xl mx-auto border-2 border-purple-500 bg-purple-50">
+              <CardHeader>
+                <BarChart3 className="h-12 w-12 text-purple-600 mb-4 mx-auto" />
+                <CardTitle className="text-2xl">データ自動主計分析</CardTitle>
+                <CardDescription className="text-base">
+                  栽培データから収益・コスト・効率をAIが自動分析するデモ機能です
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/analytics-demo">
+                  <Button
+                    size="lg"
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    <BarChart3 className="mr-2 h-5 w-5" />
+                    デモ機能を体験する
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
