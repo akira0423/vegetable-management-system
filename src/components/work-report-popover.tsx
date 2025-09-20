@@ -56,7 +56,7 @@ export function WorkReportPopover({ report, children, onEdit, onView }: WorkRepo
             }
           }
         } catch (error) {
-          console.error('会計データ取得エラー:', error)
+          
         }
       }
       fetchAccountingData()

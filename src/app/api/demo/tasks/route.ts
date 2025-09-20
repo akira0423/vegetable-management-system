@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .order('start_date', { ascending: true })
 
     if (tasksError) {
-      console.error('Error fetching demo tasks:', tasksError)
+      
       return NextResponse.json({
         success: false,
         error: tasksError.message
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       data: ganttTasks
     })
   } catch (error) {
-    console.error('Error in demo tasks API:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'Internal server error'
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // デモ版では実際にデータベースに保存せず、成功レスポンスのみ返す
-    console.log('Demo task creation request:', body)
+    
 
     // 仮のレスポンス
     return NextResponse.json({
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error in demo task creation:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、タスクの作成はできません'
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
 
     // デモ版では実際にデータベースを更新せず、成功レスポンスのみ返す
-    console.log('Demo task update request:', body)
+    
 
     return NextResponse.json({
       success: true,
@@ -121,7 +121,7 @@ export async function PUT(request: NextRequest) {
       data: body
     })
   } catch (error) {
-    console.error('Error in demo task update:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、タスクの更新はできません'
@@ -136,14 +136,14 @@ export async function DELETE(request: NextRequest) {
     const taskId = searchParams.get('id')
 
     // デモ版では実際にデータベースから削除せず、成功レスポンスのみ返す
-    console.log('Demo task deletion request for ID:', taskId)
+    
 
     return NextResponse.json({
       success: true,
       message: 'デモ版のため、実際には削除されません'
     })
   } catch (error) {
-    console.error('Error in demo task deletion:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、タスクの削除はできません'

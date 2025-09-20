@@ -36,15 +36,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Supabase環境変数が設定されていません')
-  console.error('設定が必要:')
-  console.error('- NEXT_PUBLIC_SUPABASE_URL')
-  console.error('- NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  
+  
+  
+  
 } else {
-  console.log('✅ Supabase環境変数確認:', {
-    urlExists: !!supabaseUrl,
-    keyExists: !!supabaseAnonKey,
-    urlPreview: supabaseUrl?.substring(0, 30) + '...',
+   + '...',
     keyPreview: supabaseAnonKey?.substring(0, 30) + '...'
   })
 }
@@ -168,12 +165,7 @@ const SOIL_COMPONENT_UNITS = {
 
 export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' }: HarvestSoilChartProps) {
   // Propsのデバッグ情報
-  console.log('🏢 HarvestSoilChartコンポーネント初期化:', {
-    companyId,
-    companyIdType: typeof companyId,
-    hasCompanyId: !!companyId,
-    selectedVegetable
-  })
+  
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
@@ -198,28 +190,20 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
   
   // Supabaseからユーザー野菜データを取得
   const fetchUserVegetables = useCallback(async () => {
-    console.log('🔍 fetchUserVegetables開始:', { 
-      companyId, 
-      companyIdType: typeof companyId, 
-      hasCompanyId: !!companyId 
-    })
+    
     
     if (!companyId) {
-      console.log('⚠️ companyIdが未設定、デフォルトデータを使用')
+      
       setUserVegetables(DEFAULT_VEGETABLE_OPTIONS)
       return
     }
     
     try {
-      console.log('🌱 Supabaseから野菜データを取得中...', { companyId })
+      
       
       // 認証状態をデバッグ
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('🔐 認証状態確認:', {
-        hasSession: !!session,
-        userId: session?.user?.id,
-        userEmail: session?.user?.email
-      })
+      
       
       const { data: vegetablesData, error } = await supabase
         .from('vegetables')
@@ -230,20 +214,14 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
         .order('created_at', { ascending: false })
       
       if (error) {
-        console.error('🚨 Supabaseエラー詳細:', {
-          message: error.message,
-          details: error.details, 
-          hint: error.hint,
-          code: error.code,
-          fullError: error
-        })
+        
         throw error
       }
       
-      console.log('🌱 取得した野菜データ:', vegetablesData)
+      
       
       if (!vegetablesData || vegetablesData.length === 0) {
-        console.log('🌱 ユーザー野菜データが空のためデフォルトを使用')
+        
         setUserVegetables(DEFAULT_VEGETABLE_OPTIONS)
         return
       }
@@ -263,20 +241,12 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
         }))
       ]
       
-      console.log('🌱 変換後の野菜データ:', vegetables)
+      
       setUserVegetables(vegetables)
       
     } catch (error: any) {
-      console.error('🚨 野菜データ取得エラー詳細:', {
-        message: error?.message,
-        details: error?.details,
-        hint: error?.hint,
-        code: error?.code,
-        fullError: error,
-        companyId,
-        stack: error?.stack
-      })
-      console.log('⚠️ エラーのためデフォルトデータを使用します')
+      
+      
       // エラー時はデフォルトデータを使用
       setUserVegetables(DEFAULT_VEGETABLE_OPTIONS)
     }
@@ -304,19 +274,17 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
   // Supabaseから作業報告データ（収穫・土壌データ）を取得
   const fetchHarvestSoilData = useCallback(async () => {
     if (!companyId) {
-      console.log('⚠️ companyIdが未設定')
+      
       return []
     }
     
     if (!userVegetables || userVegetables.length === 0) {
-      console.log('⚠️ 野菜データが未設定')
+      
       return []
     }
     
     try {
-      console.log('📈 Supabaseからwork_reportsデータを取得中...', {
-        companyId,
-        startMonth: startMonth.toISOString(), 
+      , 
         displayPeriod, 
         currentVegetable,
         userVegetablesCount: userVegetables.length
@@ -332,13 +300,13 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
           ? [currentVegetableInfo] 
           : []
       
-      console.log('🌱 対象野菜（UUID有効のみ）:', targetVegetables.map(v => ({ name: v.name, id: v.id })))
+      ))
       
       // 各野菜の作業報告データを取得
       for (const vegetable of targetVegetables) {
         if (vegetable.id === 'all') continue
         
-        console.log(`🌱 ${vegetable.name}のwork_reportsデータを取得中...`)
+        
         
         // work_reportsから収穫・土壌データを取得
         const { data: workReports, error: workError } = await supabase
@@ -359,7 +327,7 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
           .order('work_date', { ascending: true })
         
         if (workError) {
-          console.error(`🚨 work_reports取得エラー詳細 (${vegetable.name}):`, {
+          :`, {
             message: workError.message,
             details: workError.details,
             hint: workError.hint, 
@@ -369,13 +337,10 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
           continue
         }
         
-        console.log(`🌱 ${vegetable.name}の取得結果:`, {
-          workReports: workReports?.length || 0,
-          sampleData: workReports?.[0] || null
-        })
+        
         
         if (!workReports || workReports.length === 0) {
-          console.log(`⚠️ ${vegetable.name}のデータが見つかりません`)
+          
           continue
         }
         
@@ -452,11 +417,11 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
         }
       }
       
-      console.log('📈 work_reportsから取得したデータ:', { count: allData.length, data: allData })
+      
       return allData
       
     } catch (error) {
-      console.error('🚨 work_reportsデータ取得エラー:', error)
+      
       return []
     }
   }, [companyId, startMonth, displayPeriod, currentVegetable, currentVegetableInfo, userVegetables])
@@ -464,17 +429,17 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
   // Supabaseデータ取得実行
   React.useEffect(() => {
     if (userVegetables.length > 0 && companyId) {
-      console.log('🔄 Supabaseデータ取得開始')
+      
       setLoading(true)
       
       fetchHarvestSoilData()
         .then(data => {
           setHarvestSoilData(data)
           setLastUpdated(new Date())
-          console.log('✅ Supabaseデータ取得完了:', { count: data.length })
+          
         })
         .catch(error => {
-          console.error('🚨 Supabaseデータ取得エラー:', error)
+          
           setHarvestSoilData([])
         })
         .finally(() => {
@@ -486,10 +451,10 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
   // ユーザー野菜データを取得（エラー時はデフォルトデータを使用）
   useEffect(() => {
     if (companyId) {
-      console.log('🔄 野菜データ取得開始:', { companyId })
+      
       fetchUserVegetables()
     } else {
-      console.log('⚠️ companyIdが未設定のためデフォルトデータを使用')
+      
       setUserVegetables(DEFAULT_VEGETABLE_OPTIONS)
     }
   }, [companyId, fetchUserVegetables])
@@ -497,7 +462,7 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
   // 選択野菜でデータをフィルタリング
   const filteredData = useMemo(() => {
     if (!harvestSoilData || harvestSoilData.length === 0) {
-      console.log('📈 フィルタリング: データが空です')
+      
       return []
     }
     
@@ -526,11 +491,11 @@ export default function HarvestSoilChart({ companyId, selectedVegetable = 'all' 
         return a.month_num - b.month_num
       })
       
-      console.log('📈 フィルタリング: 全野菜結果:', result)
+      
       return result
     } else {
       const result = harvestSoilData.filter(data => data.vegetable_id === currentVegetable)
-      console.log('📈 フィルタリング: 特定野菜結果:', { currentVegetable, result })
+      
       return result
     }
   }, [harvestSoilData, currentVegetable])

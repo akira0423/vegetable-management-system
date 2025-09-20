@@ -16,7 +16,7 @@ export interface CompanyResolutionResult {
  */
 export async function resolveUserCompany(userId: string): Promise<CompanyResolutionResult> {
   try {
-    console.log('🏢 企業ID解決開始 - ユーザー:', userId)
+    
     
     const supabase = await createClient()
 
@@ -28,7 +28,7 @@ export async function resolveUserCompany(userId: string): Promise<CompanyResolut
       .eq('status', 'active')
 
     if (!membershipError && existingMemberships && existingMemberships.length > 0) {
-      console.log('✅ 既存アクティブメンバーシップを発見:', existingMemberships)
+      
       return {
         success: true,
         companyId: existingMemberships[0].company_id
@@ -45,10 +45,10 @@ export async function resolveUserCompany(userId: string): Promise<CompanyResolut
 
     if (!companyError && companies && companies.length > 0) {
       targetCompanyId = companies[0].id
-      console.log('📊 既存企業を使用:', targetCompanyId)
+      
     } else {
       // 3. デフォルト企業を作成
-      console.log('🆕 デフォルト企業を作成中...')
+      
       
       const { data: newCompany, error: createCompanyError } = await supabase
         .from('companies')
@@ -62,7 +62,7 @@ export async function resolveUserCompany(userId: string): Promise<CompanyResolut
         .single()
 
       if (createCompanyError || !newCompany) {
-        console.error('❌ 企業作成エラー:', createCompanyError)
+        
         return {
           success: false,
           error: `Failed to create company: ${createCompanyError?.message}`
@@ -70,11 +70,11 @@ export async function resolveUserCompany(userId: string): Promise<CompanyResolut
       }
 
       targetCompanyId = newCompany.id
-      console.log('✅ 新規企業作成完了:', targetCompanyId)
+      
     }
 
     // 4. メンバーシップを作成
-    console.log('👤 メンバーシップ作成中...')
+    
     
     const { data: membership, error: membershipCreateError } = await supabase
       .from('company_memberships')
@@ -89,21 +89,21 @@ export async function resolveUserCompany(userId: string): Promise<CompanyResolut
       .single()
 
     if (membershipCreateError || !membership) {
-      console.error('❌ メンバーシップ作成エラー:', membershipCreateError)
+      
       return {
         success: false,
         error: `Failed to create membership: ${membershipCreateError?.message}`
       }
     }
 
-    console.log('✅ メンバーシップ作成完了:', membership.company_id)
+    
     return {
       success: true,
       companyId: membership.company_id
     }
 
   } catch (error) {
-    console.error('💥 企業ID解決で予期しないエラー:', error)
+    
     return {
       success: false,
       error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`

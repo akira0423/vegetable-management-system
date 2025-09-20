@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    console.log('🧪 農薬API - リクエストパラメータ:', { 
-      search, productType, organicOnly, targetCrop, limit, offset 
-    })
+    
 
     // ベースクエリ
     let query = supabase
@@ -70,11 +68,11 @@ export async function GET(request: NextRequest) {
       .order('product_name')
 
     if (error) {
-      console.error('❌ 農薬API - データベースエラー:', error)
+      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ 農薬API - 取得成功:', { count: data?.length || 0 })
+    
 
     return NextResponse.json({
       success: true,
@@ -83,7 +81,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 農薬API - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error', 
       details: error instanceof Error ? error.message : 'Unknown error' 
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient()
     const body = await request.json()
 
-    console.log('🧪 農薬API - 新規作成:', body)
+    
 
     // 必須フィールドチェック
     const requiredFields = ['product_name', 'active_ingredient', 'registration_number', 'manufacturer', 'product_type']
@@ -149,11 +147,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('❌ 農薬API - 作成エラー:', error)
+      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ 農薬API - 作成成功:', data.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -161,7 +159,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('❌ 農薬API - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

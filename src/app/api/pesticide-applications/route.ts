@@ -16,9 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    console.log('🧪 農薬散布記録API - リクエストパラメータ:', { 
-      companyId, vegetableId, pesticideId, startDate, endDate, applicatorName, limit, offset 
-    })
+    
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
@@ -105,11 +103,11 @@ export async function GET(request: NextRequest) {
       .order('application_date', { ascending: false })
 
     if (error) {
-      console.error('❌ 農薬散布記録API - データベースエラー:', error)
+      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ 農薬散布記録API - 取得成功:', { count: data?.length || 0 })
+    
 
     return NextResponse.json({
       success: true,
@@ -118,7 +116,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 農薬散布記録API - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error', 
       details: error instanceof Error ? error.message : 'Unknown error' 
@@ -132,7 +130,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient()
     const body = await request.json()
 
-    console.log('🧪 農薬散布記録API - 新規作成:', body)
+    
 
     // 必須フィールドチェック
     const requiredFields = [
@@ -161,7 +159,7 @@ export async function POST(request: NextRequest) {
                         complianceResult?.harvest_interval_ok &&
                         complianceResult?.crop_approved
 
-    console.log('🔍 コンプライアンスチェック結果:', complianceResult)
+    
 
     // データ挿入
     const { data, error } = await supabase
@@ -217,11 +215,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('❌ 農薬散布記録API - 作成エラー:', error)
+      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ 農薬散布記録API - 作成成功:', data.id)
+    
 
     // 警告情報も含めて返す
     const warnings = []
@@ -246,7 +244,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('❌ 農薬散布記録API - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

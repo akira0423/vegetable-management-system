@@ -125,7 +125,7 @@ export default function NotificationCenter({ className }: NotificationCenterProp
       await checkNow()
       setNotifications(getAllNotifications())
     } catch (error) {
-      console.error('通知チェックエラー:', error)
+      
     } finally {
       setLoading(false)
     }

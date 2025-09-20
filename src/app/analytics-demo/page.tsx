@@ -311,7 +311,7 @@ export default function AnalyticsDemoPage() {
 
       setLastUpdated(new Date())
     } catch (error) {
-      console.error('Demo analytics data fetch error:', error)
+      
     } finally {
       setLoading(false)
     }

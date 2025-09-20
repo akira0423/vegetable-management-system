@@ -128,7 +128,7 @@ export function VegetableForm({
       await onSubmit(formData)
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Form submission error:', error)
+        
       }
     } finally {
       setSubmitting(false)

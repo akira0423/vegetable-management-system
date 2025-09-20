@@ -263,7 +263,7 @@ export default function GanttDemoPage() {
       }
 
     } catch (error) {
-      console.error('Error fetching demo data:', error)
+      
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -279,7 +279,7 @@ export default function GanttDemoPage() {
         setAuthChecking(false)
         fetchData()
       } catch (error) {
-        console.log('データ取得エラー:', error)
+        
         setAuthChecking(false)
         fetchData()
       }

@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { company_id, dry_run = true } = body
 
-    console.log('🔄 コストデータマイグレーション開始:', { company_id, dry_run })
+    
 
     // Step 1: 既存のwork_reportsからコスト情報を取得
     const { data: workReports, error: reportsError } = await supabase
@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
       .not('notes', 'is', null)
 
     if (reportsError) {
-      console.error('❌ 作業レポート取得エラー:', reportsError)
+      
       return NextResponse.json(
         { error: 'Failed to fetch work reports', details: reportsError },
         { status: 500 }
       )
     }
 
-    console.log(`📊 取得した作業レポート数: ${workReports?.length || 0}`)
+    
 
     // Step 2: notesからコスト情報を抽出
     const costDataToMigrate = []
@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
           })
         }
       } catch (parseError) {
-        console.warn(`⚠️ JSON解析失敗 (report_id: ${report.id}):`, parseError)
+        // エラーをスキップ
       }
     }
 
-    console.log(`💰 変換対象のコストデータ数: ${costDataToMigrate.length}`)
+    
 
     // Step 3: 会計項目マスタから適切な支出項目を取得
     const { data: accountingItems, error: itemsError } = await supabase
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       .eq('type', 'expense')
 
     if (itemsError) {
-      console.error('❌ 会計項目取得エラー:', itemsError)
+      
       return NextResponse.json(
         { error: 'Failed to fetch accounting items', details: itemsError },
         { status: 500 }
@@ -73,8 +73,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`📝 使用する会計項目: ${defaultExpenseItem.name} (${defaultExpenseItem.code})`)
-
     // Step 4: 会計データへの変換準備
     const accountingDataToInsert = costDataToMigrate.map(cost => ({
       work_report_id: cost.work_report_id,
@@ -87,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Dry Run または実際の実行
     if (dry_run) {
-      console.log('🧪 DRY RUN モード - 実際のデータ変更は行いません')
+      
       return NextResponse.json({
         success: true,
         dry_run: true,
@@ -103,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 実際のマイグレーション実行
-    console.log('🔥 実際のマイグレーション実行中...')
+    
 
     // 既存の変換済みデータをチェック
     const { data: existingData } = await supabase
@@ -116,7 +114,7 @@ export async function POST(request: NextRequest) {
       item => !existingReportIds.includes(item.work_report_id)
     )
 
-    console.log(`✨ 新規挿入データ数: ${newDataToInsert.length}`)
+    
 
     if (newDataToInsert.length > 0) {
       const { data: insertedData, error: insertError } = await supabase
@@ -125,14 +123,14 @@ export async function POST(request: NextRequest) {
         .select()
 
       if (insertError) {
-        console.error('❌ 会計データ挿入エラー:', insertError)
+        
         return NextResponse.json(
           { error: 'Failed to insert accounting data', details: insertError },
           { status: 500 }
         )
       }
 
-      console.log(`✅ ${insertedData?.length || 0}件の会計データを挿入完了`)
+      
     }
 
     return NextResponse.json({
@@ -149,7 +147,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ マイグレーションエラー:', error)
+    
     return NextResponse.json(
       { error: 'Migration failed', details: error.message },
       { status: 500 }

@@ -44,7 +44,7 @@ export function useAuth() {
         setError('ユーザー情報の取得に失敗しました')
       }
     } catch (err) {
-      console.error('Auth fetch error:', err)
+      
       setError('認証エラーが発生しました')
     } finally {
       setLoading(false)

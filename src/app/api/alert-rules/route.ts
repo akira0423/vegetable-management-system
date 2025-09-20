@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { data: alertRules, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch alert rules' }, { status: 500 })
     }
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to create alert rule' }, { status: 500 })
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -183,7 +183,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update alert rule' }, { status: 500 })
     }
 
@@ -204,7 +204,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -242,7 +242,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', ruleId)
 
     if (deleteError) {
-      console.error('Database deletion error:', deleteError)
+      
       return NextResponse.json({ error: 'Failed to delete alert rule' }, { status: 500 })
     }
 
@@ -266,7 +266,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -304,7 +304,7 @@ export async function PATCH(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -360,7 +360,7 @@ async function checkAndTriggerAlerts(supabase: any, companyId: string) {
     })
 
   } catch (error) {
-    console.error('Check triggers error:', error)
+    
     return NextResponse.json({ error: 'Failed to check alert triggers' }, { status: 500 })
   }
 }
@@ -428,14 +428,14 @@ async function evaluateAlertCondition(supabase: any, rule: any, companyId: strin
         return false
 
       default:
-        console.warn(`Unknown metric: ${metric}`)
+        
         return false
     }
 
     return evaluateCondition(currentValue, operator, value)
 
   } catch (error) {
-    console.error('Condition evaluation error:', error)
+    
     return false
   }
 }
@@ -489,7 +489,7 @@ async function triggerAlert(supabase: any, rule: any, companyId: string) {
     // 通知配信処理（メール、SMS、プッシュなど）
     if (rule.actions.email || rule.actions.sms || rule.actions.push) {
       // 実際の配信処理を実行
-      console.log(`Triggering alert: ${rule.name}`)
+      
     }
 
     // Webhook通知
@@ -498,7 +498,7 @@ async function triggerAlert(supabase: any, rule: any, companyId: string) {
     }
 
   } catch (error) {
-    console.error('Trigger alert error:', error)
+    
   }
 }
 
@@ -518,11 +518,11 @@ async function sendWebhookAlert(webhookUrl: string, rule: any, notification: any
     })
 
     if (!response.ok) {
-      console.error(`Webhook failed: ${response.status} ${response.statusText}`)
+      
     }
 
   } catch (error) {
-    console.error('Webhook error:', error)
+    
   }
 }
 
@@ -565,7 +565,7 @@ async function testAlertRule(supabase: any, ruleId: string) {
     })
 
   } catch (error) {
-    console.error('Test alert error:', error)
+    
     return NextResponse.json({ error: 'Failed to send test alert' }, { status: 500 })
   }
 }

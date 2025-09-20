@@ -288,7 +288,7 @@ export default function NotificationsPage() {
         setLoading(false)
       }, 800)
     } catch (error) {
-      console.error('通知データ取得エラー:', error)
+      
       setLoading(false)
     }
   }
@@ -384,7 +384,7 @@ export default function NotificationsPage() {
       // 実際のAPIコール
       alert('通知設定を保存しました')
     } catch (error) {
-      console.error('設定保存エラー:', error)
+      
       alert('設定の保存に失敗しました')
     }
   }
@@ -394,7 +394,7 @@ export default function NotificationsPage() {
       // テスト通知の送信
       alert(`${type}通知のテストを送信しました`)
     } catch (error) {
-      console.error('テスト通知エラー:', error)
+      
       alert('テスト通知の送信に失敗しました')
     }
   }

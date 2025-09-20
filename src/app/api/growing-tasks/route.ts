@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const { data: tasks, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch growing tasks' }, { status: 500 })
     }
 
@@ -68,10 +68,7 @@ export async function GET(request: NextRequest) {
       return task.vegetables !== null && task.vegetables.deleted_at === null
     })
 
-    console.log('📋 growing-tasks API結果:', {
-      'SQLフィルタ後': tasks.length,
-      '野菜フィルタ後': activeTasks.length
-    })
+    
 
     // レスポンス用にデータを整形
     const formattedTasks = activeTasks.map(task => ({
@@ -101,7 +98,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -152,7 +149,7 @@ export async function POST(request: NextRequest) {
       .single()
     
     if (vegetableError) {
-      console.error('Database error:', vegetableError)
+      
       return NextResponse.json({ 
         error: 'Invalid vegetable_id or vegetable not found' 
       }, { status: 400 })
@@ -204,7 +201,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
     }
 
@@ -235,7 +232,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -306,7 +303,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
     }
 
@@ -337,7 +334,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -357,7 +354,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // ハード削除実装（work_reportsと統一）
-    console.log('🗑️ growing-tasks API: ハード削除実行中...', id)
+    
     
     const { error } = await supabase
       .from('growing_tasks')
@@ -365,11 +362,11 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     if (error) {
-      console.error('🗑️ growing-tasks API: Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
     }
 
-    console.log('✅ growing-tasks API: タスクをハード削除しました:', id)
+    
 
     return NextResponse.json({
       success: true,
@@ -377,7 +374,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

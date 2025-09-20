@@ -312,7 +312,7 @@ export default function PhotosPage() {
 
   const fetchData = async () => {
     if (!currentUser?.company_id) {
-      console.error('Company ID not available')
+      
       setLoading(false)
       return
     }
@@ -331,17 +331,17 @@ export default function PhotosPage() {
         const [vegetablesResponse, photosResponse, storageResponse] = await Promise.all([
           fetch(`/api/gantt?company_id=${companyId}&start_date=2024-01-01&end_date=2024-12-31`)
             .catch(err => {
-              console.warn('Vegetables API fetch failed:', err)
+              
               return { ok: false }
             }),
           fetch(`/api/photos?company_id=${companyId}&limit=1000`)
             .catch(err => {
-              console.warn('Photos API fetch failed:', err)  
+                
               return { ok: false }
             }),
           fetch(`/api/photos/storage?company_id=${companyId}`)
             .catch(err => {
-              console.warn('Storage API fetch failed:', err)
+              
               return { ok: false }
             })
         ])
@@ -360,7 +360,7 @@ export default function PhotosPage() {
             }
           }
         } catch (err) {
-          console.warn('Failed to process vegetables data:', err)
+          
         }
 
         // 写真データの処理と作業種類別分類
@@ -390,7 +390,7 @@ export default function PhotosPage() {
             }
           }
         } catch (err) {
-          console.warn('Failed to process photos data:', err)
+          
         }
 
         // 容量情報の処理
@@ -414,15 +414,15 @@ export default function PhotosPage() {
             }
           }
         } catch (err) {
-          console.warn('Failed to process storage data:', err)
+          
         }
       } catch (networkError) {
-        console.error('Network error during API calls:', networkError)
+        
       }
 
       // データが取得できない場合の初期設定
       if (vegetables.length === 0) {
-        console.log('📊 野菜データが未登録です。サンプル野菜データを表示します。')
+        
         vegetables = [
           { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎', plot_name: 'A棟温室' },
           { id: 'v2', name: 'B棟キュウリ（四葉）', variety: '四葉', plot_name: 'B棟温室' },
@@ -453,7 +453,7 @@ export default function PhotosPage() {
       setStorageInfo(storage)
       
     } catch (error) {
-      console.error('データ取得エラー:', error)
+      
       // エラー時の初期設定
       setVegetables([
         { id: 'v1', name: 'A棟トマト（桃太郎）', variety: '桃太郎', plot_name: 'A棟温室' },
@@ -617,7 +617,7 @@ export default function PhotosPage() {
     const selectedPhotoList = filteredAndSortedPhotos.filter(p => selectedPhotos.has(p.id))
     
     // 実装では実際のダウンロードAPIを呼び出し
-    console.log('バルクダウンロード対象:', selectedPhotoList)
+    
     alert(`${selectedPhotos.size}枚の写真をダウンロードします`)
   }
 
@@ -628,8 +628,7 @@ export default function PhotosPage() {
     
     try {
       // 実装では実際の削除APIを呼び出し
-      console.log('バルク削除対象:', Array.from(selectedPhotos))
-      
+
       // ローカル状態から削除
       setPhotos(photos.filter(p => !selectedPhotos.has(p.id)))
       setSelectedPhotos(new Set())
@@ -637,7 +636,7 @@ export default function PhotosPage() {
       
       alert(`${selectedPhotos.size}枚の写真を削除しました`)
     } catch (error) {
-      console.error('削除エラー:', error)
+      
       alert('削除に失敗しました')
     }
   }

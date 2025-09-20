@@ -59,7 +59,7 @@ export default function WorkReportViewModal({
             }
           }
         } catch (error) {
-          console.error('野菜情報取得エラー:', error)
+          
           setVegetableInfo({
             name: 'Unknown',
             variety: '',
@@ -83,7 +83,7 @@ export default function WorkReportViewModal({
             }
           }
         } catch (error) {
-          console.error('会計データ取得エラー:', error)
+          
         }
       }
       fetchAccountingData()

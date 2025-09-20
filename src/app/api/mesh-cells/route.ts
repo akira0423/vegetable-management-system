@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { data: cells, error } = await query
 
     if (error) {
-      console.error('メッシュセル取得エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to fetch mesh cells' },
         { status: 500 }
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('メッシュセルAPI GET エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         .eq('farm_plot_id', farm_plot_id)
 
       if (deleteError) {
-        console.error('既存メッシュ削除エラー:', deleteError)
+        
       }
     }
 
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
         .select('*')
 
       if (insertError) {
-        console.error('メッシュセル挿入エラー:', insertError)
+        
         return NextResponse.json(
           { success: false, error: 'Failed to insert mesh cells' },
           { status: 500 }
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
       .eq('id', farm_plot_id)
 
     if (updateError) {
-      console.warn('農地メッシュフラグ更新に失敗:', updateError)
+      
     }
 
     return NextResponse.json({
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('メッシュ生成API POST エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -296,7 +296,7 @@ export async function DELETE(request: NextRequest) {
     const { error } = await query
 
     if (error) {
-      console.error('メッシュセル削除エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to delete mesh cells' },
         { status: 500 }
@@ -315,7 +315,7 @@ export async function DELETE(request: NextRequest) {
         .eq('id', farmPlotId)
 
       if (updateError) {
-        console.warn('農地メッシュフラグリセットに失敗:', updateError)
+        
       }
     }
 
@@ -325,7 +325,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('メッシュセルAPI DELETE エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

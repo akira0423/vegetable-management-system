@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (companyError) {
-        console.error('Company settings error:', companyError)
+        
       } else {
         settings.company = companySettings
       }
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (systemError) {
-        console.error('System settings error:', systemError)
+        
         // デフォルト設定を返す
         settings.system = {
           auto_backup: true,
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (securityError) {
-        console.error('Security settings error:', securityError)
+        
         // デフォルト設定を返す
         settings.security = {
           password_policy: {
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -170,7 +170,7 @@ export async function PUT(request: NextRequest) {
         .single()
 
       if (companyError) {
-        console.error('Company update error:', companyError)
+        
         return NextResponse.json({ error: 'Failed to update company settings' }, { status: 500 })
       }
 
@@ -199,7 +199,7 @@ export async function PUT(request: NextRequest) {
         .single()
 
       if (systemError) {
-        console.error('System update error:', systemError)
+        
         return NextResponse.json({ error: 'Failed to update system settings' }, { status: 500 })
       }
 
@@ -223,7 +223,7 @@ export async function PUT(request: NextRequest) {
         .single()
 
       if (securityError) {
-        console.error('Security update error:', securityError)
+        
         return NextResponse.json({ error: 'Failed to update security settings' }, { status: 500 })
       }
 
@@ -248,7 +248,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -346,7 +346,7 @@ async function createBackup(supabase: any, companyId: string) {
           })
 
       } catch (error) {
-        console.error('Backup completion error:', error)
+        
         await supabase
           .from('backups')
           .update({
@@ -364,7 +364,7 @@ async function createBackup(supabase: any, companyId: string) {
     })
 
   } catch (error) {
-    console.error('Create backup error:', error)
+    
     return NextResponse.json({ error: 'バックアップの作成に失敗しました' }, { status: 500 })
   }
 }
@@ -406,7 +406,7 @@ async function restoreBackup(supabase: any, companyId: string, backupId: string)
     })
 
   } catch (error) {
-    console.error('Restore backup error:', error)
+    
     return NextResponse.json({ error: 'バックアップの復元に失敗しました' }, { status: 500 })
   }
 }
@@ -431,7 +431,7 @@ async function getBackupHistory(supabase: any, companyId: string) {
     })
 
   } catch (error) {
-    console.error('Get backup history error:', error)
+    
     return NextResponse.json({ error: 'バックアップ履歴の取得に失敗しました' }, { status: 500 })
   }
 }
@@ -462,7 +462,7 @@ async function getSystemLogs(supabase: any, companyId: string, limit: number, le
     })
 
   } catch (error) {
-    console.error('Get system logs error:', error)
+    
     return NextResponse.json({ error: 'システムログの取得に失敗しました' }, { status: 500 })
   }
 }

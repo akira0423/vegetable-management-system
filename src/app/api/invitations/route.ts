@@ -39,13 +39,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 招待API - リクエスト:', { 
-      email, 
-      full_name, 
-      role, 
-      currentUser: currentUser.id,
-      company_id: currentUser.company_id 
-    })
+    
 
     // 現在のユーザーのメンバーシップを確認
     const { data: membership, error: membershipError } = await supabase
@@ -68,7 +62,7 @@ export async function POST(request: NextRequest) {
         })
 
       if (createError) {
-        console.error('メンバーシップ作成エラー:', createError)
+        
         return NextResponse.json({
           success: false,
           error: 'メンバーシップの作成に失敗しました'
@@ -158,14 +152,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (invitationError) {
-      console.error('招待作成エラー:', invitationError)
+      
       return NextResponse.json({
         success: false,
         error: '招待の作成に失敗しました'
       }, { status: 500 })
     }
 
-    console.log('✅ 招待作成成功:', invitation.id)
+    
 
     // NOTE: 将来の機能 - 招待メール自動送信（現在は手動対応）
     // await sendInvitationEmail(invitation)
@@ -177,7 +171,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('招待API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -201,10 +195,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'all'
 
-    console.log('🔍 招待一覧API - リクエスト:', { 
-      company_id: currentUser.company_id,
-      status 
-    })
+    
 
     // 現在のユーザーが管理者かチェック
     const { data: membership } = await supabase
@@ -249,7 +240,7 @@ export async function GET(request: NextRequest) {
     const { data: invitations, error } = await query
 
     if (error) {
-      console.error('招待一覧取得エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: '招待一覧の取得に失敗しました'
@@ -282,7 +273,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('招待一覧API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -313,10 +304,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 招待キャンセルAPI - リクエスト:', { 
-      invitationId,
-      currentUser: currentUser.id 
-    })
+    
 
     // 現在のユーザーが管理者かチェック
     const { data: membership } = await supabase
@@ -348,7 +336,7 @@ export async function DELETE(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('招待キャンセルエラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: '招待のキャンセルに失敗しました'
@@ -362,7 +350,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 404 })
     }
 
-    console.log('✅ 招待キャンセル成功:', cancelledInvitation.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -371,7 +359,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('招待キャンセルAPI エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'

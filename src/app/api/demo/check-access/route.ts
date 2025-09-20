@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       message: 'デモページへのアクセスが許可されました'
     })
   } catch (error) {
-    console.error('デモアクセスチェックエラー:', error)
+    
     // エラーの場合もデモページへのアクセスを許可
     return NextResponse.json({
       success: true,

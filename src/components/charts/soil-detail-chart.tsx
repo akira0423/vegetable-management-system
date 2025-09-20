@@ -23,9 +23,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ SoilDetailChart: Supabase環境変数が設定されていません')
+  
 } else {
-  console.log('✅ SoilDetailChart: Supabase環境変数確認済み')
+  
 }
 
 const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!)
@@ -86,12 +86,12 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
   // Supabaseから土壌データを取得
   const fetchSoilData = useCallback(async () => {
     if (!companyId) {
-      console.log('⚠️ SoilDetailChart: companyIdが未設定')
+      
       return
     }
     
     try {
-      console.log('🔬 SoilDetailChart: work_reportsから土壌データを取得中...', { companyId })
+      
       setLoading(true)
       
       const endMonth = addMonths(startMonth, displayPeriod * 12)
@@ -113,14 +113,14 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
         .order('work_date', { ascending: true })
       
       if (error) {
-        console.error('🚨 SoilDetailChart: 土壌データ取得エラー:', error)
+        
         return
       }
       
-      console.log('🔬 取得した土壌記録数:', workReports?.length || 0)
+      
       
       if (!workReports || workReports.length === 0) {
-        console.log('⚠️ SoilDetailChart: 土壌データが見つかりません')
+        
         setSoilData([])
         return
       }
@@ -169,11 +169,11 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
         })
       }
       
-      console.log('🔬 処理済み土壌データ:', processedData.length, 'ヶ月分')
+      
       setSoilData(processedData)
       
     } catch (error) {
-      console.error('🚨 SoilDetailChart: データ取得エラー:', error)
+      
       setSoilData([])
     } finally {
       setLoading(false)
@@ -191,10 +191,10 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
   )
 
   const chartData = React.useMemo(() => {
-    console.log('🔬 チャートデータ生成中...')
-    console.log('🔬 全成分数:', components.length)
-    console.log('🔬 選択成分:', selectedComponents)
-    console.log('🔬 表示成分数:', visibleComponents.length)
+    
+    
+    
+    
     
     const data = {
       labels: soilData.map(d => {
@@ -202,7 +202,7 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
         return date.toLocaleDateString('ja-JP', { month: 'short' })
       }),
       datasets: visibleComponents.map(component => {
-        console.log(`🔬 データセット生成: ${component.label}`, component.color)
+        
         return {
           label: `${component.label} (${component.unit})`,
           data: soilData.map(d => d[component.id as keyof SoilDetailData] as number * component.scale),
@@ -220,27 +220,27 @@ const SoilDetailChart: React.FC<SoilDetailChartProps> = ({ companyId }) => {
       })
     }
     
-    console.log('🔬 最終データセット数:', data.datasets.length)
+    
     return data
   }, [selectedComponents, visibleComponents])
 
   // 成分選択の切り替え処理
   const toggleComponent = (componentId: string) => {
-    console.log('🔬 成分切り替え:', componentId)
+    
     setSelectedComponents(prev => {
       const newSelection = prev.includes(componentId)
         ? prev.filter(id => id !== componentId)
         : [...prev, componentId]
-      console.log('🔬 選択された成分:', newSelection)
-      console.log('🔬 表示する成分数:', newSelection.length)
+      
+      
       return newSelection
     })
   }
 
   // デバッグ用: 選択状態の監視
   React.useEffect(() => {
-    console.log('🔬 現在の選択成分:', selectedComponents)
-    console.log('🔬 データセット数:', visibleComponents.length)
+    
+    
   }, [selectedComponents, visibleComponents])
 
   const options = {

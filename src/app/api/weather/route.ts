@@ -67,9 +67,7 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get('days') || '7')
     const refresh = searchParams.get('refresh') === 'true'
 
-    console.log('🌤️ 天気API - リクエストパラメータ:', { 
-      companyId, prefecture, days, refresh 
-    })
+    
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
@@ -107,7 +105,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (existingData && !refresh) {
-      console.log('✅ 天気API - キャッシュデータ使用')
+      
       
       // 今日から指定日数分のデータを取得
       const { data: weatherData } = await supabase
@@ -128,7 +126,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 気象庁APIから天気予報取得
-    console.log('🌐 気象庁API呼び出し - 都道府県コード:', prefectureCode)
+    
     
     const jmaResponse = await fetch(`${JMA_API_BASE}/${prefectureCode}.json`, {
       headers: {
@@ -137,7 +135,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!jmaResponse.ok) {
-      console.error('❌ 気象庁API エラー:', jmaResponse.status)
+      
       return NextResponse.json({ 
         error: 'Weather API request failed',
         status: jmaResponse.status 
@@ -145,7 +143,7 @@ export async function GET(request: NextRequest) {
     }
 
     const jmaData = await jmaResponse.json()
-    console.log('✅ 気象庁API - データ取得成功')
+    
 
     // 天気データを解析・変換
     const weatherRecords = []
@@ -203,10 +201,10 @@ export async function GET(request: NextRequest) {
         .insert(weatherRecords)
 
       if (insertError) {
-        console.error('❌ 天気データ保存エラー:', insertError)
+        
         // エラーでも取得したデータは返す
       } else {
-        console.log('✅ 天気データ保存成功:', weatherRecords.length)
+        
       }
     }
 
@@ -218,7 +216,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 天気API - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -232,7 +230,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient()
     const body = await request.json()
 
-    console.log('🚨 気象アラート設定:', body)
+    
 
     const requiredFields = ['company_id', 'alert_type', 'title', 'message', 'trigger_condition']
     for (const field of requiredFields) {
@@ -261,11 +259,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('❌ 気象アラート設定エラー:', error)
+      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ 気象アラート設定成功:', data.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -273,7 +271,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('❌ 気象アラート - 予期しないエラー:', error)
+    
     return NextResponse.json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

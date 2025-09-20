@@ -88,7 +88,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
     try {
       // データ検証
       if (!this.validateReportData(report)) {
-        console.warn('作業レポートデータが不正です:', report)
+        
         return
       }
 
@@ -103,10 +103,10 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
         timestamp: new Date().toISOString()
       })
 
-      console.log('作業レポートが分析データに同期されました:', report.id)
+      
       
     } catch (error) {
-      console.error('分析データ同期エラー:', error)
+      
     }
   }
 
@@ -118,7 +118,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       const vegetablesValid = vegetables.every(veg => veg.id && veg.name)
 
       if (!reportsValid || !vegetablesValid) {
-        console.error('データ整合性エラー: 基本データが不正です')
+        
         return false
       }
 
@@ -129,7 +129,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       )
 
       if (!referencesValid) {
-        console.error('データ整合性エラー: 野菜参照が不正です')
+        
         return false
       }
 
@@ -150,15 +150,15 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       })
 
       if (!numbersValid) {
-        console.error('データ整合性エラー: 数値データが範囲外です')
+        
         return false
       }
 
-      console.log('データ整合性検証: OK')
+      
       return true
 
     } catch (error) {
-      console.error('データ整合性検証エラー:', error)
+      
       return false
     }
   }
@@ -212,7 +212,7 @@ class AnalyticsDataSyncService implements AnalyticsDataSync {
       }
 
     } catch (error) {
-      console.error('リアルタイムメトリクス生成エラー:', error)
+      
       return null
     }
   }

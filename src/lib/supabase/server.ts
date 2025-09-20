@@ -35,7 +35,7 @@ export async function createServiceClient() {
   // 本番環境では管理機能のみ許可
   if (process.env.NODE_ENV === 'production') {
     // 管理機能でのみ使用を許可（将来の管理パネル用）
-    console.warn('⚠️ Service role client used in production - should be limited to admin functions only')
+    
   }
   
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

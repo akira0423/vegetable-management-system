@@ -157,12 +157,7 @@ export default function GanttPage() {
   
   // フィルター状態変更の監視
   useEffect(() => {
-    console.log('🔄 親コンポーネント - フィルター状態変更:', {
-      selectedVegetable,
-      selectedPriority,
-      customStartDate,
-      customEndDate
-    })
+    
   }, [selectedVegetable, selectedPriority, customStartDate, customEndDate])
   
   // タスク詳細モーダル
@@ -184,8 +179,8 @@ export default function GanttPage() {
 
   // 編集モーダルを開く
   const handleEditWorkReport = (workReport: any) => {
-    console.log('🔧 handleEditWorkReport - 受け取った作業レポート:', workReport)
-    console.log('🔧 handleEditWorkReport - 作業レポートのID:', workReport?.id)
+    
+    
     setSelectedWorkReport(workReport)
     setIsViewModalOpen(false)
     setIsEditModalOpen(true)
@@ -215,12 +210,12 @@ export default function GanttPage() {
         setSelectedWorkReport(null)
         
         // 成功メッセージ（必要に応じて）
-        console.log('実績記録が更新されました')
+        
       } else {
         throw new Error(result.error || 'Update failed')
       }
     } catch (error) {
-      console.error('実績記録の更新エラー:', error)
+      
       // エラーハンドリング（トースト通知など）
     }
   }
@@ -236,7 +231,7 @@ export default function GanttPage() {
   useEffect(() => {
     const fetchUserAuth = async () => {
       try {
-        console.log('🔍 Gantt: 認証情報取得開始')
+        
         const response = await fetch('/api/auth/user')
         
         if (!response.ok) {
@@ -246,14 +241,14 @@ export default function GanttPage() {
         const result = await response.json()
         
         if (result.success && result.user?.company_id) {
-          console.log('✅ Gantt: 認証成功, company_id:', result.user.company_id)
+          
           setCompanyId(result.user.company_id)
           setAuthError(null)
         } else {
           throw new Error('ユーザー情報の取得に失敗しました')
         }
       } catch (error) {
-        console.error('❌ Gantt: 認証エラー:', error)
+        
         setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
         setCompanyId(null)
       }
@@ -358,7 +353,7 @@ export default function GanttPage() {
   const getDateRange = useCallback(() => {
     // ガントチャートヘッダー内のカスタム期間設定を優先
     if (customStartDate && customEndDate) {
-      console.log('🔍 getDateRange - ガントチャートカスタム期間使用:', { customStartDate, customEndDate })
+      
       return {
         start: customStartDate,
         end: customEndDate
@@ -367,7 +362,7 @@ export default function GanttPage() {
     
     // レガシーカスタム範囲が設定されている場合はそれを使用
     if (isUsingCustomRange && customRange) {
-      console.log('🔍 getDateRange - レガシーカスタム範囲使用:', customRange)
+      
       return {
         start: format(customRange.start, 'yyyy-MM-dd'),
         end: format(customRange.end, 'yyyy-MM-dd')
@@ -375,7 +370,7 @@ export default function GanttPage() {
     }
 
     // デフォルトの期間計算
-    console.log('🔍 getDateRange - デフォルト期間計算:', { viewPeriod, currentDate })
+    
     const now = currentDate
     let start: Date, end: Date
 
@@ -407,7 +402,7 @@ export default function GanttPage() {
       start: format(start, 'yyyy-MM-dd'),
       end: format(end, 'yyyy-MM-dd')
     }
-    console.log('🔍 getDateRange - 計算結果:', result)
+    
     return result
   }, [viewPeriod, currentDate, isUsingCustomRange, customRange, customStartDate, customEndDate])
 
@@ -487,9 +482,9 @@ export default function GanttPage() {
         detail: analyticsData 
       }))
       
-      console.log('タスクが分析システムに同期されました:', task.id)
+      
     } catch (error) {
-      console.warn('分析システムへの同期に失敗しました:', error)
+      
       // 分析同期エラーはユーザーには表示しない（サイレントエラー）
     }
   }
@@ -518,7 +513,7 @@ export default function GanttPage() {
   // 初回データ取得（companyIdが取得された後に実行）
   useEffect(() => {
     if (companyId) {
-      console.log('📊 Gantt: companyId取得完了、初回データフェッチ開始:', companyId)
+      
       fetchData()
     }
   }, [companyId])
@@ -526,7 +521,7 @@ export default function GanttPage() {
   // フィルター変更時にデータを再取得
   useEffect(() => {
     if (companyId) {
-      console.log('🔄 フィルター変更でデータ再取得:', { selectedVegetable, viewPeriod, currentDate, customStartDate, customEndDate })
+      
       fetchData()
     }
   }, [companyId, selectedVegetable, viewPeriod, currentDate, customStartDate, customEndDate])
@@ -545,13 +540,13 @@ export default function GanttPage() {
   // タスク作成後の専用データ取得関数（作成されたタスクの日付範囲を考慮）
   const fetchDataWithTaskDateRange = async (newTask?: any) => {
     if (!companyId) {
-      console.log('❌ Gantt: companyIdが未設定のため、データ取得をスキップ')
+      
       return
     }
     
     setLoading(true)
     try {
-      console.log('📊 Gantt: fetchDataWithTaskDateRange開始, companyId:', companyId)
+      
       let { start, end } = getDateRange()
       
       // 新しく作成されたタスクの日付範囲を既存の表示範囲に含める
@@ -568,12 +563,6 @@ export default function GanttPage() {
         if (taskEnd > currentEnd) {
           end = taskEnd.toISOString().split('T')[0]
         }
-        
-        console.log('📅 タスク作成により表示期間を調整:', { 
-          元の期間: `${currentStart.toLocaleDateString()} - ${currentEnd.toLocaleDateString()}`,
-          新しい期間: `${new Date(start).toLocaleDateString()} - ${new Date(end).toLocaleDateString()}`,
-          作成されたタスク: `${taskStart.toLocaleDateString()} - ${taskEnd.toLocaleDateString()}`
-        })
       }
       
       const params = new URLSearchParams({
@@ -587,8 +576,6 @@ export default function GanttPage() {
       }
 
       params.append('active_only', 'true')
-      
-      console.log('🔍 fetchDataWithTaskDateRange - APIリクエスト:', `/api/gantt?${params.toString()}`)
 
       // ガントチャートデータ、作業レポートデータ、野菜データ、ユーザーデータを並行取得
       const [ganttResponse, reportsResponse, vegetablesResponse, usersResponse] = await Promise.all([
@@ -611,44 +598,36 @@ export default function GanttPage() {
         vegetablesResult = await vegetablesResponse.json()
       }
 
-      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      
       if (usersResponse.ok) {
         usersResult = await usersResponse.json()
-        console.log('👥 取得したユーザーデータ:', usersResult)
-        console.log('👥 ユーザーデータの構造:', {
-          success: usersResult.success,
-          dataLength: usersResult.data?.length,
-          firstUser: usersResult.data?.[0]
-        })
+        
+        
         if (usersResult.success && usersResult.data) {
           const formattedUsers = usersResult.data.map((u: any) => ({
             id: u.id,
             name: u.full_name || u.email || '名前未設定'
           }))
-          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          
           setUsers(formattedUsers)
         } else {
-          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+          
         }
       } else {
-        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        
         try {
           const errorText = await usersResponse.text()
-          console.error('❌ エラー詳細:', errorText)
+          
         } catch (e) {
-          console.error('❌ エラーテキスト取得失敗:', e)
+          
         }
       }
 
-      console.log('🔍 fetchDataWithTaskDateRange - APIレスポンス:', {
-        ganttSuccess: ganttResult.success,
-        ganttTasksCount: ganttResult.data?.tasks?.length || 0,
-        ganttError: ganttResult.error
-      })
+      
 
       // タスクデータの設定（実データのみ）
       if (ganttResult.success) {
-        console.log('🔍 fetchDataWithTaskDateRange - 取得されたタスク詳細:', ganttResult.data.tasks?.map((t: any) => ({
+        const tasks = ganttResult.data.tasks.map((t: any) => ({
           id: t.id,
           name: t.name,
           start: t.start_date,
@@ -657,7 +636,7 @@ export default function GanttPage() {
         })))
         setTasks(ganttResult.data.tasks || [])
       } else {
-        console.log('❌ fetchDataWithTaskDateRange - Gantt API エラー:', ganttResult.error)
+        
         setTasks([])
       }
 
@@ -671,7 +650,7 @@ export default function GanttPage() {
           area_size: v.area_size || 0
         })))
       } else {
-        console.log('野菜API エラー:', vegetablesResult.error)
+        
         setVegetables([])
       }
 
@@ -679,11 +658,11 @@ export default function GanttPage() {
       if (reportsResult.success) {
         setWorkReports(reportsResult.data || [])
       } else {
-        console.log('作業レポートAPI エラー:', reportsResult.error)
+        
         setWorkReports([])
       }
     } catch (error) {
-      console.error('データ取得エラー:', error)
+      
       // エラー時は空のデータを設定
       setTasks([])
       setVegetables([])
@@ -695,13 +674,13 @@ export default function GanttPage() {
 
   const fetchData = async () => {
     if (!companyId) {
-      console.log('❌ Gantt: companyIdが未設定のため、データ取得をスキップ')
+      
       return
     }
     
     setLoading(true)
     try {
-      console.log('📊 Gantt: fetchData開始, companyId:', companyId, 'selectedVegetable:', selectedVegetable)
+      
       const { start, end } = getDateRange()
       
       const params = new URLSearchParams({
@@ -712,18 +691,18 @@ export default function GanttPage() {
 
       if (selectedVegetable !== 'all') {
         params.append('vegetable_id', selectedVegetable)
-        console.log('🔍 fetchData - 野菜フィルター適用:', selectedVegetable)
+        
       } else {
-        console.log('🔍 fetchData - 全野菜表示')
+        
       }
 
       params.append('active_only', 'true')
       
-      console.log('🔍 fetchData - APIパラメータ:', params.toString())
+      )
       
       // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
-      console.log('🔍 fetchData - 野菜API呼び出し準備 company_id:', companyId)
-      console.log('🔍 fetchData - 野菜API URL:', `/api/vegetables?company_id=${companyId}`)
+      
+      
       
       // JWTトークンを取得
       const { data: { session } } = await supabase.auth.getSession()
@@ -732,8 +711,8 @@ export default function GanttPage() {
         'Content-Type': 'application/json'
       }
 
-      console.log('🔍 ユーザーAPI呼び出し準備 - URL:', `/api/users?company_id=${companyId}`)
-      console.log('🔍 認証ヘッダー存在確認:', !!session?.access_token)
+      
+      
 
       const [ganttResponse, reportsResponse, vegetablesResponse, usersResponse] = await Promise.all([
         fetch(`/api/gantt?${params.toString()}`, { headers: authHeaders }),
@@ -755,50 +734,46 @@ export default function GanttPage() {
         vegetablesResult = await vegetablesResponse.json()
       }
 
-      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      
       if (usersResponse.ok) {
         usersResult = await usersResponse.json()
-        console.log('👥 取得したユーザーデータ:', usersResult)
-        console.log('👥 ユーザーデータの構造:', {
-          success: usersResult.success,
-          dataLength: usersResult.data?.length,
-          firstUser: usersResult.data?.[0]
-        })
+        
+        
         if (usersResult.success && usersResult.data) {
           const formattedUsers = usersResult.data.map((u: any) => ({
             id: u.id,
             name: u.full_name || u.email || '名前未設定'
           }))
-          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          
           setUsers(formattedUsers)
         } else {
-          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+          
         }
       } else {
-        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        
         try {
           const errorText = await usersResponse.text()
-          console.error('❌ エラー詳細:', errorText)
+          
         } catch (e) {
-          console.error('❌ エラーテキスト取得失敗:', e)
+          
         }
       }
 
       // タスクデータの設定（実データのみ）
       if (ganttResult.success) {
-        console.log('📊 fetchData - 取得されたタスク数:', ganttResult.data.tasks?.length || 0)
-        console.log('📊 fetchData - タスク詳細:', ganttResult.data.tasks?.map(t => ({ id: t.id, name: t.name })) || [])
+        
+        ) || [])
         setTasks(ganttResult.data.tasks || [])
       } else {
-        console.log('Gantt API エラー:', ganttResult.error)
+        
         setTasks([])
       }
 
       // 野菜データは専用APIから取得（実データのみ）
-      console.log('🔍 fetchData - 野菜API結果:', vegetablesResult)
+      
       if (vegetablesResult.success && vegetablesResult.data) {
-        console.log('🔍 fetchData - 取得された野菜数:', vegetablesResult.data.length)
-        console.log('🔍 fetchData - 野菜詳細:', vegetablesResult.data.map((v: any) => ({ id: v.id, name: v.name, company_id: v.company_id })))
+        
+         => ({ id: v.id, name: v.name, company_id: v.company_id })))
         const vegetableData = vegetablesResult.data.map((v: any) => ({
           id: v.id,
           name: v.name,
@@ -813,26 +788,21 @@ export default function GanttPage() {
           setExpandedVegetables(new Set(vegetableData.map(v => v.id)))
         }
       } else {
-        console.log('❌ fetchData - 野菜API エラー:', vegetablesResult.error)
+        
         setVegetables([])
       }
 
       // 作業レポートデータの設定（実データのみ）
       if (reportsResult.success) {
-        console.log('📊 fetchData - 作業レポートデータ詳細:', reportsResult.data?.map(r => ({ 
-          id: r.id, 
-          work_date: r.work_date, 
-          work_type: r.work_type,
-          vegetable_id: r.vegetable_id 
-        })) || [])
-        console.log('📊 fetchData - 作業レポート生データ（最初の3件）:', reportsResult.data?.slice(0, 3) || [])
+        ) || [])
+         || [])
         setWorkReports(reportsResult.data || [])
       } else {
-        console.log('作業レポートAPI エラー:', reportsResult.error)
+        
         setWorkReports([])
       }
     } catch (error) {
-      console.error('データ取得エラー:', error)
+      
       // エラー時は空のデータを設定
       setTasks([])
       setVegetables([])
@@ -873,13 +843,13 @@ export default function GanttPage() {
   // カスタム期間でのデータ取得関数
   const fetchDataWithCustomRange = async (startDate: Date, endDate: Date) => {
     if (!companyId) {
-      console.log('❌ Gantt: companyIdが未設定のため、カスタム範囲データ取得をスキップ')
+      
       return
     }
     
     setLoading(true)
     try {
-      console.log('📊 Gantt: fetchDataWithCustomRange開始, companyId:', companyId)
+      
       
       const startStr = format(startDate, 'yyyy-MM-dd')
       const endStr = format(endDate, 'yyyy-MM-dd')
@@ -917,32 +887,28 @@ export default function GanttPage() {
         vegetablesResult = await vegetablesResponse.json()
       }
 
-      console.log('👥 ユーザーAPIレスポンスステータス:', usersResponse.status, usersResponse.ok)
+      
       if (usersResponse.ok) {
         usersResult = await usersResponse.json()
-        console.log('👥 取得したユーザーデータ:', usersResult)
-        console.log('👥 ユーザーデータの構造:', {
-          success: usersResult.success,
-          dataLength: usersResult.data?.length,
-          firstUser: usersResult.data?.[0]
-        })
+        
+        
         if (usersResult.success && usersResult.data) {
           const formattedUsers = usersResult.data.map((u: any) => ({
             id: u.id,
             name: u.full_name || u.email || '名前未設定'
           }))
-          console.log('👥 フォーマット済みユーザー:', formattedUsers)
+          
           setUsers(formattedUsers)
         } else {
-          console.log('❌ ユーザーデータ取得失敗:', usersResult)
+          
         }
       } else {
-        console.error('❌ ユーザーAPI呼び出し失敗:', usersResponse.status, usersResponse.statusText)
+        
         try {
           const errorText = await usersResponse.text()
-          console.error('❌ エラー詳細:', errorText)
+          
         } catch (e) {
-          console.error('❌ エラーテキスト取得失敗:', e)
+          
         }
       }
 
@@ -972,10 +938,10 @@ export default function GanttPage() {
         setWorkReports([])
       }
 
-      console.log(`✅ カスタム期間データ取得完了: ${startStr} 〜 ${endStr}`)
+      
       
     } catch (error) {
-      console.error('カスタム期間データ取得エラー:', error)
+      
       setTasks([])
       setVegetables([])
       setWorkReports([])
@@ -995,7 +961,7 @@ export default function GanttPage() {
       }
       return format(date, formatStr, { locale: ja })
     } catch (error) {
-      console.warn('日付フォーマットエラー:', dateValue, error)
+      
       return '-'
     }
   }
@@ -1024,7 +990,7 @@ export default function GanttPage() {
   }
 
   const handleTaskClick = (task: GanttTask) => {
-    console.log('Task clicked:', task.name) // デバッグ用
+     // デバッグ用
     setSelectedTask(task)
   }
 
@@ -1057,21 +1023,21 @@ export default function GanttPage() {
 
   const handleNewTask = async () => {
     if (!companyId) {
-      console.log('❌ Gantt: companyIdが未設定のため、新規タスク作成をスキップ')
+      
       return
     }
     
     // タスク作成前に最新の野菜データを取得
     try {
-      console.log('🎯 Gantt: handleNewTask開始, companyId:', companyId)
+      
       
       const response = await fetch(`/api/vegetables?company_id=${companyId}`)
       
       if (response.ok) {
         const result = await response.json()
-        console.log('🎯 handleNewTask - 野菜API結果:', result)
+        
         if (result.success && result.data) {
-          console.log('🎯 handleNewTask - 取得した野菜数:', result.data.length)
+          
           // 最新の野菜データで更新
           setVegetables(result.data.map((v: any) => ({
             id: v.id,
@@ -1080,12 +1046,12 @@ export default function GanttPage() {
             status: v.status
           })))
         } else {
-          console.log('❌ handleNewTask - APIからのデータが空のため、空の野菜設定とします')
+          
           setVegetables([])
         }
       }
     } catch (error) {
-      console.error('野菜データの更新に失敗:', error)
+      
     }
     
     setShowNewTaskModal(true)
@@ -1150,7 +1116,7 @@ export default function GanttPage() {
         const userData = await userResponse.json()
         if (userData.success && userData.user?.id) {
           createdBy = userData.user.id
-          console.log('✅ handleCreateTask - 作成者ID:', createdBy)
+          
         }
       }
       
@@ -1168,7 +1134,7 @@ export default function GanttPage() {
         created_by: createdBy
       }
       
-      console.log('🚀 統一アーキテクチャでタスク作成:', payload)
+      
       
       const response = await retryWithBackoff(() => fetch('/api/growing-tasks', {
         method: 'POST',
@@ -1189,7 +1155,7 @@ export default function GanttPage() {
         throw new Error(result.error || 'タスクの作成に失敗しました')
       }
 
-      console.log('✅ タスク作成成功:', result.data)
+      
 
       // /api/growing-tasksのレスポンス形式をガンチャート用に変換
       const getStatusColor = (status: string): string => {
@@ -1229,7 +1195,7 @@ export default function GanttPage() {
       setShowNewTaskModal(false)
       
       // タスク作成成功
-      console.log('✅ タスク作成成功:', result.data.name)
+      
       
       // データを再取得して確実に最新状態を表示
       // 新しく作成されたタスクの日付を含むように期間を調整
@@ -1239,11 +1205,11 @@ export default function GanttPage() {
       try {
         await syncTaskToAnalytics(result.data)
       } catch (syncError) {
-        console.warn('分析データ同期エラー:', syncError)
+        
       }
       
     } catch (error) {
-      console.error('タスク作成エラー:', error)
+      
       
       // ネットワークエラーの特別処理
       if (isNetworkError(error)) {
@@ -1341,10 +1307,10 @@ export default function GanttPage() {
       }
 
       // 成功時のフィードバック
-      console.log(`✅ タスク進捗を${newProgress}%に更新しました`)
+      
 
     } catch (error) {
-      console.error('進捗更新エラー:', error)
+      
       // ロールバック
       setTasks(oldTasks)
       toast({
@@ -1371,15 +1337,15 @@ export default function GanttPage() {
       const requestBody: any = { id: taskId }
 
       // 変更されたフィールドのみを含める
-      console.log('🔍 updates オブジェクト:', updates)
-      console.log('🔍 updates.progress:', updates.progress, 'type:', typeof updates.progress)
+      
+      
 
       if (updates.name !== undefined) requestBody.name = updates.name
       if (updates.start !== undefined) requestBody.start_date = updates.start
       if (updates.end !== undefined) requestBody.end_date = updates.end
       if (updates.progress !== undefined) {
         requestBody.progress = updates.progress
-        console.log('✅ progress を requestBody に追加:', updates.progress)
+        
       }
       if (updates.status !== undefined) requestBody.status = updates.status
       if (updates.priority !== undefined) requestBody.priority = updates.priority
@@ -1390,9 +1356,9 @@ export default function GanttPage() {
         requestBody.assigned_user_id = updates.assignedUser?.id || null
       }
 
-      console.log('📤 送信する更新データ:', requestBody)
-      console.log('📤 requestBodyのキー:', Object.keys(requestBody))
-      console.log('📤 id以外のキー:', Object.keys(requestBody).filter(key => key !== 'id'))
+      
+      )
+      .filter(key => key !== 'id'))
 
       const response = await fetch('/api/gantt', {
         method: 'PUT',
@@ -1425,7 +1391,7 @@ export default function GanttPage() {
       }
       
     } catch (error) {
-      console.error('タスク更新エラー:', error)
+      
       // ロールバック
       setTasks(oldTasks)
       toast({
@@ -1440,11 +1406,11 @@ export default function GanttPage() {
 
   // プロフェッショナル削除処理：楽観的更新＋ロールバック対応
   const handleDeleteTask = async (taskId: string, reason?: string) => {
-    console.log('🗑️ プロフェッショナル削除処理開始:', taskId)
+    
     
     const taskToDelete = tasks.find(t => t.id === taskId)
     if (!taskToDelete) {
-      console.log('❌ タスクが見つかりません:', taskId)
+      
       toast({
         title: 'エラー',
         description: 'タスクが見つかりません',
@@ -1454,7 +1420,7 @@ export default function GanttPage() {
     }
 
     // 1. 楽観的更新：即座にUIからタスクを削除
-    console.log('⚡ 楽観的更新実行中...')
+    
     const originalTasks = tasks
     setTasks(prev => prev.filter(task => task.id !== taskId))
     setIsDeletingTask(taskId)
@@ -1472,7 +1438,7 @@ export default function GanttPage() {
 
     try {
       // 3. サーバーAPIコール（統一エンドポイント使用）
-      console.log('🌐 統一削除API呼び出し:', `/api/growing-tasks/${taskId}`)
+      
       const response = await fetch(`/api/growing-tasks/${taskId}?reason=${encodeURIComponent(reason || '手動削除')}`, {
         method: 'DELETE',
         headers: {
@@ -1481,15 +1447,15 @@ export default function GanttPage() {
       })
 
       const result = await response.json()
-      console.log('📡 削除API レスポンス:', result)
+      
 
       if (!result.success) {
-        console.error('🗑️ 削除API詳細エラー:', result)
+        
         throw new Error(result.error || 'タスクの削除に失敗しました')
       }
 
       // 4. 削除成功：楽観的更新を確定
-      console.log('✅ 削除成功確定:', result.data?.deleted_name)
+      
       
       toast({
         title: '削除完了',
@@ -1512,14 +1478,14 @@ export default function GanttPage() {
       }))
 
       // 6. 関連データ更新通知
-      console.log('📊 関連データ更新イベント発行')
+      
       window.dispatchEvent(new CustomEvent('tasksDataChanged', {
         detail: { action: 'delete', taskId, vegetableName: result.data?.vegetable_info?.name }
       }))
 
     } catch (error) {
       // 7. エラー発生：楽観的更新をロールバック
-      console.error('❌ 削除エラー - ロールバック実行:', error)
+      
       
       // タスクリストを元に戻す（ソート順も保持）
       setTasks(originalTasks)
@@ -1533,17 +1499,13 @@ export default function GanttPage() {
       })
 
       // 詳細エラー情報をログ出力
-      console.error('削除エラー詳細:', {
-        taskId,
-        taskName: taskToDelete.name,
-        error: error.message,
-        timestamp: new Date().toISOString()
+      .toISOString()
       })
 
     } finally {
       // 8. 後処理
       setIsDeletingTask(null)
-      console.log('🏁 削除処理完了')
+      
     }
   }
 
@@ -1577,7 +1539,7 @@ export default function GanttPage() {
       fetchData()
       
     } catch (error) {
-      console.error('実績記録削除エラー:', error)
+      
       toast({
         title: 'エラー',
         description: error instanceof Error ? error.message : '実績記録の削除に失敗しました',
@@ -1588,7 +1550,7 @@ export default function GanttPage() {
 
   // プロフェッショナル削除確認：事前検証付き
   const showDeleteConfirmation = async (item: any, type: 'task' | 'report') => {
-    console.log('🗑️ 削除確認ダイアログ準備中:', { item: item.name, type, id: item.id })
+    
     
     // 初期ダイアログ表示
     setDeleteConfirmDialog({
@@ -1602,13 +1564,13 @@ export default function GanttPage() {
     // タスクの場合は削除前検証を実行
     if (type === 'task') {
       try {
-        console.log('🔍 削除前検証実行中...')
+        
         const response = await fetch(`/api/growing-tasks/${item.id}`, {
           method: 'GET'
         })
         
         const validation = await response.json()
-        console.log('🔍 検証結果:', validation)
+        
         
         setDeleteConfirmDialog(prev => ({
           ...prev,
@@ -1616,7 +1578,7 @@ export default function GanttPage() {
           isValidating: false
         }))
       } catch (error) {
-        console.error('削除前検証エラー:', error)
+        
         setDeleteConfirmDialog(prev => ({
           ...prev,
           validation: {
@@ -1640,13 +1602,7 @@ export default function GanttPage() {
   const handleConfirmDelete = async (reason?: string) => {
     const { item, type, validation } = deleteConfirmDialog
     
-    console.log('🗑️ 削除実行開始:', { 
-      item: item?.name, 
-      type, 
-      id: item?.id, 
-      reason: reason || '理由未指定',
-      can_delete: validation?.can_delete 
-    })
+    
     
     // 削除不可能な場合の確認
     if (validation && !validation.can_delete) {
@@ -1668,10 +1624,10 @@ export default function GanttPage() {
     })
     
     if (type === 'task') {
-      console.log('🗑️ タスク削除処理を呼び出し:', item.id, '理由:', reason)
+      
       await handleDeleteTask(item.id, reason)
     } else {
-      console.log('🗑️ レポート削除処理を呼び出し:', item.id)
+      
       await handleDeleteReport(item.id)
     }
   }
@@ -1884,15 +1840,15 @@ export default function GanttPage() {
           customStartDate={customStartDate}
           customEndDate={customEndDate}
           onVegetableChange={(value) => {
-            console.log('🔄 親コンポーネント - 野菜変更:', value)
+            
             setSelectedVegetable(value)
           }}
           onPriorityChange={(value) => {
-            console.log('🔄 親コンポーネント - 優先度変更:', value)
+            
             setSelectedPriority(value)
           }}
           onDateRangeChange={(startDate, endDate) => {
-            console.log('🔄 親コンポーネント - 日付変更:', startDate, endDate)
+            
             setCustomStartDate(startDate)
             setCustomEndDate(endDate)
           }}
@@ -2280,7 +2236,7 @@ export default function GanttPage() {
 
       {/* タスク詳細モーダル */}
       <Dialog open={isTaskModalOpen} onOpenChange={(open) => {
-        console.log('Dialog onOpenChange called with:', open)
+        
         if (!open) {
           setSelectedTask(null)
           setIsTaskModalOpen(false)
@@ -2566,40 +2522,40 @@ export default function GanttPage() {
                         const updates: any = {}
 
                         // デバッグ: pendingTaskChangesの内容を確認
-                        console.log('🔍 pendingTaskChanges内容:', pendingTaskChanges)
-                        console.log('🔍 pendingTaskChangesのキー:', Object.keys(pendingTaskChanges))
+                        
+                        )
 
                         // assigned_user_idを直接チェック
                         if ('assigned_user_id' in pendingTaskChanges) {
                           updates.assigned_user_id = pendingTaskChanges.assigned_user_id
-                          console.log('✅ assigned_user_idを追加:', pendingTaskChanges.assigned_user_id)
+                          
                         }
                         // priorityをチェック
                         if ('priority' in pendingTaskChanges) {
                           updates.priority = pendingTaskChanges.priority
-                          console.log('✅ priorityを追加:', pendingTaskChanges.priority)
+                          
                         }
                         // progressをチェック
                         if ('progress' in pendingTaskChanges) {
                           updates.progress = pendingTaskChanges.progress
-                          console.log('✅ progressを追加:', pendingTaskChanges.progress)
+                          
                         }
                         // statusをチェック
                         if ('status' in pendingTaskChanges) {
                           updates.status = pendingTaskChanges.status
-                          console.log('✅ statusを追加:', pendingTaskChanges.status)
+                          
                         }
 
-                        console.log('📝 最終的な更新データ:', updates)
-                        console.log('📝 更新データのキー:', Object.keys(updates))
-                        console.log('📝 更新データの数:', Object.keys(updates).length)
+                        
+                        )
+                        .length)
 
                         // 更新データが空でない場合のみ送信
                         if (Object.keys(updates).length > 0) {
-                          console.log('✅ handleUpdateTaskを呼び出します')
+                          
                           await handleUpdateTask(selectedTask.id, updates)
                         } else {
-                          console.log('⚠️ 更新データが空のため、送信をスキップ')
+                          
                         }
 
                         // 更新後、モーダルを閉じてページをリフレッシュ

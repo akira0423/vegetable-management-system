@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       .order('work_date', { ascending: false })
 
     if (reportsError) {
-      console.error('Error fetching demo work reports:', reportsError)
+      
       return NextResponse.json({
         success: false,
         error: reportsError.message
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       data: formattedReports
     })
   } catch (error) {
-    console.error('Error in demo work reports API:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'Internal server error'
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // デモ版では実際にデータベースに保存せず、成功レスポンスのみ返す
-    console.log('Demo work report creation request:', body)
+    
 
     // 仮のレスポンス
     return NextResponse.json({
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error in demo work report creation:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、作業記録の作成はできません'
@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
 
     // デモ版では実際にデータベースを更新せず、成功レスポンスのみ返す
-    console.log('Demo work report update request:', body)
+    
 
     return NextResponse.json({
       success: true,
@@ -112,7 +112,7 @@ export async function PUT(request: NextRequest) {
       data: body
     })
   } catch (error) {
-    console.error('Error in demo work report update:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、作業記録の更新はできません'
@@ -127,14 +127,14 @@ export async function DELETE(request: NextRequest) {
     const reportId = searchParams.get('id')
 
     // デモ版では実際にデータベースから削除せず、成功レスポンスのみ返す
-    console.log('Demo work report deletion request for ID:', reportId)
+    
 
     return NextResponse.json({
       success: true,
       message: 'デモ版のため、実際には削除されません'
     })
   } catch (error) {
-    console.error('Error in demo work report deletion:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'デモ版のため、作業記録の削除はできません'

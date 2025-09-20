@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const { data: notifications, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 })
     }
 
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to create notification' }, { status: 500 })
     }
 
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -230,7 +230,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update notification' }, { status: 500 })
     }
 
@@ -241,7 +241,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -290,7 +290,7 @@ export async function PATCH(request: NextRequest) {
       .select()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update notifications' }, { status: 500 })
     }
 
@@ -301,7 +301,7 @@ export async function PATCH(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -321,14 +321,14 @@ async function processNotificationDelivery(supabase: any, notification: any, com
       .single()
 
     if (!settings) {
-      console.log('No notification settings found, using defaults')
+      
       return
     }
 
     // カテゴリ設定を確認
     const categorySettings = settings.categories?.[notification.category]
     if (!categorySettings?.enabled) {
-      console.log(`Notifications disabled for category: ${notification.category}`)
+      
       return
     }
 
@@ -348,7 +348,7 @@ async function processNotificationDelivery(supabase: any, notification: any, com
     }
 
   } catch (error) {
-    console.error('Notification delivery error:', error)
+    
   }
 }
 
@@ -356,7 +356,7 @@ async function processNotificationDelivery(supabase: any, notification: any, com
 async function sendEmailNotification(notification: any, companyId: string, userId?: string) {
   try {
     // 実際の実装では適切なメールサービスを使用
-    console.log('Sending email notification:', notification.title)
+    
     
     // メール送信ログを記録
     // await supabase.from('notification_delivery_logs').insert({
@@ -368,7 +368,7 @@ async function sendEmailNotification(notification: any, companyId: string, userI
     // })
 
   } catch (error) {
-    console.error('Email notification error:', error)
+    
   }
 }
 
@@ -376,7 +376,7 @@ async function sendEmailNotification(notification: any, companyId: string, userI
 async function sendSMSNotification(notification: any, companyId: string, userId?: string) {
   try {
     // 実際の実装では適切なSMSサービスを使用
-    console.log('Sending SMS notification:', notification.title)
+    
     
     // SMS送信ログを記録
     // await supabase.from('notification_delivery_logs').insert({
@@ -388,7 +388,7 @@ async function sendSMSNotification(notification: any, companyId: string, userId?
     // })
 
   } catch (error) {
-    console.error('SMS notification error:', error)
+    
   }
 }
 
@@ -396,7 +396,7 @@ async function sendSMSNotification(notification: any, companyId: string, userId?
 async function sendPushNotification(notification: any, companyId: string, userId?: string) {
   try {
     // 実際の実装では適切なプッシュ通知サービスを使用
-    console.log('Sending push notification:', notification.title)
+    
     
     // WebSocket経由でリアルタイム通知を送信
     // await broadcastNotification(notification, companyId, userId)
@@ -411,6 +411,6 @@ async function sendPushNotification(notification: any, companyId: string, userId
     // })
 
   } catch (error) {
-    console.error('Push notification error:', error)
+    
   }
 }

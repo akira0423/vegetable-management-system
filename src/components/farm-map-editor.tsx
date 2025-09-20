@@ -279,9 +279,9 @@ export default function FarmMapEditor({
       map.current.setLayoutProperty(layerId, 'visibility', 'visible')
       
       setActiveLayer(layerId)
-      console.log(`地図レイヤーを${layerId}に切り替えました`)
+      
     } catch (error) {
-      console.error('レイヤー切り替えエラー:', error)
+      
     }
   }, [])
 
@@ -534,7 +534,7 @@ export default function FarmMapEditor({
       })
     }
     
-    console.log('農地描画完了:', plotFeature)
+    
   }, [addFarmPlot])
 
   // WAGRIレイヤー追加
@@ -617,35 +617,35 @@ export default function FarmMapEditor({
       }
     })
 
-    console.log('WAGRIレイヤーを追加しました')
+    
   }, [])
 
   // WAGRI農地ピンを読み込み
   const loadWagriFarmPins = useCallback(async (cityCode: string) => {
     if (!cityCode) return
 
-    console.log(`WAGRI農地ピン読み込み開始: cityCode=${cityCode}`)
+    
     
     try {
       const response = await fetch(`/api/wagri/farm-pins?cityCode=${cityCode}&limit=500`)
-      console.log('WAGRI農地ピンAPI レスポンス:', response.status, response.statusText)
+      
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const result = await response.json()
-      console.log('WAGRI農地ピンAPI結果:', result)
+      
 
       if (result.success) {
         setWagriFarmPins(result.data)
         updateWagriPinsLayer(result.data)
-        console.log(`✅ WAGRI農地ピン ${result.data.length}件を読み込みました`)
+        
       } else {
-        console.warn('WAGRI農地ピン読み込み失敗:', result.error)
+        
       }
     } catch (error) {
-      console.error('❌ WAGRI農地ピン読み込みエラー:', error)
+      
     }
   }, [])
 
@@ -653,37 +653,37 @@ export default function FarmMapEditor({
   const loadWagriPolygons = useCallback(async (cityCode: string) => {
     if (!cityCode) return
 
-    console.log(`WAGRI農地ポリゴン読み込み開始: cityCode=${cityCode}`)
+    
     
     try {
       const response = await fetch(`/api/wagri/polygons?cityCode=${cityCode}`)
-      console.log('WAGRI農地ポリゴンAPI レスポンス:', response.status, response.statusText)
+      
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const result = await response.json()
-      console.log('WAGRI農地ポリゴンAPI結果:', result)
+      
 
       if (result.success) {
         setWagriPolygons(result.data)
         updateWagriPolygonsLayer(result.data)
-        console.log(`✅ WAGRI農地ポリゴン ${result.data.length}件を読み込みました`)
+        
       } else {
-        console.warn('WAGRI農地ポリゴン読み込み失敗:', result.error)
+        
       }
     } catch (error) {
-      console.error('❌ WAGRI農地ポリゴン読み込みエラー:', error)
+      
     }
   }, [])
 
   // WAGRIピンレイヤー更新
   const updateWagriPinsLayer = useCallback((pins: any[]) => {
-    console.log('WAGRIピンレイヤー更新:', pins.length, '件')
+    
     
     if (!map.current) {
-      console.warn('マップが初期化されていません')
+      
       return
     }
 
@@ -704,7 +704,7 @@ export default function FarmMapEditor({
       }
     }))
 
-    console.log('WAGRIピン フィーチャー:', features)
+    
 
     const source = map.current.getSource('wagri-pins') as maplibregl.GeoJSONSource
     if (source) {
@@ -712,9 +712,9 @@ export default function FarmMapEditor({
         type: 'FeatureCollection',
         features: features
       })
-      console.log('✅ WAGRIピンレイヤーを更新しました')
+      
     } else {
-      console.warn('⚠️ wagri-pinsソースが見つかりません')
+      
     }
   }, [])
 
@@ -815,7 +815,7 @@ ${properties.attributes ? JSON.stringify(properties.attributes, null, 2) : ''}
         cropToPolygon: true
       })
       
-      console.log(`${result.totalCells}個のメッシュセルを生成しました`, result.cells)
+      
       
       setMeshCells(result.cells)
       
@@ -836,20 +836,20 @@ ${properties.attributes ? JSON.stringify(properties.attributes, null, 2) : ''}
         if (source) {
           const geoJSON = cellsToGeoJSON(result.cells)
           source.setData(geoJSON)
-          console.log('メッシュレイヤー更新完了:', geoJSON.features.length, 'features')
+          
           
           // レイヤー表示確認
           const layer = map.current.getLayer('mesh-cells-fill')
           if (layer) {
-            console.log('メッシュレイヤーは表示状態です')
+            
           } else {
-            console.warn('メッシュレイヤーが見つかりません')
+            
           }
         }
       }
       
     } catch (error) {
-      console.error('メッシュ生成エラー:', error)
+      
       alert('メッシュ生成に失敗しました')
       setMapState(prev => ({ ...prev, isGeneratingMesh: false }))
     }
@@ -932,7 +932,7 @@ ${properties.attributes ? JSON.stringify(properties.attributes, null, 2) : ''}
         {/* WAGRI農地データ検索 */}
         <CityCodeSearch
           onCityCodeSelect={(cityCode, cityName) => {
-            console.log(`WAGRI農地データを読み込み: ${cityName} (${cityCode})`)
+            `)
             loadWagriDataByCityCode(cityCode)
           }}
           className="w-80"

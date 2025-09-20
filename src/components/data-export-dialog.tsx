@@ -89,7 +89,7 @@ export default function DataExportDialog({ className }: DataExportDialogProps) {
   const handleExport = async () => {
     setLoading(true)
     try {
-      console.log('🚀 データエクスポート開始:', { dataType, exportFormat, dateRange, filters })
+      
       
       const exportOptions = {
         format: exportFormat,
@@ -128,7 +128,7 @@ export default function DataExportDialog({ className }: DataExportDialogProps) {
       setOpen(false)
       
     } catch (error) {
-      console.error('エクスポートエラー:', error)
+      
       alert('エクスポートに失敗しました。もう一度お試しください。')
     } finally {
       setLoading(false)

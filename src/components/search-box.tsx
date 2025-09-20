@@ -127,7 +127,7 @@ export default function SearchBox({
           setSearchHistory(JSON.parse(saved).slice(0, 5))
         }
       } catch (error) {
-        console.warn('検索履歴の読み込みに失敗:', error)
+        
       }
     }
   }, [showHistory])
@@ -144,7 +144,7 @@ export default function SearchBox({
       try {
         localStorage.setItem('farm-map-search-history', JSON.stringify(newHistory))
       } catch (error) {
-        console.warn('検索履歴の保存に失敗:', error)
+        
       }
       
       return newHistory
@@ -158,12 +158,12 @@ export default function SearchBox({
       const response = await fetch(`/api/geocoding?q=${encodeURIComponent(query)}&type=address`)
       
       if (!response.ok) {
-        console.warn(`住所検索API エラー: ${response.status} ${response.statusText}`)
+        
         return []
       }
       
       const data = await response.json()
-      console.log('住所検索結果:', data)
+      
       
       if (data.success && data.results) {
         return data.results.map((item: any, index: number) => ({
@@ -181,7 +181,7 @@ export default function SearchBox({
       
       return []
     } catch (error) {
-      console.error('住所検索エラー:', error)
+      
       return []
     }
   }, [])
@@ -232,7 +232,7 @@ export default function SearchBox({
       
       setResults(searchResults.slice(0, maxResults))
     } catch (error) {
-      console.error('検索エラー:', error)
+      
       setResults([])
     } finally {
       setIsLoading(false)
@@ -291,7 +291,7 @@ export default function SearchBox({
         setIsLoading(false)
       },
       (error) => {
-        console.error('位置情報取得エラー:', error)
+        
         alert('位置情報の取得に失敗しました')
         setIsLoading(false)
       },
@@ -334,7 +334,7 @@ export default function SearchBox({
     try {
       localStorage.removeItem('farm-map-search-history')
     } catch (error) {
-      console.warn('履歴削除に失敗:', error)
+      
     }
   }, [])
 

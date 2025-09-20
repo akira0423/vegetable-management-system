@@ -254,13 +254,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
 
       // デバッグ: 大きな支出を検出
       if (monthlyExpense >= 100000000) {
-        console.log('📊 Y軸計算 - 大規模支出検出:', {
-          月: d.month,
-          年: d.year,
-          月間支出: monthlyExpense,
-          月間収入: monthlyIncome,
-          work_types: d.work_types
-        })
+        
       }
 
       maxIncome = Math.max(maxIncome, monthlyIncome)
@@ -404,11 +398,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
 
     // デバッグ: Y軸範囲の最終値
     if (Math.abs(symmetricMin) >= 100000000) {
-      console.log('📐 Y軸範囲計算結果:', {
-        計算されたステップ: stepSize,
-        Y軸最小値: symmetricMin,
-        Y軸最大値: symmetricMax
-      })
+      
     }
 
     return {
@@ -424,21 +414,13 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
     
     setLoading(true)
     try {
-      console.log('📊 キャッシュフローデータ取得開始:', companyId)
+      
       
       const endMonth = addMonths(startMonth, responsiveDimensions.monthCount - 1)
       const startDate = format(startMonth, 'yyyy-MM-01')
       // 終了月の最終日を取得（例：2025-12-31）
       const lastDayOfEndMonth = new Date(endMonth.getFullYear(), endMonth.getMonth() + 1, 0)
       const endDate = format(lastDayOfEndMonth, 'yyyy-MM-dd')
-
-      console.log('📅 データ取得期間:', {
-        開始月: format(startMonth, 'yyyy年M月'),
-        終了月: format(endMonth, 'yyyy年M月'),
-        月数: responsiveDimensions.monthCount,
-        開始日: startDate,
-        終了日: endDate
-      })
       
       // 現在年と前年データを並行取得
       let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
@@ -472,12 +454,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
       const previousYearResult = previousYearResponse.ok ? await previousYearResponse.json() : { success: false, data: [] }
       const previousYearReports = previousYearResult.success ? previousYearResult.data : []
       
-      console.log('🥬 キャッシュフロー: フィルター適用', {
-        選択野菜数: selectedVegetables.length,
-        選択野菜ID: selectedVegetables,
-        取得レポート数: reports.length,
-        前年レポート数: previousYearReports.length
-      })
+      
       
       // 月次キャッシュフローデータを生成
       const monthlyData: CashFlowData[] = []
@@ -513,14 +490,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
 
                 // デバッグ: 大きな金額の場合ログ出力
                 if (Math.abs(amount) >= 100000000) {
-                  console.log('💰 大規模金額検出:', {
-                    項目名: itemName,
-                    金額: amount,
-                    cost_type: costType,
-                    code: code,
-                    作業種別: workType,
-                    日付: r.work_date
-                  })
+                  
                 }
 
                 // cost_typeがある場合はそれを優先
@@ -604,18 +574,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
 
         // デバッグ：大きな金額の月を検出
         if (Math.abs(monthlyExpense) >= 100000000) {
-          console.log('🔍 月次キャッシュフロー - 大規模支出検出:', {
-            月: format(currentMonth, 'yyyy年M月', { locale: ja }),
-            総支出: monthlyExpense,
-            総収入: monthlyIncome,
-            純損益: monthlyIncome - monthlyExpense,
-            作業種別別内訳: Object.entries(workTypes).map(([type, data]: [string, any]) => ({
-              作業種別: type,
-              収入: data.income,
-              支出: data.expense,
-              純額: data.net
-            }))
-          })
+          // 大きな金額のログは削除済み
         }
 
         monthlyData.push({
@@ -715,10 +674,10 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
       setCashflowData(monthlyData)
       setPreviousYearData(previousMonthlyData)
       setLastUpdated(new Date())
-      console.log('✅ キャッシュフローデータ生成完了:', monthlyData.length, '件', '前年:', previousMonthlyData.length, '件')
+      
       
     } catch (error) {
-      console.error('❌ キャッシュフローデータ取得エラー:', error)
+      
       setCashflowData([])
     } finally {
       setLoading(false)
@@ -1044,11 +1003,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
 
     // デバッグ: Y軸範囲の最終値
     if (Math.abs(symmetricMin) >= 100000000) {
-      console.log('📐 Y軸範囲計算結果:', {
-        計算されたステップ: stepSize,
-        Y軸最小値: symmetricMin,
-        Y軸最大値: symmetricMax
-      })
+      
     }
 
     return {
@@ -1521,7 +1476,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetables = [
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('CSVエクスポートエラー:', error)
+      
       alert('CSVエクスポートに失敗しました')
     }
   }

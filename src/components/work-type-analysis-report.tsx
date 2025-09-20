@@ -194,21 +194,8 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetables =
       }
 
       // データ集計処理（グループ化）
-      console.log('📈 作業レポートデータ:', {
-        total_reports: workReports.length,
-        with_accounting: workReports.filter(r => r.work_report_accounting?.length > 0).length,
-        vegetables_count: vegetables.length,
-        period: `${startDateToUse} ~ ${endDateToUse}`
-      })
       
       const analysisData = generateGroupedWorkAnalysisData(workReports, vegetables)
-      
-      console.log('📊 生成された分析データ:', {
-        vegetables_with_works: analysisData.length,
-        total_works: analysisData.flatMap(v => v.works).length,
-        total_revenue: analysisData.flatMap(v => v.works).reduce((sum, w) => sum + w.totalRevenue, 0),
-        total_cost: analysisData.flatMap(v => v.works).reduce((sum, w) => sum + w.totalCost, 0)
-      })
       
       setData(analysisData)
       setLastUpdated(new Date())
@@ -218,7 +205,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetables =
       setExpandedVegetables(new Set(allVegetableIds))
       
     } catch (error) {
-      console.error('作業分析データの取得エラー:', error)
+      
       setData([])
     } finally {
       setLoading(false)
@@ -305,12 +292,7 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetables =
           const costType = accounting.accounting_items?.cost_type
           const amount = accounting.amount || 0
 
-          console.log('📊 会計データ:', {
-            work_type: report.work_type,
-            vegetable: existing.vegetableName,
-            cost_type: costType,
-            amount: amount
-          })
+          
 
           // cost_typeに基づいて収入・支出を判定
           if (costType === 'variable_cost' || costType === 'fixed_cost') {

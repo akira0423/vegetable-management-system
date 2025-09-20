@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Database error:', error)
+        
       }
       return NextResponse.json(
         { error: 'Database error occurred' },
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('API error:', error)
+      
     }
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Database error:', error)
+        
       }
       return NextResponse.json(
         { error: 'Database error occurred' },
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('API error:', error)
+      
     }
     return NextResponse.json(
       { error: 'Internal server error' },

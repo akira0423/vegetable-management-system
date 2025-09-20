@@ -90,7 +90,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
         .order('start_time', { ascending: false })
 
       if (error) {
-        console.error('作業記録の取得エラー:', error)
+        
         // エラーの場合はテストデータを表示
         const testLogs: OperationLog[] = [
           {
@@ -136,7 +136,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
 
       setLogs(data || [])
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
     } finally {
       setLoading(false)
     }
@@ -183,7 +183,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
           .eq('id', editingLog.id)
 
         if (error) {
-          console.error('作業記録更新エラー:', error)
+          
           alert('作業記録の更新に失敗しました')
           return
         }
@@ -194,7 +194,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
           .insert(logData)
 
         if (error) {
-          console.error('作業記録作成エラー:', error)
+          
           alert('作業記録の作成に失敗しました')
           return
         }
@@ -207,7 +207,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
       fetchLogs()
       onLogUpdated?.()
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
       alert('予期しないエラーが発生しました')
     }
   }
@@ -224,7 +224,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
         .eq('id', log.id)
 
       if (error) {
-        console.error('作業記録削除エラー:', error)
+        
         alert('作業記録の削除に失敗しました')
         return
       }
@@ -233,7 +233,7 @@ export default function WorkLog({ vegetableId, tasks, onLogUpdated }: WorkLogPro
       fetchLogs()
       onLogUpdated?.()
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
       alert('予期しないエラーが発生しました')
     }
   }

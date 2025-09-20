@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 招待確認API - トークン:', token)
+    
 
     // 招待情報を取得
     const { data: invitation, error } = await supabase
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('招待取得エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: '招待が見つかりません'
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('✅ 有効な招待を確認:', invitation.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('招待確認API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 招待受諾API - リクエスト:', { token, user_id })
+    
 
     // 招待受諾処理を実行
     const { data: result, error } = await supabase
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (error) {
-      console.error('招待受諾エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: '招待の受諾に失敗しました'
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('✅ 招待受諾成功:', acceptResult.membership_id)
+    
 
     // 新しいメンバーシップ情報を取得
     const { data: membership, error: membershipError } = await supabase
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (membershipError) {
-      console.error('メンバーシップ取得エラー:', membershipError)
+      
       // 受諾は成功したが、情報取得に失敗した場合
       return NextResponse.json({
         success: true,
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('招待受諾API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'

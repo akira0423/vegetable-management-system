@@ -509,7 +509,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         processingRef.current = false
       }
     } catch (error) {
-      console.error('❌ エリア処理エラー:', error)
+      
       processingRef.current = false
     }
   }
@@ -518,7 +518,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   const handleDrawCreate = (e: any) => {
     // 重複処理防止
     if (isHandlingCreateRef.current) {
-      console.warn('⚠️ handleDrawCreate: 重複呼び出しをスキップ')
+      
       return
     }
     
@@ -526,7 +526,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     
     if (feature?.geometry?.type === 'Polygon') {
       isHandlingCreateRef.current = true
-      console.log('🎯 ポリゴン描画完了:', feature.geometry.type)
+      
       
       // ポリゴン完成処理（モード変更前に実行）
       handlePolygonComplete(feature)
@@ -536,9 +536,9 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         if (draw.current) {
           try {
             draw.current.changeMode('simple_select')
-            console.log('✅ モード切り替え完了: simple_select')
+            
           } catch (error) {
-            console.warn('⚠️ モード切り替えエラー:', error)
+            
           }
         }
         // フラグをリセット
@@ -607,7 +607,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       setCurrentArea(updatedArea)
       
     } catch (error) {
-      console.error('❌ メッシュ生成エラー:', error)
+      
       alert('メッシュ生成に失敗しました')
     } finally {
       setIsGeneratingMesh(false)
@@ -651,7 +651,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
               map.current.getCanvas().style.cursor = 'grab'
             }
           } catch (error) {
-            console.error('❌ 地図移動モードへの切り替えに失敗:', error)
+            
           }
         }
       }, 50)
@@ -687,7 +687,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
           }
       }
     } catch (error) {
-      console.error(`❌ モード切り替えエラー (${mode}):`, error)
+      // エラーをスキップ
     }
   }, [currentMode])
 
@@ -750,7 +750,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       }
       
     } catch (error) {
-      console.error('❌ 保存エラー:', error)
+      
       alert(`保存に失敗しました: ${error.message}`)
     } finally {
       setIsSaving(false)
@@ -778,7 +778,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
   const changeMapStyle = useCallback((newStyle: 'standard' | 'pale' | 'photo') => {
     if (!map.current || newStyle === mapStyle) return
     
-    console.log(`🔄 地図スタイル変更: ${mapStyle} → ${newStyle}`)
+    
     
     const getMapStyle = (styleType: 'standard' | 'pale' | 'photo') => {
       const styles = {
@@ -806,21 +806,20 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     try {
       // 変更前の描画状態を保存
       const currentDrawings = draw.current ? draw.current.getAll() : null
-      console.log('📝 現在の描画データ:', currentDrawings)
+      
       
       // 既存のレイヤー一覧をログ出力
       const allLayers = map.current.getStyle().layers
-      console.log('🗂️ 変更前のレイヤー一覧:', allLayers.map(l => l.id))
       
       // 既存の背景レイヤーとソースを削除
       const currentStyleConfig = getMapStyle(mapStyle)
       if (map.current.getLayer(currentStyleConfig.source)) {
         map.current.removeLayer(currentStyleConfig.source)
-        console.log(`🗑️ 削除したレイヤー: ${currentStyleConfig.source}`)
+        
       }
       if (map.current.getSource(currentStyleConfig.source)) {
         map.current.removeSource(currentStyleConfig.source)
-        console.log(`🗑️ 削除したソース: ${currentStyleConfig.source}`)
+        
       }
       
       // 新しいソースを追加
@@ -830,7 +829,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         tileSize: 256,
         attribution: newStyleConfig.attribution
       })
-      console.log(`➕ 追加したソース: ${newStyleConfig.source}`)
+      
       
       // 新しい背景レイヤーを一番下に追加
       map.current.addLayer({
@@ -838,17 +837,16 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         type: 'raster',
         source: newStyleConfig.source
       })
-      console.log(`➕ 追加したレイヤー: ${newStyleConfig.source}`)
+      
       
       // 描画データを復元
       if (currentDrawings && currentDrawings.features.length > 0) {
         draw.current?.set(currentDrawings)
-        console.log('🔄 描画データを復元しました')
+        
       }
       
       // レイヤーの現在の順序を確認
       const layersAfterAdd = map.current.getStyle().layers
-      console.log('🗂️ 追加後のレイヤー一覧:', layersAfterAdd.map(l => l.id))
       
       // 実際に存在するレイヤーをすべて取得して、描画レイヤーを特定
       const currentLayers = map.current.getStyle().layers
@@ -859,15 +857,13 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         layer.id === 'mesh-cells-highlight'
       )
       
-      console.log('🎯 移動対象レイヤー:', drawLayers.map(l => l.id))
-      
       // 描画レイヤーとメッシュレイヤーを最上位に移動
       drawLayers.forEach((layer) => {
         try {
           map.current?.moveLayer(layer.id)
-          console.log(`⬆️ 移動したレイヤー: ${layer.id}`)
+          
         } catch (error) {
-          console.warn(`❌ レイヤー ${layer.id} の移動に失敗:`, error)
+          
         }
       })
       
@@ -875,19 +871,18 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       setTimeout(() => {
         if (map.current) {
           const finalLayers = map.current.getStyle().layers
-          console.log('🏁 最終レイヤー順序:', finalLayers.map(l => l.id))
           
           // 描画データの存在を再確認
           const finalDrawings = draw.current ? draw.current.getAll() : null
-          console.log('🔍 最終描画データ:', finalDrawings)
+          
         }
       }, 200)
       
       setMapStyle(newStyle)
-      console.log(`✅ 地図スタイル変更完了: ${newStyle}`)
+      
       
     } catch (error) {
-      console.error('❌ 地図スタイル変更エラー:', error)
+      
     }
   }, [mapStyle])
 
@@ -924,7 +919,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         map.current.getCanvas().style.cursor = 'grab'
       }
       
-      console.log('🗑️ 全ての描画をリセットしました')
+      
     }
   }, [updateMeshLayer])
 
@@ -956,11 +951,11 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     // 野菜エリアのポリゴンを表示する機能
     showVegetablePolygon: (vegetable: any) => {
       if (!map.current || !vegetable.farm_area_data?.geometry) {
-        console.warn('⚠️ 地図またはポリゴン情報がありません')
+        
         return
       }
 
-      console.log('🗺️ 野菜ポリゴンを表示:', vegetable)
+      
       
       // まず全ての既存ポリゴンをクリーンアップ
       try {
@@ -976,7 +971,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
                 map.current.removeLayer(layerId)
               }
             } catch (error) {
-              console.warn(`⚠️ 事前レイヤー削除エラー: ${layerId}`, error)
+              
             }
           })
           
@@ -989,12 +984,12 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
                 map.current.removeSource(sourceId)
               }
             } catch (error) {
-              console.warn(`⚠️ 事前ソース削除エラー: ${sourceId}`, error)
+              
             }
           })
         }
       } catch (error) {
-        console.warn('⚠️ 事前クリーンアップエラー:', error)
+        
       }
       
       const geometry = vegetable.farm_area_data.geometry
@@ -1006,18 +1001,18 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         [`${layerId}`, `${layerId}-stroke`, `${layerId}-label`].forEach(id => {
           if (map.current.getLayer(id)) {
             map.current.removeLayer(id)
-            console.log(`🗑️ 個別レイヤー削除: ${id}`)
+            
           }
         });
         
         [`${sourceId}`, `${sourceId}-label`].forEach(id => {
           if (map.current.getSource(id)) {
             map.current.removeSource(id)
-            console.log(`🗑️ 個別ソース削除: ${id}`)
+            
           }
         })
       } catch (error) {
-        console.warn('⚠️ 個別削除エラー:', error)
+        
       }
 
       // 新しいソースとレイヤーを追加
@@ -1075,7 +1070,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     clearVegetablePolygons: () => {
       if (!map.current) return
       
-      console.log('🧹 野菜ポリゴンをクリーンアップ中...')
+      
       
       try {
         const style = map.current.getStyle()
@@ -1090,10 +1085,10 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
           try {
             if (map.current.getLayer(layerId)) {
               map.current.removeLayer(layerId)
-              console.log(`🗑️ レイヤー削除: ${layerId}`)
+              
             }
           } catch (error) {
-            console.warn(`⚠️ レイヤー削除エラー: ${layerId}`, error)
+            
           }
         })
         
@@ -1105,17 +1100,17 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
           try {
             if (map.current.getSource(sourceId)) {
               map.current.removeSource(sourceId)
-              console.log(`🗑️ ソース削除: ${sourceId}`)
+              
             }
           } catch (error) {
-            console.warn(`⚠️ ソース削除エラー: ${sourceId}`, error)
+            
           }
         })
         
-        console.log('✅ 野菜ポリゴンクリーンアップ完了')
+        
         
       } catch (error) {
-        console.error('❌ 野菜ポリゴンクリーンアップエラー:', error)
+        
       }
     },
     
@@ -1129,7 +1124,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       // 塗りつぶし色を更新
       if (map.current.getLayer(layerId)) {
         map.current.setPaintProperty(layerId, 'fill-color', newColor)
-        console.log(`🎨 ポリゴン${vegetableId}の色を${newColor}に更新`)
+        
       }
       
       // 境界線色も更新（少し濃い色に）
@@ -1147,11 +1142,11 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     // ポリゴン編集モードを有効化
     enablePolygonEditMode: (vegetable: any) => {
       if (!map.current || !draw.current || !vegetable.farm_area_data?.geometry) {
-        console.warn('⚠️ 地図、描画、またはポリゴン情報がありません')
+        
         return
       }
       
-      console.log('✏️ ポリゴン編集モード開始:', vegetable.name)
+      
       
       // 既存の描画をクリア
       draw.current.deleteAll()
@@ -1182,7 +1177,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       setTimeout(() => {
         if (draw.current) {
           draw.current.changeMode('direct_select', { featureId: vegetable.id })
-          console.log('✅ ポリゴン編集モードに切り替えました')
+          
         }
       }, 100)
     },
@@ -1190,7 +1185,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     // 編集中のポリゴンを保存
     saveEditedPolygon: (vegetableId: string) => {
       if (!draw.current) {
-        console.warn('⚠️ 描画コンポーネントが初期化されていません')
+        
         return null
       }
       
@@ -1198,11 +1193,11 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       const editedFeature = features.features.find((f: any) => f.id === vegetableId)
       
       if (!editedFeature) {
-        console.warn('⚠️ 編集されたポリゴンが見つかりません')
+        
         return null
       }
       
-      console.log('💾 編集されたポリゴンを保存:', editedFeature)
+      
       
       // 編集を終了してsimple_selectモードに戻る
       draw.current.changeMode('simple_select')
@@ -1223,11 +1218,11 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     // 🆕 複数ポリゴン表示対応メソッド
     showPolygon: (vegetable: any) => {
       if (!map.current || !vegetable.farm_area_data?.geometry) {
-        console.warn('⚠️ 地図またはポリゴン情報がありません')
+        
         return
       }
 
-      console.log('🟢 野菜ポリゴンを表示:', vegetable)
+      
       
       const vegetableId = vegetable.id
       const geometry = vegetable.farm_area_data.geometry
@@ -1294,13 +1289,13 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       // レイヤーIDを記録
       vegetableLayersRef.current.set(vegetableId, layerId)
       
-      console.log(`✅ ポリゴン表示完了: ${vegetableId}`)
+      
     },
 
     hidePolygon: (vegetableId: string) => {
       if (!map.current) return
       
-      console.log('🔄 ポリゴンを非表示:', vegetableId)
+      
       
       const layerId = `vegetable-polygon-layer-${vegetableId}`
       const sourceId = `vegetable-polygon-${vegetableId}`
@@ -1310,26 +1305,26 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         [`${layerId}`, `${layerId}-stroke`].forEach(id => {
           if (map.current.getLayer(id)) {
             map.current.removeLayer(id)
-            console.log(`🗑️ レイヤー削除: ${id}`)
+            
           }
         });
         
         // ソースを削除
         if (map.current.getSource(sourceId)) {
           map.current.removeSource(sourceId)
-          console.log(`🗑️ ソース削除: ${sourceId}`)
+          
         }
         
         // 記録を削除
         vegetableLayersRef.current.delete(vegetableId)
         
       } catch (error) {
-        console.warn(`⚠️ ポリゴン非表示エラー: ${vegetableId}`, error)
+        
       }
     },
 
     showMultiplePolygons: (vegetables: any[]) => {
-      console.log('🔢 複数ポリゴンを表示:', vegetables.length)
+      
       vegetables.forEach(vegetable => {
         if (vegetable.farm_area_data?.geometry) {
           // showPolygonメソッドを再利用
@@ -1341,7 +1336,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
     clearAllPolygons: () => {
       if (!map.current) return
       
-      console.log('🧹 全ポリゴンをクリア')
+      
       
       try {
         const style = map.current.getStyle()
@@ -1358,7 +1353,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
               map.current.removeLayer(layerId)
             }
           } catch (error) {
-            console.warn(`⚠️ レイヤー削除エラー: ${layerId}`, error)
+            
           }
         })
         
@@ -1372,17 +1367,17 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
               map.current.removeSource(sourceId)
             }
           } catch (error) {
-            console.warn(`⚠️ ソース削除エラー: ${sourceId}`, error)
+            
           }
         })
         
         // 記録をクリア
         vegetableLayersRef.current.clear()
         
-        console.log('✅ 全ポリゴンクリア完了')
+        
         
       } catch (error) {
-        console.error('❌ 全ポリゴンクリアエラー:', error)
+        
       }
     }
   }), [polygonColors])

@@ -38,7 +38,7 @@ export default function AccountingAnalyticsDashboard({ companyId }: AccountingAn
   const fetchAccountingData = async () => {
     setLoading(true)
     try {
-      console.log('📊 会計分析ダッシュボード - データ取得開始:', { companyId, dateRange })
+      
       
       const response = await fetch(
         `/api/analytics/accounting-summary?company_id=${companyId}&start_date=${dateRange.start}&end_date=${dateRange.end}`
@@ -53,12 +53,12 @@ export default function AccountingAnalyticsDashboard({ companyId }: AccountingAn
       if (result.success) {
         setData(result)
         setLastUpdated(new Date())
-        console.log('✅ 会計分析ダッシュボード - データ取得成功:', result)
+        
       } else {
         throw new Error(result.error || 'データ取得に失敗しました')
       }
     } catch (error) {
-      console.error('❌ 会計分析ダッシュボード - データ取得エラー:', error)
+      
       alert(`データの取得に失敗しました: ${error.message}`)
     } finally {
       setLoading(false)

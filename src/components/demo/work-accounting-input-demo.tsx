@@ -142,7 +142,7 @@ export default function WorkAccountingInputDemo({
 
   // 手動反映機能
   const manualReflectToAccounting = useCallback((amount: number, itemName: string) => {
-    console.log('🔧 [デモ版] 手動反映機能が呼び出されました:', { amount, itemName })
+    
 
     if (amount > 0 && accountingItems.length > 0) {
       let salesItem = accountingItems.find(item => item.code === '101' && item.type === 'income')
@@ -221,7 +221,7 @@ export default function WorkAccountingInputDemo({
       }
 
     } catch (error) {
-      console.error('❌ [デモ版] 初期データ読み込みエラー:', error)
+      
       // エラー時もフォールバックデータを設定
       const fallbackItems: AccountingItem[] = [
         { id: '1', code: '101', name: '販売金額', type: 'income', category: '収入' },

@@ -107,7 +107,7 @@ export default function NewVegetablePage() {
         alert(`登録に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error('登録エラー:', error)
+      
       alert('登録に失敗しました。ネットワーク接続を確認してください。')
     } finally {
       setSubmitting(false)

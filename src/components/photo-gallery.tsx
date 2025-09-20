@@ -46,7 +46,7 @@ export default function PhotoGallery({ vegetableId, onPhotoDeleted }: PhotoGalle
         .order('taken_at', { ascending: false })
 
       if (error) {
-        console.error('写真データの取得エラー:', error)
+        
         return
       }
 
@@ -63,7 +63,7 @@ export default function PhotoGallery({ vegetableId, onPhotoDeleted }: PhotoGalle
       setImageUrls(urls)
 
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
     } finally {
       setLoading(false)
     }
@@ -82,7 +82,7 @@ export default function PhotoGallery({ vegetableId, onPhotoDeleted }: PhotoGalle
         .eq('id', photo.id)
 
       if (dbError) {
-        console.error('データベース削除エラー:', dbError)
+        
         throw dbError
       }
 
@@ -92,7 +92,7 @@ export default function PhotoGallery({ vegetableId, onPhotoDeleted }: PhotoGalle
         .remove([photo.storage_path])
 
       if (storageError) {
-        console.warn('Storage削除エラー:', storageError)
+        
         // Storage削除エラーは警告のみ（データベースは削除済み）
       }
 
@@ -115,7 +115,7 @@ export default function PhotoGallery({ vegetableId, onPhotoDeleted }: PhotoGalle
         .download(photo.storage_path)
 
       if (error) {
-        console.error('ダウンロードエラー:', error)
+        
         throw error
       }
 

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('q')
     const queryType = searchParams.get('type') || 'address'
     
-    console.log(`ジオコーディングAPI呼び出し: query=${query}, type=${queryType}`)
+    
     
     if (!query) {
       return NextResponse.json(
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       results = await reverseGeocode(query)
     }
 
-    console.log(`ジオコーディング結果: ${results.length}件`)
+    
 
     // キャッシュ保存は試行するがエラーは無視
     try {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           .single()
 
         if (cached) {
-          console.log('キャッシュからデータを返却')
+          
           return NextResponse.json({
             success: true,
             results: [{
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           })
         }
       } catch (cacheCheckError) {
-        console.warn('キャッシュチェックエラー（無視）:', cacheCheckError)
+        
       }
 
       // 結果をキャッシュに保存（エラーは無視）
@@ -97,13 +97,13 @@ export async function GET(request: NextRequest) {
               onConflict: 'query,query_type',
               ignoreDuplicates: false 
             })
-          console.log('キャッシュに保存しました')
+          
         } catch (cacheError) {
-          console.warn('キャッシュ保存エラー（無視）:', cacheError)
+          
         }
       }
     } catch (supabaseError) {
-      console.warn('Supabase接続エラー（無視）:', supabaseError)
+      
     }
 
     return NextResponse.json({
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('ジオコーディングAPI エラー:', error)
+    
     
     // エラーが発生してもフォールバック結果を返す
     try {
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
         error_recovered: true
       })
     } catch (fallbackError) {
-      console.error('フォールバック処理もエラー:', fallbackError)
+      
       return NextResponse.json(
         { 
           success: false, 
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
 // 住所から座標を取得
 async function geocodeAddress(address: string): Promise<GeocodingResult[]> {
   try {
-    console.log(`住所ジオコーディング開始: ${address}`)
+    
     
     // シンプルな住所パターンマッチング（実際の実装では地理院APIやGoogle Maps APIを使用）
     const results: GeocodingResult[] = []
@@ -149,53 +149,53 @@ async function geocodeAddress(address: string): Promise<GeocodingResult[]> {
     // 郵便番号パターン
     const postalCodeMatch = address.match(/(\d{3})-?(\d{4})/)
     if (postalCodeMatch) {
-      console.log('郵便番号パターン検出:', postalCodeMatch[0])
+      
       try {
         const mockResult = await mockGeocodePostalCode(`${postalCodeMatch[1]}-${postalCodeMatch[2]}`)
         if (mockResult) {
           results.push(mockResult)
-          console.log('郵便番号結果追加:', mockResult)
+          
         }
       } catch (postalError) {
-        console.warn('郵便番号処理エラー:', postalError)
+        
       }
     }
 
     // 都道府県・市区町村パターン
     const prefectureMatch = address.match(/(東京都|大阪府|京都府|北海道|.+県)/)
     if (prefectureMatch) {
-      console.log('都道府県パターン検出:', prefectureMatch[1])
+      
       try {
         const prefecture = prefectureMatch[1]
         const mockResult = await mockGeocodePrefecture(prefecture, address)
         if (mockResult) {
           results.push(mockResult)
-          console.log('都道府県結果追加:', mockResult)
+          
         }
       } catch (prefError) {
-        console.warn('都道府県処理エラー:', prefError)
+        
       }
     }
 
     // 代替として、住所の一部にマッチする結果を生成
     if (results.length === 0) {
-      console.log('一般的な処理にフォールバック')
+      
       try {
         const mockResult = await mockGeocodeGeneral(address)
         if (mockResult) {
           results.push(mockResult)
-          console.log('一般的な結果追加:', mockResult)
+          
         }
       } catch (generalError) {
-        console.warn('一般的な処理エラー:', generalError)
+        
       }
     }
 
-    console.log(`住所ジオコーディング完了: ${results.length}件`)
+    
     return results
 
   } catch (error) {
-    console.error('住所ジオコーディングエラー:', error)
+    
     // エラーでも空配列を返す
     return []
   }
@@ -229,7 +229,7 @@ async function reverseGeocode(coordinates: string): Promise<GeocodingResult[]> {
     }]
 
   } catch (error) {
-    console.error('逆ジオコーディングエラー:', error)
+    
     return []
   }
 }
@@ -440,7 +440,7 @@ export async function DELETE() {
       .lt('expires_at', new Date().toISOString())
 
     if (error) {
-      console.error('キャッシュクリーンアップエラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to cleanup cache' },
         { status: 500 }
@@ -453,7 +453,7 @@ export async function DELETE() {
     })
 
   } catch (error) {
-    console.error('キャッシュクリーンアップエラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

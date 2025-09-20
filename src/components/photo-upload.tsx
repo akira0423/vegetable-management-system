@@ -103,8 +103,8 @@ export default function PhotoUpload({ vegetableId, operationLogId, onUploadSucce
         })
 
       if (uploadError) {
-        console.error('ファイルアップロードエラー:', uploadError)
-        console.error('エラー詳細:', uploadError.message)
+        
+        
         alert(`ファイルアップロードエラー: ${uploadError.message}`)
         throw uploadError
       }
@@ -141,8 +141,8 @@ export default function PhotoUpload({ vegetableId, operationLogId, onUploadSucce
         .insert(photoData)
 
       if (dbError) {
-        console.error('データベース保存エラー:', dbError)
-        console.error('DB エラー詳細:', dbError.message)
+        
+        
         alert(`データベース保存エラー: ${dbError.message}`)
         // アップロードされたファイルを削除
         await supabase.storage
@@ -154,8 +154,8 @@ export default function PhotoUpload({ vegetableId, operationLogId, onUploadSucce
       return { success: true, storagePath, publicUrl: urlData.publicUrl }
 
     } catch (error: any) {
-      console.error('アップロード失敗:', error)
-      console.error('エラーの詳細:', error.message || error)
+      
+      
       
       // エラー状態に更新
       setUploadingFiles(prev => {

@@ -94,13 +94,13 @@ export default function SignupPage() {
           return
         }
 
-        console.log('✅ 完全なアカウント作成完了:', completeResult.data)
+        
       }
 
       setSuccess(true)
     } catch (err) {
       setError('システムエラーが発生しました。しばらく経ってから再試行してください。')
-      console.error('サインアップエラー:', err)
+      
     } finally {
       setLoading(false)
     }

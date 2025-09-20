@@ -43,7 +43,7 @@ class RealtimeSyncManager {
     // ページ間通信用のBroadcastChannelを設定
     this.setupBroadcastChannel()
     
-    console.log('🔄 リアルタイム同期システム初期化完了')
+    
   }
 
   /**
@@ -117,7 +117,7 @@ class RealtimeSyncManager {
    * フル同期トリガー
    */
   private triggerFullSync() {
-    console.log('🔄 フル同期を実行中...')
+    
     
     // 全てのリスナーに同期イベントを送信
     const syncEvent: SyncEvent = {
@@ -158,7 +158,7 @@ class RealtimeSyncManager {
    * 同期イベントの処理
    */
   private handleSyncEvent(event: SyncEvent) {
-    console.log('📡 同期イベント受信:', event.type, event.data)
+    
 
     // 関連するリスナーを実行
     const handlers = this.listeners.get(event.type) || []
@@ -168,7 +168,7 @@ class RealtimeSyncManager {
       try {
         handler(event)
       } catch (error) {
-        console.error('同期イベントハンドラーエラー:', error)
+        
       }
     })
 

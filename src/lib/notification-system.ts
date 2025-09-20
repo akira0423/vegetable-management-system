@@ -60,7 +60,7 @@ class NotificationManager {
     this.startPeriodicCheck()
     this.requestNotificationPermission()
     this.isInitialized = true
-    console.log('🔔 通知システム初期化完了')
+    
   }
 
   /**
@@ -73,7 +73,7 @@ class NotificationManager {
         this.notifications = JSON.parse(stored)
       }
     } catch (error) {
-      console.error('通知データ読み込みエラー:', error)
+      
       this.notifications = []
     }
   }
@@ -85,7 +85,7 @@ class NotificationManager {
     try {
       localStorage.setItem('farm-notifications', JSON.stringify(this.notifications))
     } catch (error) {
-      console.error('通知データ保存エラー:', error)
+      
     }
   }
 
@@ -96,9 +96,9 @@ class NotificationManager {
     if ('Notification' in window && Notification.permission === 'default') {
       try {
         const permission = await Notification.requestPermission()
-        console.log('通知許可状況:', permission)
+        
       } catch (error) {
-        console.error('通知許可要求エラー:', error)
+        
       }
     }
   }
@@ -122,7 +122,7 @@ class NotificationManager {
    */
   private async checkDeadlinesAndAlerts() {
     try {
-      console.log('🔍 期限・アラートチェック実行中...')
+      
       
       // 野菜データを取得
       const vegetables = await this.fetchVegetables()
@@ -140,7 +140,7 @@ class NotificationManager {
       this.checkWeatherAlerts()
 
     } catch (error) {
-      console.error('期限チェックエラー:', error)
+      
     }
   }
 
@@ -157,7 +157,7 @@ class NotificationManager {
         const userData = await userResponse.json()
         if (userData.success && userData.user?.company_id) {
           companyId = userData.user.company_id
-          console.log('📢 通知システム - 使用するcompany_id:', companyId)
+          
         }
       }
       
@@ -174,11 +174,11 @@ class NotificationManager {
       
       if (response.ok) {
         const result = await response.json()
-        console.log('📢 通知システム - 取得した野菜数:', result.data?.length || 0)
+        
         return result.data || []
       }
     } catch (error) {
-      console.error('野菜データ取得エラー:', error)
+      
     }
     
     return []
@@ -197,7 +197,7 @@ class NotificationManager {
         const userData = await userResponse.json()
         if (userData.success && userData.user?.company_id) {
           companyId = userData.user.company_id
-          console.log('📢 通知システム - タスク用company_id:', companyId)
+          
         }
       }
       
@@ -205,11 +205,11 @@ class NotificationManager {
       
       if (response.ok) {
         const result = await response.json()
-        console.log('📢 通知システム - 取得したタスク数:', result.data?.length || 0)
+        
         return result.data || []
       }
     } catch (error) {
-      console.error('タスクデータ取得エラー:', error)
+      
     }
     
     return []
@@ -377,7 +377,7 @@ class NotificationManager {
     // ブラウザ通知
     this.showBrowserNotification(notification)
 
-    console.log('🔔 新しい通知を追加:', notification.title)
+    
   }
 
   /**
@@ -420,7 +420,7 @@ class NotificationManager {
           browserNotification.close()
         }
       } catch (error) {
-        console.error('ブラウザ通知エラー:', error)
+        
       }
     }
   }
@@ -433,7 +433,7 @@ class NotificationManager {
       try {
         listener(notification)
       } catch (error) {
-        console.error('通知リスナーエラー:', error)
+        
       }
     })
   }

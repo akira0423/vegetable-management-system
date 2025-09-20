@@ -20,7 +20,7 @@ export async function ensureUserMembership(
   companyId: string
 ): Promise<MembershipResult> {
   try {
-    console.log('🔍 企業アクセス権確認開始:', { userId, companyId })
+    
     
     const supabase = await createClient()
 
@@ -31,14 +31,9 @@ export async function ensureUserMembership(
       .eq('id', userId)
       .single()
 
-    console.log('📊 ユーザー情報:', { user, error: userError?.message })
+    
 
     if (userError || !user) {
-      console.log('❌ ユーザー検索失敗:', { 
-        userError: userError?.message,
-        userId,
-        timestamp: new Date().toISOString()
-      })
       return {
         success: false,
         error: `User not found: ${userError?.message || 'No user data'}`
@@ -55,11 +50,7 @@ export async function ensureUserMembership(
 
     // ユーザーが既に企業に関連付けられている場合
     if (user.company_id === companyId) {
-      console.log('✅ ユーザーは既に企業に関連付けられています', {
-        userCompanyId: user.company_id,
-        requestedCompanyId: companyId,
-        match: user.company_id === companyId
-      })
+      
       return {
         success: true,
         membership: {
@@ -73,7 +64,7 @@ export async function ensureUserMembership(
 
     // ユーザーが企業に関連付けられていない場合、自動で関連付け
     if (!user.company_id) {
-      console.log('🔄 ユーザーを企業に関連付け中...')
+      
       
       const { error: updateError } = await supabase
         .from('users')
@@ -81,14 +72,14 @@ export async function ensureUserMembership(
         .eq('id', userId)
 
       if (updateError) {
-        console.error('❌ ユーザー企業関連付けエラー:', updateError)
+        
         return {
           success: false,
           error: `Failed to associate user with company: ${updateError.message}`
         }
       }
 
-      console.log('✅ ユーザー企業関連付け完了')
+      
       return {
         success: true,
         membership: {
@@ -101,18 +92,14 @@ export async function ensureUserMembership(
     }
 
     // ユーザーが異なる企業に関連付けられている場合
-    console.log('⚠️ ユーザーは異なる企業に関連付けられています:', {
-      userCompanyId: user.company_id,
-      requestedCompanyId: companyId,
-      userId: userId
-    })
+    
     return {
       success: false,
       error: `User belongs to different company: ${user.company_id} (requested: ${companyId})`
     }
 
   } catch (error) {
-    console.error('💥 企業アクセス権確認で予期しないエラー:', error)
+    
     return {
       success: false,
       error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`

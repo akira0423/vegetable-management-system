@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       .order('name')
 
     if (error) {
-      console.error('Farm areas fetch error:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to fetch farm areas' },
         { status: 500 }
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Farm areas API error:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (companyError || !userCompany) {
-      console.warn('User company not found, using fallback for development')
+      
       
       // Fallback: Get or create a default company
       const { data: companies, error: companiesError } = await supabase
@@ -199,14 +199,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('Farm area insert error:', insertError)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to create farm area' },
         { status: 500 }
       )
     }
 
-    console.log('✅ Farm area created:', newFarmArea.name)
+    
 
     return NextResponse.json({
       success: true,
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('Farm area creation error:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

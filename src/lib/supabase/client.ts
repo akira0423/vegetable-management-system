@@ -15,12 +15,12 @@ export function createBrowserClientSingleton() {
 
   // 環境変数の検証
   if (!supabaseUrl) {
-    console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing')
+    
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
   }
 
   if (!supabaseAnonKey) {
-    console.error('❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing')
+    
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
   }
 
@@ -37,11 +37,6 @@ export function createBrowserClientSingleton() {
     }
   )
 
-  console.log('✅ ブラウザSupabaseクライアント作成（シングルトン）', {
-    url: supabaseUrl.substring(0, 30) + '...',
-    hasKey: !!supabaseAnonKey
-  })
-  
   return supabaseClientInstance
 }
 

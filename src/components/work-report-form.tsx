@@ -179,7 +179,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
   // デバッグ用: onManualReflectコールバック
   const handleManualReflectCallback = (reflectFunction: (amount: number, itemName: string) => void) => {
-    console.log('🔄 手動反映機能がコールバック経由で設定されました:', !!reflectFunction)
+    
     setManualReflectFunction(() => reflectFunction)
   }
   
@@ -196,7 +196,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
   useEffect(() => {
     const fetchUserAuth = async () => {
       try {
-        console.log('🔍 WorkReport: 認証情報取得開始')
+        
         const response = await fetch('/api/auth/user')
         
         if (!response.ok) {
@@ -206,7 +206,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         const result = await response.json()
         
         if (result.success && result.user?.company_id) {
-          console.log('✅ WorkReport: 認証成功, company_id:', result.user.company_id)
+          
           setCompanyId(result.user.company_id)
           setUserInfo({
             company_id: result.user.company_id,
@@ -217,7 +217,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
           throw new Error('ユーザー情報の取得に失敗しました')
         }
       } catch (error) {
-        console.error('❌ WorkReport: 認証エラー:', error)
+        
         setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
         setCompanyId(null)
       }
@@ -234,29 +234,21 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
   const fetchVegetables = async () => {
     if (!companyId) {
-      console.log('❌ WorkReport: companyIdが未設定のため、野菜データ取得をスキップ')
+      
       return
     }
     
     setLoading(true)
     try {
-      console.log('📊 WorkReport: fetchVegetables開始, companyId:', companyId)
+      
       
       const response = await fetch(`/api/vegetables?company_id=${companyId}&limit=100`)
       
-      console.log('🌱 野菜API レスポンス状況:', {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText
-      })
+      
       
       if (response.ok) {
         const result = await response.json()
-        console.log('🌱 野菜API データ:', {
-          success: result.success,
-          dataLength: result.data?.length,
-          data: result.data
-        })
+        
         
         if (result.success && result.data && result.data.length > 0) {
           const vegetables = result.data.map((v: any) => ({
@@ -266,20 +258,20 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
             plot_name: v.plot_name,
             status: v.status
           }))
-          console.log('✅ 実際の野菜データを使用:', vegetables)
+          
           setVegetables(vegetables)
         } else {
-          console.warn('⚠️ APIからのデータが空のため、空の配列を設定します')
+          
           // テストデータを表示せず、空の配列を設定
           setVegetables([])
         }
       } else {
-        console.error('❌ API呼び出しが失敗しました:', response.status, response.statusText)
+        
         // エラー時は空の配列を設定
         setVegetables([])
       }
     } catch (error) {
-      console.error('❌ 野菜データ取得エラー:', error)
+      
       // エラー時は空の配列を設定
       setVegetables([])
     } finally {
@@ -315,20 +307,14 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
   // 会計記録に手動反映する関数
   const handleReflectToAccounting = () => {
-    console.log('🚀 会計記録反映ボタンがクリックされました')
-    console.log('📊 反映データ:', { 
-      manualReflectFunction: !!manualReflectFunction, 
-      expected_revenue: currentReport.expected_revenue 
-    })
+    
+    
     
     if (manualReflectFunction && currentReport.expected_revenue && currentReport.expected_revenue > 0) {
-      console.log('✅ 反映実行中...')
+      
       manualReflectFunction(currentReport.expected_revenue, '収穫売上')
     } else {
-      console.log('❌ 反映条件を満たしていません:', {
-        hasFunction: !!manualReflectFunction,
-        revenue: currentReport.expected_revenue
-      })
+      
     }
   }
 
@@ -454,13 +440,13 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
 
   const proceedWithSave = async () => {
     if (!companyId) {
-      console.log('❌ WorkReport: companyIdが未設定のため、保存をスキップ')
+      
       return
     }
     
     setSaving(true)
     try {
-      console.log('💾 WorkReport: proceedWithSave開始, companyId:', companyId)
+      
       let createdBy = userInfo.user_id || 'd0efa1ac-7e7e-420b-b147-dabdf01454b7' // デフォルト
       
       // プロフェッショナル版：包括的なデータ構造
@@ -508,7 +494,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         work_notes: currentReport.work_notes || null
       }
 
-      console.log('📤 作業報告データ送信:', reportToSave)
+      
 
       const response = await fetch('/api/reports', {
         method: 'POST',
@@ -521,7 +507,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
       const result = await response.json()
 
       if (result.success) {
-        console.log('✅ 作業報告保存成功:', result.data)
+        
         
         // 会計データの保存（完全なデータのみ）
         const validIncomeItems = accountingData.income_items.filter(item => 
@@ -541,7 +527,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
               expense_items: validExpenseItems
             }
             
-            console.log('💰 会計データ保存開始:', accountingPayload)
+            
             
             const accountingResponse = await fetch('/api/work-accounting', {
               method: 'POST',
@@ -551,22 +537,22 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
               body: JSON.stringify(accountingPayload)
             })
             
-            console.log('📡 会計データ保存レスポンス状態:', accountingResponse.status)
+            
             
             const accountingResult = await accountingResponse.json()
-            console.log('📋 会計データ保存レスポンス内容:', accountingResult)
+            
             
             if (accountingResult.success) {
-              console.log('✅ 会計データ保存成功')
+              
             } else {
-              console.error('❌ 会計データ保存失敗:', accountingResult.error)
-              console.error('📄 詳細エラー情報:', accountingResult.details)
+              
+              
               alert(`❌ 会計データ保存失敗: "${accountingResult.error}"`)
               setSaving(false)
               return
             }
           } catch (accountingError) {
-            console.error('❌ 会計データ保存エラー:', accountingError)
+            
           }
         }
         
@@ -608,7 +594,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         try {
           analyticsDataSync.syncWorkReportToAnalytics(reportToSave, vegetables)
         } catch (syncError) {
-          console.error('分析データ同期エラー:', syncError)
+          
         }
         
         // フォームリセット
@@ -640,7 +626,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
         alert(`保存に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error('保存エラー:', error)
+      
       alert('保存に失敗しました。ネットワーク接続を確認してください。')
     } finally {
       setSaving(false)
@@ -1361,7 +1347,7 @@ export default function WorkReportForm({ open, onOpenChange, onSuccess }: WorkRe
                       <PhotoUpload
                         vegetableId={selectedVegetable}
                         onUploadSuccess={() => {
-                          console.log('写真アップロード成功')
+                          
                         }}
                       />
                     </div>

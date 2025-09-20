@@ -122,7 +122,7 @@ export function CollapsibleSearchFilter({
         const parsed = JSON.parse(stored)
         setRecentPeriods(parsed.slice(0, 3)) // 最新3件のみ保持
       } catch (e) {
-        console.error('Failed to parse recent periods:', e)
+        
       }
     }
   }, [])

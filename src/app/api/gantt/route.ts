@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('end_date')
 
     // API リクエストパラメータの基本ログ
-    console.log('📋 GET /api/gantt:', { company_id: companyId, filters: { vegetableId, status, startDate, endDate } })
+    
 
     // Company IDが指定されていない場合はエラー
     if (!companyId) {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - 企業アクセスエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // アクティブなタスクのみ取得するかどうか
     const activeOnly = searchParams.get('active_only') !== 'false'
-    console.log('🔍 Gantt API: active_only パラメータ:', activeOnly, 'URL:', request.url)
+    
     
     // 統一アーキテクチャのベースクエリ（work_reportsと同じ直接フィルタリング）
     let query = supabase
@@ -84,12 +84,12 @@ export async function GET(request: NextRequest) {
       .eq('company_id', companyId) // 作業記録と同じ直接フィルタリング
       
     // 一時的にソフト削除フィルターを無効化（カラムが存在しないため）
-    console.log('🔍 Gantt API: ハード削除使用中のため、deleted_atフィルターをスキップ')
+    
     // if (activeOnly) {
-    //   console.log('🔍 Gantt API: ソフトデリートフィルターを適用中 (deleted_at IS NULL)')
+    //   ')
     //   query = query.is('deleted_at', null)
     // } else {
-    //   console.log('🔍 Gantt API: active_only=false のため、削除済みタスクも含める')
+    //   
     // }
     
     query = query.order('start_date', { ascending: true })
@@ -112,25 +112,13 @@ export async function GET(request: NextRequest) {
 
     const { data: tasks, error } = await query
 
-    console.log('📋 クエリ結果:', { タスク数: tasks?.length || 0, エラー: error?.message })
-    console.log('📋 全タスクのdeleted_at状態:', tasks?.map(t => ({ id: t.id, name: t.name, deleted_at: t.deleted_at })) || [])
-
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
     }
 
 
     // データの変換（削除された野菜に関連するタスクを除外）
-    console.log('📋 フィルタリング前のタスク数:', tasks.length)
-    console.log('📋 削除チェック詳細:', tasks.map(t => ({
-      task_id: t.id,
-      task_name: t.name,
-      vegetable_id: t.vegetable_id,
-      vegetable_deleted_at: t.vegetables?.deleted_at,
-      vegetable_name: t.vegetables?.name
-    })))
-    
     const ganttTasks = tasks
       .filter(task => {
         // ハード削除のため、タスクの削除チェックは不要
@@ -138,12 +126,7 @@ export async function GET(request: NextRequest) {
         const vegetableValid = task.vegetables !== null && task.vegetables.deleted_at === null
         
         if (!vegetableValid) {
-          console.log('❌ 除外されるタスク:', {
-            task_id: task.id,
-            task_name: task.name,
-            vegetable_deleted_at: task.vegetables?.deleted_at,
-            reason: task.vegetables === null ? 'vegetables is null' : 'vegetable deleted_at is not null'
-          })
+          
         }
         return vegetableValid
       })
@@ -170,17 +153,6 @@ export async function GET(request: NextRequest) {
         color: getStatusColor(task.status)
       }))
 
-    console.log('✅ フィルタリング後のタスク数:', ganttTasks.length)
-    console.log('✅ 表示されるタスク:', ganttTasks.map(t => ({
-      task_id: t.id,
-      task_name: t.name,
-      vegetable_name: t.vegetable.name,
-      status: t.status,
-      progress: t.progress,
-      start: t.start,
-      end: t.end
-    })))
-
     // 野菜一覧も取得（削除された野菜を除外）
     const { data: vegetables, error: vegetablesError } = await supabase
       .from('vegetables')
@@ -190,16 +162,10 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
 
     if (vegetablesError) {
-      console.error('Vegetables fetch error:', vegetablesError)
+      
     }
 
-    // 野菜データの面積情報をログ出力
-    console.log('🗺️ 野菜データ面積確認:', vegetables?.map(v => ({
-      id: v.id,
-      name: v.name,
-      area_size: v.area_size,
-      面積データソース: v.area_size ? 'area_size (地図自動算出)' : '面積データなし'
-    })) || [])
+    // 野菜データの面積情報をログ出力（削除済み）
 
     return NextResponse.json({
       success: true,
@@ -210,7 +176,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -271,7 +237,7 @@ export async function POST(request: NextRequest) {
       .single()
     
     if (vegetableError) {
-      console.error('Database error:', vegetableError)
+      
       return NextResponse.json({ 
         error: 'Invalid vegetable_id or vegetable not found' 
       }, { status: 400 })
@@ -283,7 +249,7 @@ export async function POST(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -345,7 +311,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
     }
 
@@ -377,7 +343,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -401,7 +367,7 @@ export async function PUT(request: NextRequest) {
     }
     const body = await request.json()
 
-    console.log('🔧 PUT /api/gantt - リクエストボディ:', body)
+    
 
     const {
       id,
@@ -436,7 +402,7 @@ export async function PUT(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -469,25 +435,17 @@ export async function PUT(request: NextRequest) {
 
         if (userExists) {
           updateData.assigned_to = assigned_user_id
-          console.log('✅ ユーザー存在確認: OK', assigned_user_id)
+          
         } else {
-          console.log('⚠️ ユーザーが存在しません:', assigned_user_id)
+          
         }
       } else {
-        console.log('⚠️ 無効なassigned_user_id形式:', assigned_user_id)
+        
       }
     }
 
-    console.log('🔧 PUT /api/gantt - 更新データ:', updateData)
-    console.log('🔧 PUT /api/gantt - 更新データのキー:', Object.keys(updateData))
-    console.log('🔧 PUT /api/gantt - タスクID:', id)
-    console.log('🔧 PUT /api/gantt - 受信したbodyの全内容:', body)
-
     // 更新データが空の場合はエラーを返す
     if (Object.keys(updateData).length === 0) {
-      console.log('⚠️ 更新データが空です')
-      console.log('⚠️ 受信したbody:', JSON.stringify(body))
-      console.log('⚠️ progressの値:', body.progress, 'type:', typeof body.progress)
       return NextResponse.json({ error: 'No data to update' }, { status: 400 })
     }
 
@@ -499,12 +457,12 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (checkError || !taskExists) {
-      console.error('🔴 タスクが見つかりません:', { id, checkError })
+      
       return NextResponse.json({ error: 'Task not found in database' }, { status: 404 })
     }
 
     if (taskExists.deleted_at) {
-      console.error('🔴 タスクは削除されています:', { id, deleted_at: taskExists.deleted_at })
+      
       return NextResponse.json({ error: 'Task has been deleted' }, { status: 410 })
     }
 
@@ -538,14 +496,9 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('🔴 Database error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      })
-      console.error('🔴 Failed update data:', updateData)
-      console.error('🔴 Task ID:', id)
+      
+      
+      
       return NextResponse.json({ error: `Failed to update task: ${error.message}` }, { status: 500 })
     }
 
@@ -576,7 +529,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -586,7 +539,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    console.log('🗑️ DELETE API 開始')
+    
     // 認証済みクライアントを使用（セキュリティ強化）
     const supabase = await createClient()
     
@@ -602,7 +555,7 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json()
     
     const { id, reason, hard_delete = false } = body
-    console.log('🗑️ DELETE API - 削除対象ID:', id)
+    
 
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
@@ -625,7 +578,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -634,7 +587,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // ハード削除実行（work_reportsと同じ方式）
-    console.log('🗑️ ハード削除実行中...')
+    
     
     const { error } = await supabase
       .from('growing_tasks')
@@ -642,11 +595,11 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     if (error) {
-      console.error('🗑️ Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
     }
 
-    console.log('✅ タスクをハード削除しました:', id)
+    
 
     return NextResponse.json({
       success: true,
@@ -654,7 +607,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('🗑️ API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

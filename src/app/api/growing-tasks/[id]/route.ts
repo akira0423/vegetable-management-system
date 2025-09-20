@@ -9,7 +9,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    console.log('🗑️ 削除開始:', id)
+    
     
     const supabase = await createServiceClient()
     
@@ -20,14 +20,14 @@ export async function DELETE(
       .eq('id', id)
 
     if (deleteError) {
-      console.error('🗑️ 削除エラー:', deleteError)
+      
       return NextResponse.json({
         success: false,
         error: deleteError.message
       }, { status: 500 })
     }
 
-    console.log('✅ 削除成功:', id)
+    
     
     // キャッシュクリア用ヘッダー追加
     const response = NextResponse.json({
@@ -42,7 +42,7 @@ export async function DELETE(
     return response
 
   } catch (error) {
-    console.error('🗑️ API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'サーバーエラー'

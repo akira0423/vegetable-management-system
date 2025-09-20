@@ -90,7 +90,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
         .order('start_date', { ascending: true })
 
       if (error) {
-        console.error('タスクの取得エラー:', error)
+        
         // エラーの場合はテストデータを表示
         const testTasks = [
           {
@@ -154,7 +154,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
 
       setTasks(data || [])
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
     } finally {
       setLoading(false)
     }
@@ -185,7 +185,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
           .eq('id', editingTask.id)
 
         if (error) {
-          console.error('タスク更新エラー:', error)
+          
           alert('タスクの更新に失敗しました')
           return
         }
@@ -196,7 +196,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
           .insert(taskData)
 
         if (error) {
-          console.error('タスク作成エラー:', error)
+          
           alert('タスクの作成に失敗しました')
           return
         }
@@ -209,7 +209,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
       fetchTasks()
       onTaskUpdated?.()
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
       alert('予期しないエラーが発生しました')
     }
   }
@@ -226,7 +226,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
         .eq('id', task.id)
 
       if (error) {
-        console.error('タスク削除エラー:', error)
+        
         alert('タスクの削除に失敗しました')
         return
       }
@@ -235,7 +235,7 @@ export default function TaskManagement({ vegetableId, onTaskUpdated }: TaskManag
       fetchTasks()
       onTaskUpdated?.()
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
       alert('予期しないエラーが発生しました')
     }
   }

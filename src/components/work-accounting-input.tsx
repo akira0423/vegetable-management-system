@@ -89,12 +89,12 @@ export default function WorkAccountingInput({
 
   // 手動反映機能
   const manualReflectToAccounting = useCallback((amount: number, itemName: string) => {
-    console.log('🔧 手動反映機能が呼び出されました:', { amount, itemName, accountingItemsLength: accountingItems.length })
+    
     
     if (amount > 0 && accountingItems.length > 0) {
       // デバッグ: 全会計項目を確認
-      console.log('📋 利用可能な会計項目（income）:', accountingItems.filter(item => item.type === 'income'))
-      console.log('📋 コード101の項目:', accountingItems.filter(item => item.code === '101'))
+      )
+      )
       
       // 販売金額の会計項目を探す（複数のパターンで検索）
       let salesItem = accountingItems.find(item => item.code === '101' && item.type === 'income')
@@ -112,12 +112,12 @@ export default function WorkAccountingInput({
         salesItem = accountingItems.find(item => item.type === 'income')
       }
       
-      console.log('💰 販売項目検索結果:', salesItem)
+      
       
       if (salesItem) {
         // 既存の販売金額項目があるかチェック
         const existingSalesEntry = incomeItems.find(item => item.accounting_item_id === salesItem.id)
-        console.log('📋 既存エントリ確認:', existingSalesEntry)
+        
         
         if (!existingSalesEntry) {
           // 新しい販売金額エントリを追加
@@ -130,11 +130,11 @@ export default function WorkAccountingInput({
             is_ai_recommended: false
           }
           
-          console.log('➕ 新しい収入エントリを追加:', newIncomeEntry)
+          
           setIncomeItems(prev => [newIncomeEntry, ...prev])
         } else {
           // 既存の項目の金額を更新
-          console.log('🔄 既存エントリを更新')
+          
           setIncomeItems(prev => prev.map(item => 
             item.accounting_item_id === salesItem.id 
               ? { ...item, amount: amount, notes: '収穫情報から手動更新' }
@@ -142,17 +142,17 @@ export default function WorkAccountingInput({
           ))
         }
       } else {
-        console.log('❌ 販売項目が見つかりません')
+        
       }
     } else {
-      console.log('❌ 反映条件を満たしていません:', { amount, accountingItemsLength: accountingItems.length })
+      
     }
   }, [accountingItems, incomeItems])
 
   // 手動反映機能を親に渡す
   useEffect(() => {
     if (onManualReflect && accountingItems.length > 0) {
-      console.log('🔗 手動反映機能を親コンポーネントに設定')
+      
       onManualReflect(manualReflectToAccounting)
     }
   }, [onManualReflect, manualReflectToAccounting, accountingItems.length])
@@ -206,7 +206,7 @@ export default function WorkAccountingInput({
       }
       
     } catch (error) {
-      console.error('❌ 初期データ読み込みエラー:', error)
+      
     } finally {
       setLoading(false)
     }

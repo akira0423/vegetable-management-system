@@ -18,10 +18,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeStats = searchParams.get('include_stats') === 'true'
 
-    console.log('🔍 メンバーシップAPI - リクエスト:', { 
-      company_id: currentUser.company_id,
-      include_stats: includeStats 
-    })
+    
 
     // 現在のユーザーのメンバーシップを確認
     const { data: currentMembership, error: membershipError } = await supabase
@@ -33,12 +30,12 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     if (membershipError) {
-      console.error('メンバーシップ確認エラー:', membershipError)
+      
     }
 
     // メンバーシップが存在しない場合、既存ユーザーから作成
     if (!currentMembership) {
-      console.log('🔧 メンバーシップが存在しないため作成します')
+      
       
       const { data: newMembershipId, error: createError } = await supabase
         .rpc('create_membership_for_existing_user', {
@@ -50,14 +47,14 @@ export async function GET(request: NextRequest) {
         })
 
       if (createError) {
-        console.error('メンバーシップ作成エラー:', createError)
+        
         return NextResponse.json({
           success: false,
           error: 'メンバーシップの作成に失敗しました'
         }, { status: 500 })
       }
 
-      console.log('✅ メンバーシップ作成成功:', newMembershipId)
+      
     }
 
     // メンバーシップ一覧を取得
@@ -98,7 +95,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('メンバーシップ一覧取得エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: 'メンバーシップ一覧の取得に失敗しました'
@@ -117,7 +114,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log('✅ メンバーシップ一覧取得成功:', summary)
+    
 
     return NextResponse.json({
       success: true,
@@ -126,7 +123,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('メンバーシップAPI エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -165,12 +162,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 メンバーシップ更新API - リクエスト:', { 
-      membership_id,
-      role,
-      status,
-      currentUser: currentUser.id 
-    })
+    
 
     // 現在のユーザーが管理者かチェック
     const { data: currentMembership } = await supabase
@@ -260,14 +252,14 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('メンバーシップ更新エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: 'メンバー情報の更新に失敗しました'
       }, { status: 500 })
     }
 
-    console.log('✅ メンバーシップ更新成功:', updatedMembership.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -276,7 +268,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('メンバーシップ更新API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -307,10 +299,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🔍 メンバーシップ削除API - リクエスト:', { 
-      membershipId,
-      currentUser: currentUser.id 
-    })
+    
 
     // 現在のユーザーが管理者かチェック
     const { data: currentMembership } = await supabase
@@ -375,14 +364,14 @@ export async function DELETE(request: NextRequest) {
       .eq('id', membershipId)
 
     if (error) {
-      console.error('メンバーシップ削除エラー:', error)
+      
       return NextResponse.json({
         success: false,
         error: 'メンバーの削除に失敗しました'
       }, { status: 500 })
     }
 
-    console.log('✅ メンバーシップ削除成功:', membershipId)
+    
 
     return NextResponse.json({
       success: true,
@@ -395,7 +384,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('メンバーシップ削除API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
@@ -420,10 +409,7 @@ export async function POST(request: NextRequest) {
     const { action } = body
 
     if (action === 'get_current_membership') {
-      console.log('🔍 現在のメンバーシップ取得 - リクエスト:', { 
-        user_id: currentUser.id,
-        company_id: currentUser.company_id 
-      })
+      
 
       // 現在のユーザーのメンバーシップを取得
       const { data: membership, error } = await supabase
@@ -460,7 +446,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        console.error('メンバーシップ取得エラー:', error)
+        
         return NextResponse.json({
           success: false,
           error: 'メンバーシップ情報の取得に失敗しました'
@@ -479,7 +465,7 @@ export async function POST(request: NextRequest) {
           })
 
         if (createError) {
-          console.error('メンバーシップ作成エラー:', createError)
+          
           return NextResponse.json({
             success: false,
             error: 'メンバーシップの作成に失敗しました'
@@ -520,7 +506,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (fetchError) {
-          console.error('新規メンバーシップ取得エラー:', fetchError)
+          
           return NextResponse.json({
             success: false,
             error: 'メンバーシップ情報の取得に失敗しました'
@@ -546,7 +532,7 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
 
   } catch (error) {
-    console.error('メンバーシップ操作API エラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'

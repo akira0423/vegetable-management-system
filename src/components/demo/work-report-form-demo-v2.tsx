@@ -179,7 +179,7 @@ export default function WorkReportFormDemoV2({
   const [manualReflectFunction, setManualReflectFunction] = useState<((amount: number, itemName: string) => void) | null>(null)
 
   const handleManualReflectCallback = (reflectFunction: (amount: number, itemName: string) => void) => {
-    console.log('🔄 [デモ版] 手動反映機能がセットされました')
+    
     setManualReflectFunction(() => reflectFunction)
   }
 
@@ -211,10 +211,10 @@ export default function WorkReportFormDemoV2({
 
   // 会計記録に手動反映する関数
   const handleReflectToAccounting = () => {
-    console.log('🚀 [デモ版] 会計記録反映ボタンがクリックされました')
+    
 
     if (manualReflectFunction && currentReport.expected_revenue && currentReport.expected_revenue > 0) {
-      console.log('✅ [デモ版] 反映実行中...')
+      
       manualReflectFunction(currentReport.expected_revenue, '収穫売上')
     }
   }

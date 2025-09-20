@@ -25,11 +25,7 @@ export default function LoginPage() {
     try {
       // 環境変数をデバッグログに出力（本番環境では削除予定）
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔐 Login attempt:', {
-          hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          email: email
-        })
+        
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -38,7 +34,7 @@ export default function LoginPage() {
       })
 
       if (error) {
-        console.error('🚫 Login error:', error.message, error.status)
+        
         
         // より詳細なエラーメッセージを提供
         if (error.message.includes('Invalid login credentials')) {
@@ -54,11 +50,11 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
-        console.log('✅ Login successful:', data.user.email)
+        
         router.push('/dashboard/gantt')
       }
     } catch (err) {
-      console.error('💥 Unexpected login error:', err)
+      
       setError('システムエラーが発生しました。しばらく経ってから再試行してください。')
     } finally {
       setLoading(false)

@@ -405,7 +405,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = 
 
       if (error) {
         // テーブルが存在しない場合などは静かに無視
-        console.warn('気象データテーブルが存在しないか、データが取得できませんでした')
+        
         return null
       }
 
@@ -447,7 +447,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = 
       }
     } catch (error) {
       // ネットワークエラーや予期しないエラーは静かに無視
-      console.warn('気象データ取得時にエラーが発生しました:', error)
+      
       return null
     }
   }, [companyId, supabase])
@@ -512,7 +512,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = 
     
     setLoading(true)
     try {
-      console.log('⏰ 作業時間データ取得開始:', companyId)
+      
       
       const endMonth = addMonths(startMonth, responsiveDimensions.monthCount - 1)
       const startDate = format(startMonth, 'yyyy-MM-01')
@@ -546,12 +546,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = 
       const previousYearResult = previousYearResponse.ok ? await previousYearResponse.json() : { success: false, data: [] }
       const previousYearReports = previousYearResult.success ? previousYearResult.data : []
       
-      console.log('⏰ 作業時間: フィルター適用', {
-        選択野菜数: selectedVegetables.length,
-        選択野菜ID: selectedVegetables,
-        取得レポート数: reports.length,
-        前年レポート数: previousYearReports.length
-      })
+      
       
       // 月次作業時間データを生成
       const monthlyData: WorkHoursData[] = []
@@ -714,10 +709,10 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = 
       setWorkHoursData(monthlyData)
       setPreviousYearData(previousMonthlyData)
       setLastUpdated(new Date())
-      console.log('✅ 作業時間データ生成完了:', monthlyData.length, '件')
+      
       
     } catch (error) {
-      console.error('❌ 作業時間データ取得エラー:', error)
+      
       setWorkHoursData([])
     } finally {
       setLoading(false)

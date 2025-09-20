@@ -112,7 +112,7 @@ export function WorkReportCard({ report, onClick, onEdit, onDelete }: WorkReport
             }
           }
         } catch (error) {
-          console.error('会計データ取得エラー:', error)
+          
         }
       }
       fetchAccountingData()

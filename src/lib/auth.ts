@@ -199,7 +199,7 @@ export async function getCurrentUserWithMembership(): Promise<AuthUserWithMember
     .maybeSingle()
   
   if (error && error.code !== 'PGRST116') {
-    console.error('メンバーシップ取得エラー:', error)
+    
   }
   
   const userWithMembership: AuthUserWithMembership = {
@@ -256,13 +256,13 @@ export async function migrateToMembership(userId: string, companyId: string, ema
       })
     
     if (error) {
-      console.error('メンバーシップ移行エラー:', error)
+      
       return null
     }
     
     return membershipId
   } catch (error) {
-    console.error('メンバーシップ移行中エラー:', error)
+    
     return null
   }
 }

@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -123,7 +123,7 @@ async function calculateOperationCosts(supabase: any, companyId: string, startDa
     }, 0) || 0
 
   } catch (error) {
-    console.error('Operation cost calculation error:', error)
+    
     return 0
   }
 }
@@ -170,14 +170,9 @@ async function getSummaryStats(supabase: any, companyId: string, startDate: Date
       .gte('created_at', startDate.toISOString())
 
     // デバッグ用ログ
-    console.log('Analytics Debug - getSummaryStats:')
-    console.log('  Company ID:', companyId)
-    console.log('  Start Date:', startDate.toISOString())
-    console.log('  Vegetables found:', vegetables?.length || 0)
-    console.log('  Harvest reports found:', harvestReports?.length || 0)
     
     if (harvestReports && harvestReports.length > 0) {
-      console.log('  Sample harvest report:', harvestReports[0])
+      
     }
 
     // 正確な収穫データ集計
@@ -195,7 +190,7 @@ async function getSummaryStats(supabase: any, companyId: string, startDate: Date
     // コスト分析（作業種別ごとの実コスト）
     const totalCost = await calculateOperationCosts(supabase, companyId, startDate)
     
-    console.log('  Calculated values:', { totalHarvest, totalRevenue, totalCost })
+    
 
     const totalPlotSize = vegetables?.reduce((sum: number, v: any) => sum + (v.plot_size || 0), 0) || 1
     const avgYieldPerSqm = totalHarvest / totalPlotSize
@@ -220,7 +215,7 @@ async function getSummaryStats(supabase: any, companyId: string, startDate: Date
       efficiency_score: efficiencyScore
     }
   } catch (error) {
-    console.error('Summary stats error:', error)
+    
     return {
       total_revenue: 0,
       total_cost: 0,
@@ -285,7 +280,7 @@ async function getHarvestAnalysis(supabase: any, companyId: string, startDate: D
       color: 'bg-green-500'
     }))
   } catch (error) {
-    console.error('Harvest analysis error:', error)
+    
     return []
   }
 }
@@ -371,7 +366,7 @@ async function getCostAnalysis(supabase: any, companyId: string, startDate: Date
       .sort((a, b) => b.value - a.value)
 
   } catch (error) {
-    console.error('Cost analysis error:', error)
+    
     return []
   }
 }
@@ -429,7 +424,7 @@ async function getEfficiencyTrends(supabase: any, companyId: string, startDate: 
       value: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0
     }))
   } catch (error) {
-    console.error('Efficiency trends error:', error)
+    
     return []
   }
 }
@@ -484,7 +479,7 @@ async function getSeasonalPerformance(supabase: any, companyId: string) {
       }[label]
     }))
   } catch (error) {
-    console.error('Seasonal performance error:', error)
+    
     return []
   }
 }
@@ -576,7 +571,7 @@ async function getVegetablePerformance(supabase: any, companyId: string, startDa
     .sort((a, b) => b.roi - a.roi) || [] // ROI順でソート
 
   } catch (error) {
-    console.error('Vegetable performance error:', error)
+    
     return []
   }
 }
@@ -667,7 +662,7 @@ async function getRecentActivities(supabase: any, companyId: string) {
       }
     }) || []
   } catch (error) {
-    console.error('Recent activities error:', error)
+    
     return []
   }
 }
@@ -786,7 +781,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Export error:', error)
+    
     return NextResponse.json(
       { error: 'Export failed' }, 
       { status: 500 }

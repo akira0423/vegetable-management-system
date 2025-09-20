@@ -10,7 +10,7 @@ export async function GET() {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
     const cutoffDate = sixMonthsAgo.toISOString()
     
-    console.log(`6ヶ月自動削除処理開始: ${cutoffDate}以前のデータを削除`)
+    
     
     // 期限切れタスクを物理削除
     const { data: expiredTasks, error: tasksSelectError } = await supabase
@@ -20,7 +20,7 @@ export async function GET() {
       .lt('deleted_at', cutoffDate)
     
     if (tasksSelectError) {
-      console.error('期限切れタスク取得エラー:', tasksSelectError)
+      
       throw tasksSelectError
     }
     
@@ -32,12 +32,12 @@ export async function GET() {
         .in('id', expiredTasks.map(t => t.id))
       
       if (deleteTasksError) {
-        console.error('タスク物理削除エラー:', deleteTasksError)
+        
         throw deleteTasksError
       }
       
       deletedTasksCount = expiredTasks.length
-      console.log(`${deletedTasksCount}件のタスクを自動削除しました`)
+      
     }
     
     // 期限切れ実績記録を物理削除
@@ -48,7 +48,7 @@ export async function GET() {
       .lt('deleted_at', cutoffDate)
     
     if (reportsSelectError) {
-      console.error('期限切れ実績記録取得エラー:', reportsSelectError)
+      
       throw reportsSelectError
     }
     
@@ -60,12 +60,12 @@ export async function GET() {
         .in('id', expiredReports.map(r => r.id))
       
       if (deleteReportsError) {
-        console.error('実績記録物理削除エラー:', deleteReportsError)
+        
         throw deleteReportsError
       }
       
       deletedReportsCount = expiredReports.length
-      console.log(`${deletedReportsCount}件の実績記録を自動削除しました`)
+      
     }
     
     // 削除ログを記録（オプション）
@@ -77,7 +77,7 @@ export async function GET() {
       status: 'success'
     }
     
-    console.log('自動削除処理完了:', logEntry)
+    
     
     return NextResponse.json({
       success: true,
@@ -91,7 +91,7 @@ export async function GET() {
     })
     
   } catch (error) {
-    console.error('自動削除処理エラー:', error)
+    
     return NextResponse.json(
       { 
         success: false, 
@@ -117,7 +117,7 @@ export async function POST() {
     return await GET()
     
   } catch (error) {
-    console.error('手動削除処理エラー:', error)
+    
     return NextResponse.json(
       { error: 'Manual cleanup failed' },
       { status: 500 }

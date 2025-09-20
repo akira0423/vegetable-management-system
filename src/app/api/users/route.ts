@@ -7,17 +7,17 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const serviceSupabase = await createServiceClient()
     
-    console.log('🔍 Users API - 開始')
+    
     
     // 現在のユーザーを取得（認証確認）
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !currentUser) {
-      console.log('❌ Users API - 認証エラー:', authError?.message)
+      
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    console.log('✅ Users API - 認証成功:', currentUser.email)
+    
 
     // URLクエリパラメータを取得
     const { searchParams } = new URL(request.url)
@@ -29,11 +29,11 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
 
     if (!companyId) {
-      console.log('❌ Users API - Company ID が必要です')
+      
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
     
-    console.log('📋 Users API - Company ID:', companyId)
+    
 
     // 現在のユーザーの情報を取得（Service clientを使用してRLSをバイパス）
     const { data: currentUserData, error: userError } = await serviceSupabase
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       .eq('id', currentUser.id)
       .single()
       
-    console.log('📋 Users API - ユーザーデータ取得:', userError ? `エラー: ${userError.message}` : '成功')
+    
 
     // ユーザーがusersテーブルに存在しない場合のみ作成
     if (userError && userError.code === 'PGRST116') {
@@ -61,18 +61,18 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (insertError) {
-        console.error('User creation error:', insertError)
+        
         return NextResponse.json({ error: `Failed to create user profile: ${insertError.message}` }, { status: 500 })
       }
       
-      console.log('New user created:', newUser)
+      
     } else if (userError) {
       // その他のデータベースエラー
-      console.error('Database error when fetching user:', userError)
+      
       return NextResponse.json({ error: `Database error: ${userError.message}` }, { status: 500 })
     } else if (currentUserData) {
       // ユーザーが既に存在する場合
-      console.log('Existing user found:', currentUserData)
+      
       
       // 管理者権限チェック
       if (currentUserData.company_id !== companyId) {
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
     const { data: users, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
       .eq('company_id', companyId)
       .eq('is_active', true)
       
-    console.log('📊 Users API - 統計情報:', { totalUsers, activeUsers, roleCounts })
+    
 
     return NextResponse.json({
       success: true,
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -186,8 +186,8 @@ export async function POST(request: NextRequest) {
     const serviceSupabase = await createServiceClient()
     const body = await request.json()
     
-    console.log('🔍 Users POST API - 開始')
-    console.log('📋 リクエストボディ:', body)
+    
+    
     
     const {
       email,
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingUser) {
-      console.log('❌ Users POST API - メール重複:', email)
+      
       return NextResponse.json({ 
         error: 'Email address already exists' 
       }, { status: 400 })
@@ -248,14 +248,14 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
-    console.log('📋 Users POST API - 挿入結果:', error ? `エラー: ${error.message}` : '成功')
+    
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: `Failed to create user: ${error.message}` }, { status: 500 })
     }
 
-    console.log('✅ Users POST API - ユーザー作成成功:', user)
+    
 
     // 招待メール送信 (Supabase Auth)
     try {
@@ -268,13 +268,13 @@ export async function POST(request: NextRequest) {
       })
       
       if (inviteError) {
-        console.log('⚠️ 招待メール送信エラー:', inviteError.message)
+        
         // エラーでも作成は成功とする（手動でパスワード設定可能）
       } else {
-        console.log('✅ 招待メール送信成功:', email)
+        
       }
     } catch (inviteError) {
-      console.log('⚠️ 招待メール送信エラー:', inviteError)
+      
     }
 
     return NextResponse.json({
@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -350,7 +350,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
     }
 
@@ -364,7 +364,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -409,7 +409,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', userId)
 
     if (deleteError) {
-      console.error('Database deletion error:', deleteError)
+      
       return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
     }
 
@@ -424,7 +424,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

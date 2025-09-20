@@ -107,7 +107,7 @@ export async function generateMesh(
   }
 ): Promise<MeshGenerationResult> {
   try {
-    console.log('🔄 メッシュ生成開始:', options)
+    
     
     if (!polygonFeature?.geometry?.coordinates) {
       throw new Error('Invalid polygon feature provided')
@@ -117,18 +117,18 @@ export async function generateMesh(
 
     // ポリゴンの境界ボックスを取得
     const boundingBox = turf.bbox(polygonFeature)
-    console.log('📦 境界ボックス:', boundingBox)
+    
 
     // バッファを適用（オプション）
     let workingPolygon = polygonFeature
     if (bufferDistance && bufferDistance > 0) {
       workingPolygon = turf.buffer(polygonFeature, bufferDistance, { units }) as Feature<Polygon>
-      console.log(`🔍 バッファ適用: ${bufferDistance}${units}`)
+      
     }
 
     // グリッドを生成
     const grid = turf.squareGrid(boundingBox, cellSize, { units })
-    console.log(`📐 グリッド生成: ${grid.features.length}セル`)
+    
 
     let intersectingCells: Feature<Polygon>[] = []
 
@@ -139,11 +139,11 @@ export async function generateMesh(
           // セルがポリゴンと交差または含まれるかチェック
           return turf.booleanIntersects(cell, workingPolygon) || turf.booleanWithin(cell, workingPolygon)
         } catch (error) {
-          console.warn('セル交差チェックエラー:', error)
+          
           return false
         }
       })
-      console.log(`✂️ クロップ後: ${intersectingCells.length}セル`)
+      
     } else {
       intersectingCells = grid.features
     }
@@ -198,7 +198,7 @@ export async function generateMesh(
         averageCellArea
       }
 
-      console.log('📊 統計情報:', statistics)
+      
     }
 
     const result: MeshGenerationResult = {
@@ -208,11 +208,11 @@ export async function generateMesh(
       statistics
     }
 
-    console.log('✅ メッシュ生成完了:', result.totalCells, 'セル')
+    
     return result
 
   } catch (error) {
-    console.error('❌ メッシュ生成エラー:', error)
+    
     const errorMessage = error instanceof Error ? error.message : String(error)
     throw new Error(`Mesh generation failed: ${errorMessage}`)
   }
@@ -410,22 +410,5 @@ export function generateMeshInWorker(
  * デバッグ用：メッシュ生成結果をログ出力
  */
 export function debugMeshResult(result: MeshGenerationResult) {
-  console.log('🐛 メッシュ生成結果デバッグ:')
-  console.log(`  - 総セル数: ${result.totalCells}`)
-  console.log(`  - カバー面積: ${result.coveredAreaSqm.toFixed(2)}㎡`)
-  
-  if (result.statistics) {
-    console.log(`  - グリッド総数: ${result.statistics.totalGridCells}`)
-    console.log(`  - 交差セル数: ${result.statistics.intersectingCells}`)
-    console.log(`  - カバレッジ: ${result.statistics.coveragePercentage.toFixed(1)}%`)
-    console.log(`  - 平均セル面積: ${result.statistics.averageCellArea.toFixed(2)}㎡`)
-  }
-  
-  if (result.cells.length > 0) {
-    const firstCell = result.cells[0]
-    console.log('  - 最初のセル例:')
-    console.log(`    ID: ${firstCell.id}`)
-    console.log(`    位置: 行${firstCell.row}, 列${firstCell.col}`)
-    console.log(`    面積: ${firstCell.area_square_meters.toFixed(2)}㎡`)
-  }
+  // デバッグログは削除済み
 }

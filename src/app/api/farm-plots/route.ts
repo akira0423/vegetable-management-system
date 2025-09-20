@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const { data: plots, error } = await query
 
     if (error) {
-      console.error('農地データ取得エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to fetch farm plots' },
         { status: 500 }
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('農地API GET エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('農地作成エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to create farm plot' },
         { status: 500 }
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('農地API POST エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -177,7 +177,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('農地更新エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to update farm plot' },
         { status: 500 }
@@ -193,7 +193,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('農地API PUT エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -225,7 +225,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', plotId)
 
     if (error) {
-      console.error('農地削除エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to delete farm plot' },
         { status: 500 }
@@ -238,7 +238,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('農地API DELETE エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

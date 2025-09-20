@@ -15,7 +15,7 @@ export function PWARegister() {
           updateViaCache: 'none' 
         })
         .then((registration) => {
-          console.log('✅ AgriFinance Pro SW - 登録成功:', registration)
+          
           
           // 更新チェック
           registration.addEventListener('updatefound', () => {
@@ -31,20 +31,20 @@ export function PWARegister() {
           })
         })
         .catch((error) => {
-          console.error('❌ AgriFinance Pro SW - 登録失敗:', error)
+          
         })
     }
 
     // PWA インストールプロンプト処理
     const handleBeforeInstallPrompt = (e: Event) => {
-      console.log('📱 PWA インストールプロンプト準備')
+      
       e.preventDefault()
       setDeferredPrompt(e)
       setIsInstallable(true)
     }
 
     const handleAppInstalled = () => {
-      console.log('✅ AgriFinance Pro PWA - インストール完了')
+      
       setDeferredPrompt(null)
       setIsInstallable(false)
       
@@ -78,18 +78,18 @@ export function PWARegister() {
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
       
-      console.log('🤔 PWA インストール選択:', outcome)
+      
       
       if (outcome === 'accepted') {
-        console.log('✅ ユーザーがPWAインストールを承認')
+        
       } else {
-        console.log('❌ ユーザーがPWAインストールを拒否')
+        
       }
       
       setDeferredPrompt(null)
       setIsInstallable(false)
     } catch (error) {
-      console.error('❌ PWA インストールエラー:', error)
+      
     }
   }
 
@@ -99,7 +99,7 @@ export function PWARegister() {
       try {
         const permission = await Notification.requestPermission()
         if (permission === 'granted') {
-          console.log('✅ 通知許可取得成功')
+          
           
           // 歓迎通知
           new Notification('AgriFinance Pro', {
@@ -108,10 +108,10 @@ export function PWARegister() {
             tag: 'welcome'
           })
         } else {
-          console.log('❌ 通知許可拒否')
+          
         }
       } catch (error) {
-        console.error('❌ 通知許可要求エラー:', error)
+        
       }
     }
   }

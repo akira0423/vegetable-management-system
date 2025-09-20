@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const { data: photos, error } = await query
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 })
     }
 
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to save photo metadata' }, { status: 500 })
     }
 
@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -306,7 +306,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to update photo' }, { status: 500 })
     }
 
@@ -324,7 +324,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -354,7 +354,7 @@ export async function DELETE(request: NextRequest) {
       .in('id', idsToDelete)
 
     if (fetchError) {
-      console.error('Fetch error:', fetchError)
+      
       return NextResponse.json({ error: 'Failed to fetch photos for deletion' }, { status: 500 })
     }
 
@@ -369,7 +369,7 @@ export async function DELETE(request: NextRequest) {
       .remove(storagePaths)
 
     if (storageError) {
-      console.error('Storage deletion error:', storageError)
+      
       // ストレージ削除エラーでも続行（データベースからは削除）
     }
 
@@ -380,7 +380,7 @@ export async function DELETE(request: NextRequest) {
       .in('id', idsToDelete)
 
     if (dbError) {
-      console.error('Database deletion error:', dbError)
+      
       return NextResponse.json({ error: 'Failed to delete photos from database' }, { status: 500 })
     }
 
@@ -391,7 +391,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       .select('*')
 
     if (error) {
-      console.error('野菜セル登録エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to register vegetable cells' },
         { status: 500 }
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('野菜セルAPI POST エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     const { data: vegetableCells, error } = await query
 
     if (error) {
-      console.error('野菜セルデータ取得エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to fetch vegetable cells' },
         { status: 500 }
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('野菜セルAPI GET エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

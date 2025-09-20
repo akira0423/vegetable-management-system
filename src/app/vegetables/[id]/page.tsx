@@ -138,7 +138,7 @@ export default function VegetableDetailPageSimple() {
         throw new Error(result.error || 'タスクの取得に失敗しました')
       }
     } catch (error) {
-      console.error('タスク取得エラー:', error)
+      
       setTasksError(error instanceof Error ? error.message : 'タスクの取得に失敗しました')
       setTasks([])
     } finally {
@@ -453,7 +453,7 @@ export default function VegetableDetailPageSimple() {
           <PhotoGallery 
             vegetableId={vegetableId}
             onPhotoDeleted={() => {
-              console.log('Photo deleted')
+              
             }}
           />
         </TabsContent>

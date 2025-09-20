@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - 企業アクセスエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -114,10 +114,7 @@ export async function GET(request: NextRequest) {
     
     // 削除された作業レポートを除外
     if (activeOnly) {
-      console.log('🔍 Reports API: 削除済み作業レポートを除外中 (deleted_at IS NULL)')
       query = query.is('deleted_at', null)
-    } else {
-      console.log('🔍 Reports API: active_only=false のため、削除済み作業レポートも含める')
     }
     
     query = query.order('work_date', { ascending: false })
@@ -152,7 +149,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Database error:', error)
+        
       }
       return NextResponse.json(
         { error: 'Database error occurred' },
@@ -160,19 +157,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('📊 Reports API - 取得された作業レポート数:', data?.length || 0)
-    console.log('📊 Reports API - 取得されたレポート詳細:', data?.map(r => ({
-      id: r.id,
-      work_date: r.work_date,
-      work_type: r.work_type,
-      vegetable_name: r.vegetables?.name,
-      accounting_items: r.work_report_accounting?.length || 0
-    })) || [])
-
     // 削除された野菜に関連する作業記録を除外
     const filteredData = data?.filter(report => report.vegetables !== null) || []
 
-    console.log('📊 Reports API - 野菜フィルタ後のレポート数:', filteredData.length)
+    
 
     return NextResponse.json({
       success: true,
@@ -182,7 +170,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('API error:', error)
+      
     }
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -210,7 +198,7 @@ export async function POST(request: NextRequest) {
       body = await request.json()
     } catch (jsonError) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('JSON parse error:', jsonError)
+        
       }
       return NextResponse.json(
         { error: 'Invalid JSON in request body' },
@@ -229,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -310,7 +298,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Database error:', error)
+        
       }
       return NextResponse.json(
         { error: 'Database error occurred' },
@@ -326,8 +314,8 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('POST API error:', error)
-      console.error('Error stack:', error.stack)
+      
+      
     }
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -374,7 +362,7 @@ export async function DELETE(request: NextRequest) {
 
     if (!membershipResult.success) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('❌ API - メンバーシップエラー:', membershipResult.error)
+        
       }
       return NextResponse.json(
         { error: 'Access denied to this company data' },
@@ -391,7 +379,7 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('Database error:', error)
+          
         }
         return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
       }
@@ -409,7 +397,7 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('Database error:', error)
+          
         }
         return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 })
       }
@@ -421,7 +409,7 @@ export async function DELETE(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

@@ -29,7 +29,7 @@ export function createSafeErrorResponse(
       timestamp: new Date().toISOString()
     }
     
-    console.error('🔍 Development Error Details:', devError)
+    
     
     return NextResponse.json(devError, { status: statusCode })
   }
@@ -43,13 +43,7 @@ export function createSafeErrorResponse(
 
   // 本番環境でのエラーログ（外部ログサービスに送信することを推奨）
   if (process.env.NODE_ENV === 'production') {
-    console.error('❌ Production Error:', {
-      message: defaultMessage,
-      statusCode,
-      requestId: safeError.requestId,
-      timestamp: safeError.timestamp,
-      // 機密情報は含めない
-    })
+    
   }
 
   return NextResponse.json(safeError, { status: statusCode })

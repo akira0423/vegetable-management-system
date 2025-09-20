@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    console.log('📊 作業会計データ取得API - ID:', workReportId)
+    
     
     const { data, error } = await supabase
       .from('work_report_accounting')
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .order('created_at')
     
     if (error) {
-      console.error('❌ 作業会計データ取得エラー:', error)
+      
       return NextResponse.json(
         { error: 'Failed to fetch work accounting data', details: error },
         { status: 500 }
@@ -50,12 +50,7 @@ export async function GET(request: NextRequest) {
     const incomeTotal = incomeItems.reduce((sum, item) => sum + (item.amount || 0), 0)
     const expenseTotal = Math.abs(expenseItems.reduce((sum, item) => sum + Math.abs(item.amount || 0), 0))
     
-    console.log('✅ 作業会計データ取得完了:', {
-      収入項目: incomeItems.length,
-      支出項目: expenseItems.length,
-      収入合計: incomeTotal,
-      支出合計: expenseTotal
-    })
+    
     
     return NextResponse.json({
       success: true,
@@ -69,7 +64,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 作業会計データAPI内部エラー:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -97,13 +92,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log('💾 作業会計データ保存API:', {
-      work_report_id,
-      収入項目数: income_items.length,
-      支出項目数: expense_items.length,
-      収入項目詳細: income_items,
-      支出項目詳細: expense_items
-    })
+    
     
     // 既存の会計データを削除
     const { error: deleteError } = await supabase
@@ -112,7 +101,7 @@ export async function POST(request: NextRequest) {
       .eq('work_report_id', work_report_id)
     
     if (deleteError) {
-      console.error('❌ 既存データ削除エラー:', deleteError)
+      
     }
     
     // 新しい会計データを挿入
@@ -131,10 +120,7 @@ export async function POST(request: NextRequest) {
         item.accounting_item_id || item.custom_item_name
       )
       
-      console.log('📝 挿入データ準備完了:', {
-        挿入予定件数: insertData.length,
-        挿入データ詳細: insertData
-      })
+      
       
       const { data: insertedData, error: insertError } = await supabase
         .from('work_report_accounting')
@@ -142,7 +128,7 @@ export async function POST(request: NextRequest) {
         .select()
       
       if (insertError) {
-        console.error('❌ 会計データ挿入エラー:', insertError)
+        
         return NextResponse.json(
           { error: 'Failed to save accounting data', details: insertError },
           { status: 500 }
@@ -154,9 +140,7 @@ export async function POST(request: NextRequest) {
         await updateRecommendations(supabase, company_id, work_type, allItems)
       }
       
-      console.log('✅ 会計データ保存完了:', {
-        保存件数: insertedData?.length || 0
-      })
+      
     }
     
     return NextResponse.json({
@@ -166,7 +150,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 作業会計データ保存API内部エラー:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -194,11 +178,11 @@ async function updateRecommendations(supabase: any, companyId: string, workType:
         })
         
         if (!response.ok) {
-          console.warn('⚠️ AI推奨学習データ更新に失敗:', item.accounting_item_id)
+          
         }
       }
     }
   } catch (error) {
-    console.error('❌ AI推奨学習データ更新エラー:', error)
+    
   }
 }

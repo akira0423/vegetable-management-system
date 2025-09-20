@@ -131,7 +131,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     if (!currentUser?.company_id) {
-      console.error('Company ID not available')
+      
       setLoading(false)
       return
     }
@@ -153,7 +153,7 @@ export default function UsersPage() {
       if (response.ok && result.success) {
         setUsers(result.data)
       } else {
-        console.error('API エラー:', result.error)
+        
         
         if (response.status === 401) {
           // 認証が必要
@@ -164,12 +164,12 @@ export default function UsersPage() {
           alert('管理者権限が必要です')
         } else {
           // その他のエラー - サンプルデータを使用
-          console.log('サンプルデータを使用します')
+          
           loadSampleData()
         }
       }
     } catch (error) {
-      console.error('データ取得エラー:', error)
+      
       loadSampleData()
     } finally {
       setLoading(false)
@@ -346,7 +346,7 @@ export default function UsersPage() {
         alert(`作成に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error('作成エラー:', error)
+      
       alert('作成に失敗しました')
     } finally {
       setFormLoading(false)
@@ -379,7 +379,7 @@ export default function UsersPage() {
         alert(`更新に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error('更新エラー:', error)
+      
       alert('更新に失敗しました')
     } finally {
       setFormLoading(false)
@@ -405,7 +405,7 @@ export default function UsersPage() {
         alert(`削除に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error('削除エラー:', error)
+      
       alert('削除に失敗しました')
     }
   }
@@ -438,7 +438,7 @@ export default function UsersPage() {
         alert(`${action}に失敗しました: ${result.error}`)
       }
     } catch (error) {
-      console.error(`${action}エラー:`, error)
+      
       alert(`${action}に失敗しました`)
     }
   }

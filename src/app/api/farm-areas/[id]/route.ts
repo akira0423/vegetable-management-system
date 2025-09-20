@@ -72,7 +72,7 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('Farm area fetch error:', error)
+      
       if (error.code === 'PGRST116') {
         return NextResponse.json(
           { success: false, error: 'Farm area not found' },
@@ -94,7 +94,7 @@ export async function GET(
       try {
         geoJsonFeature = JSON.parse(geoJsonData)
       } catch (parseError) {
-        console.warn('GeoJSON parsing error:', parseError)
+        
       }
     }
 
@@ -121,7 +121,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Farm area fetch error:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -195,7 +195,7 @@ export async function PUT(
       .single()
 
     if (updateError) {
-      console.error('Farm area update error:', updateError)
+      
       if (updateError.code === 'PGRST116') {
         return NextResponse.json(
           { success: false, error: 'Farm area not found' },
@@ -208,7 +208,7 @@ export async function PUT(
       )
     }
 
-    console.log('✅ Farm area updated:', updatedFarmArea.name)
+    
 
     return NextResponse.json({
       success: true,
@@ -217,7 +217,7 @@ export async function PUT(
     })
 
   } catch (error) {
-    console.error('Farm area update error:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -279,14 +279,14 @@ export async function DELETE(
       .eq('id', farmAreaId)
 
     if (deleteError) {
-      console.error('Farm area delete error:', deleteError)
+      
       return NextResponse.json(
         { success: false, error: 'Failed to delete farm area' },
         { status: 500 }
       )
     }
 
-    console.log('🗑️ Farm area deleted:', farmArea.name)
+    
 
     return NextResponse.json({
       success: true,
@@ -294,7 +294,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Farm area delete error:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

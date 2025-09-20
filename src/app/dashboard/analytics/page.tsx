@@ -208,7 +208,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const fetchUserAuth = async () => {
       try {
-        console.log('🔍 Analytics: 認証情報取得開始')
+        
         const response = await fetch('/api/auth/user')
         
         if (!response.ok) {
@@ -218,14 +218,14 @@ export default function AnalyticsPage() {
         const result = await response.json()
         
         if (result.success && result.user?.company_id) {
-          console.log('✅ Analytics: 認証成功, company_id:', result.user.company_id)
+          
           setCompanyId(result.user.company_id)
           setAuthError(null)
         } else {
           throw new Error('ユーザー情報の取得に失敗しました')
         }
       } catch (error) {
-        console.error('❌ Analytics: 認証エラー:', error)
+        
         setAuthError(error instanceof Error ? error.message : '認証エラーが発生しました')
         setCompanyId(null)
       }
@@ -237,14 +237,14 @@ export default function AnalyticsPage() {
   // データの取得（companyIdが取得できた後に実行）
   useEffect(() => {
     if (companyId) {
-      console.log('📊 Analytics: companyId取得完了、データフェッチ開始:', companyId)
+      
       fetchAnalyticsData()
     }
   }, [companyId, selectedVegetables, selectedPlot])
 
   // リアルタイムデータ同期リスナー
   const handleAnalyticsUpdate = useCallback((updateData: any) => {
-    console.log('リアルタイムデータ更新:', updateData)
+    
     
     // 既存データとマージ
     if (data && updateData.metrics) {
@@ -289,7 +289,7 @@ export default function AnalyticsPage() {
     
     const interval = setInterval(() => {
       fetchAnalyticsData()
-      console.log('分析データが自動更新されました')
+      
     }, 5 * 60 * 1000) // 5分ごと
     
     return () => clearInterval(interval)
@@ -297,12 +297,12 @@ export default function AnalyticsPage() {
 
   const fetchAnalyticsData = async () => {
     if (!companyId) {
-      console.log('❌ Analytics: companyIdが未設定のため、データ取得をスキップ')
+      
       return
     }
     
     try {
-      console.log('📊 Analytics: データ取得開始, companyId:', companyId)
+      
       setLoading(true)
       
       // 直近12カ月の期間を計算
@@ -360,11 +360,7 @@ export default function AnalyticsPage() {
       }
       
       // データが取得できない場合は空状態を維持
-      console.log('📊 分析データ取得結果:', {
-        作業レポート数: workReports.length,
-        野菜データ数: vegetables ? vegetables.length : 0,
-        タスクデータ数: tasks.length
-      })
+      
       
       // 選択された野菜によるフィルタリング（複数選択対応）
       let filteredWorkReports = workReports
@@ -379,14 +375,7 @@ export default function AnalyticsPage() {
           : []
       }
 
-      console.log('🔍 Analytics: フィルター後のデータ', {
-        選択野菜数: selectedVegetables.length,
-        選択野菜ID: selectedVegetables,
-        全作業レポート数: workReports.length,
-        フィルター後作業レポート数: filteredWorkReports.length,
-        全野菜数: vegetables ? vegetables.length : 0,
-        フィルター後野菜数: filteredVegetables.length
-      })
+      
 
       // 作業レポートから分析データを生成（直近12カ月データ）
       if (filteredWorkReports.length > 0 || filteredVegetables.length > 0) {
@@ -396,12 +385,6 @@ export default function AnalyticsPage() {
         const last12MonthsReports = filteredWorkReports.filter((report: any) => {
           const reportDate = new Date(report.work_date)
           return reportDate >= twelveMonthsAgo
-        })
-        
-        console.log('📅 直近12カ月データフィルタリング:', {
-          total_reports: filteredWorkReports.length,
-          last_12_months: last12MonthsReports.length,
-          period: `${twelveMonthsAgo.toLocaleDateString('ja-JP')} ~ ${new Date().toLocaleDateString('ja-JP')}`
         })
         
         const analyticsFromReports = generateDetailedAnalyticsFromReports(last12MonthsReports, filteredVegetables)
@@ -416,7 +399,7 @@ export default function AnalyticsPage() {
       setLoading(false)
       
     } catch (error) {
-      console.error('分析データの取得エラー:', error)
+      
       // エラー時は空状態を表示
       setData(null)
       setLastUpdated(new Date())
@@ -448,7 +431,7 @@ export default function AnalyticsPage() {
       }
     }
 
-    console.log('🔍 Analytics: 会計統合データ処理開始', { reportCount: reports.length })
+    
 
     // 月別収穫量データ生成（年跨ぎ対応）
     const harvestByMonth = reports
@@ -512,13 +495,7 @@ export default function AnalyticsPage() {
         (reports.filter(r => r.work_report_accounting && r.work_report_accounting.length > 0).length / reports.length) * 100 : 0
     }
 
-    console.log('💰 Analytics: 会計データ統合結果', {
-      totalActualRevenue,
-      totalActualCost,
-      totalEstimatedRevenue,
-      totalEstimatedCost,
-      dataQuality
-    })
+    
 
     // 作業種別频度分析
     const workFrequency = reports.reduce((acc: any, report) => {

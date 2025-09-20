@@ -24,7 +24,7 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
       await supabase.auth.signOut()
       router.push('/login')
     } catch (error) {
-      console.error('Logout error:', error)
+      
     } finally {
       setIsLoggingOut(false)
     }

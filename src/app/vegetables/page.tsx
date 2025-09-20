@@ -124,7 +124,7 @@ export default function VegetablesPage() {
         .order('planting_date', { ascending: false })
 
       if (error || !data || data.length === 0) {
-        console.log('データベースデータが取得できないため、テストデータを表示します')
+        
         setVegetables(testData)
         return
       }
@@ -132,7 +132,7 @@ export default function VegetablesPage() {
       // データベースデータとテストデータを結合
       setVegetables([...data, ...testData])
     } catch (error) {
-      console.error('予期しないエラー:', error)
+      
       setVegetables(testData)
     } finally {
       setLoading(false)
@@ -180,11 +180,11 @@ export default function VegetablesPage() {
 
       // 詳細な削除結果をコンソールに出力（開発者向け）
       if (result.deletionSummary) {
-        console.log('🗑️ 削除完了サマリー:', result.deletionSummary)
+        
       }
 
     } catch (error) {
-      console.error('削除エラー:', error)
+      
       toast({
         title: '削除失敗',
         description: error instanceof Error ? error.message : '削除中にエラーが発生しました',

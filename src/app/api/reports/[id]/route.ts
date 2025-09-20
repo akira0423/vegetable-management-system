@@ -35,7 +35,7 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('作業レポート取得エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: 'Report not found' },
         { status: 404 }
@@ -48,7 +48,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('API エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -138,12 +138,8 @@ export async function PUT(
       }
     })
 
-    console.log('作業レポート更新データ:', { id, updateData })
-    console.log('土壌データ詳細:', {
-      soil_ph: body.soil_ph,
-      soil_ec: body.soil_ec,
-      available_phosphorus: body.available_phosphorus
-    })
+    
+    
 
     const { data: updatedReport, error } = await supabase
       .from('work_reports')
@@ -161,14 +157,14 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('作業レポート更新エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
       )
     }
 
-    console.log('作業レポート更新成功:', updatedReport)
+    
 
     return NextResponse.json({
       success: true,
@@ -177,7 +173,7 @@ export async function PUT(
     })
 
   } catch (error) {
-    console.error('作業レポート更新 API エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -205,7 +201,7 @@ export async function DELETE(
       .eq('id', id)
 
     if (error) {
-      console.error('作業レポート削除エラー:', error)
+      
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
@@ -218,7 +214,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('作業レポート削除 API エラー:', error)
+    
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

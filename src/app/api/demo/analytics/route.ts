@@ -268,7 +268,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Demo analytics API error:', error)
+    
     return NextResponse.json(
       {
         success: false,

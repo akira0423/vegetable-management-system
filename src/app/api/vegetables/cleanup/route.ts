@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .lt('custom_fields->>auto_delete_after', new Date().toISOString())
 
     if (error) {
-      console.error('Query error:', error)
+      
       return NextResponse.json({ error: 'Failed to query vegetables' }, { status: 500 })
     }
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    console.log('🧹 時限ソフトデリート：自動クリーンアップ開始')
+    
 
     // 削除対象の野菜を取得
     const { data: targetVegetables, error: queryError } = await supabase
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       .lt('custom_fields->>auto_delete_after', new Date().toISOString())
 
     if (queryError) {
-      console.error('Query error:', queryError)
+      
       return NextResponse.json({ error: 'Failed to query vegetables' }, { status: 500 })
     }
 
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log(`🗑️ ${targetVegetables.length}件の野菜データを完全削除します`)
+    
 
     // 関連データも同時に削除
     const vegetableIds = targetVegetables.map(v => v.id)
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       .in('vegetable_id', vegetableIds)
 
     if (taskDeleteError) {
-      console.warn('タスク削除でエラー:', taskDeleteError)
+      
     }
 
     // 写真を削除
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       .in('vegetable_id', vegetableIds)
 
     if (photoDeleteError) {
-      console.warn('写真削除でエラー:', photoDeleteError)
+      
     }
 
     // 作業ログを削除
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       .in('vegetable_id', vegetableIds)
 
     if (logDeleteError) {
-      console.warn('作業ログ削除でエラー:', logDeleteError)
+      
     }
 
     // 野菜データを完全削除
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       .in('id', vegetableIds)
 
     if (deleteError) {
-      console.error('野菜データ削除エラー:', deleteError)
+      
       return NextResponse.json({ error: 'Failed to delete vegetables' }, { status: 500 })
     }
 
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       auto_delete_after: v.custom_fields?.auto_delete_after
     }))
 
-    console.log(`✅ ${targetVegetables.length}件の野菜データとその関連データを完全削除しました`)
+    
 
     return NextResponse.json({
       success: true,
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Cleanup error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

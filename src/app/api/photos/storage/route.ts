@@ -6,17 +6,17 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const formData = await request.formData()
     
-    console.log('📸 Photo Storage API - 開始')
+    
     
     // 現在のユーザーを取得（認証確認）
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      console.log('❌ Photo Storage API - 認証エラー:', authError?.message)
+      
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    console.log('✅ Photo Storage API - 認証成功:', user.email)
+    
 
     // フォームデータから必要な情報を取得
     const file = formData.get('file') as File
@@ -27,19 +27,13 @@ export async function POST(request: NextRequest) {
     const companyId = formData.get('company_id') as string
 
     if (!file || !vegetableId || !companyId) {
-      console.log('❌ Photo Storage API - 必須フィールド不足')
+      
       return NextResponse.json({ 
         error: 'Missing required fields: file, vegetable_id, company_id' 
       }, { status: 400 })
     }
 
-    console.log('📋 Photo Storage API - ファイル情報:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      vegetableId,
-      companyId
-    })
+    
 
     // ファイルサイズの制限チェック（50MB）
     if (file.size > 50 * 1024 * 1024) {
@@ -61,7 +55,7 @@ export async function POST(request: NextRequest) {
     const fileExtension = file.name.split('.').pop()
     const fileName = `${companyId}/${vegetableId}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
-    console.log('📁 Photo Storage API - 保存パス:', fileName)
+    
 
     // ファイルをSupabase Storageにアップロード
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -72,13 +66,13 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('Storage upload error:', uploadError)
+      
       return NextResponse.json({ 
         error: `Failed to upload file: ${uploadError.message}` 
       }, { status: 500 })
     }
 
-    console.log('✅ Photo Storage API - ファイルアップロード成功:', uploadData.path)
+    
 
     // 写真メタデータをデータベースに保存
     const photoData = {
@@ -95,7 +89,7 @@ export async function POST(request: NextRequest) {
       created_by: user.id
     }
 
-    console.log('💾 Photo Storage API - メタデータ保存:', photoData)
+    
 
     const { data: photo, error: dbError } = await supabase
       .from('photos')
@@ -123,7 +117,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (dbError) {
-      console.error('Database error:', dbError)
+      
       
       // データベースエラーの場合、アップロード済みファイルを削除
       await supabase.storage
@@ -135,7 +129,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log('✅ Photo Storage API - メタデータ保存成功:', photo.id)
+    
 
     // 公開URLを生成
     const { data: urlData } = supabase.storage
@@ -169,7 +163,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Photo Storage API error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -183,13 +177,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('company_id')
     
-    console.log('📸 Photo Storage API GET - 開始')
+    
     
     // 認証チェック
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      console.log('❌ Photo Storage API GET - 認証エラー')
+      
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -197,7 +191,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    console.log('📋 Photo Storage API GET - Company ID:', companyId)
+    
 
     // Supabase Storageの使用量統計を取得
     // 注意: Storageの直接統計取得はできないため、データベースから算出
@@ -212,7 +206,7 @@ export async function GET(request: NextRequest) {
       .eq('vegetables.company_id', companyId)
 
     if (error) {
-      console.error('Database error:', error)
+      
       return NextResponse.json({ error: 'Failed to fetch storage statistics' }, { status: 500 })
     }
 
@@ -235,12 +229,7 @@ export async function GET(request: NextRequest) {
       return acc
     }, {} as Record<string, number>) || {}
 
-    console.log('📊 Photo Storage API GET - 統計情報:', {
-      totalFiles,
-      totalSizeMB,
-      fileTypes,
-      monthlyStats
-    })
+    
 
     return NextResponse.json({
       success: true,
@@ -261,7 +250,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Photo Storage API GET error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
@@ -276,7 +265,7 @@ export async function DELETE(request: NextRequest) {
     const storagePath = searchParams.get('storage_path')
     const companyId = searchParams.get('company_id')
     
-    console.log('🗑️ Photo Storage API DELETE - 開始')
+    
     
     // 認証チェック
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -291,7 +280,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('📁 Photo Storage API DELETE - パス:', storagePath)
+    
 
     // まずデータベースから写真情報を取得（権限確認のため）
     const { data: photo, error: fetchError } = await supabase
@@ -315,7 +304,7 @@ export async function DELETE(request: NextRequest) {
       .remove([storagePath])
 
     if (storageError) {
-      console.error('Storage deletion error:', storageError)
+      
       // ストレージ削除エラーでも続行（データベースからは削除）
     }
 
@@ -326,11 +315,11 @@ export async function DELETE(request: NextRequest) {
       .eq('id', photo.id)
 
     if (dbError) {
-      console.error('Database deletion error:', dbError)
+      
       return NextResponse.json({ error: 'Failed to delete photo metadata' }, { status: 500 })
     }
 
-    console.log('✅ Photo Storage API DELETE - 削除成功:', photo.id)
+    
 
     return NextResponse.json({
       success: true,
@@ -342,7 +331,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Photo Storage API DELETE error:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }

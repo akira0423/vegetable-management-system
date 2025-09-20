@@ -99,7 +99,7 @@ export default function InvitePage() {
         }
       }
     } catch (err) {
-      console.error('招待取得エラー:', err)
+      
       setError('招待情報の取得に失敗しました')
     } finally {
       setLoading(false)
@@ -116,7 +116,7 @@ export default function InvitePage() {
         }
       }
     } catch (err) {
-      console.error('ユーザー確認エラー:', err)
+      
     }
   }
 
@@ -150,7 +150,7 @@ export default function InvitePage() {
         setError(data.error)
       }
     } catch (err) {
-      console.error('招待受諾エラー:', err)
+      
       setError('招待の受諾に失敗しました')
     } finally {
       setAccepting(false)

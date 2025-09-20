@@ -64,7 +64,7 @@ class DataExportManager {
    */
   async exportVegetables(options: ExportOptions): Promise<void> {
     try {
-      console.log('🚀 野菜データエクスポート開始:', options.format)
+      
       
       const companyId = 'a1111111-1111-1111-1111-111111111111'
       
@@ -96,7 +96,7 @@ class DataExportManager {
       }
       
     } catch (error) {
-      console.error('野菜データエクスポートエラー:', error)
+      
       alert('野菜データのエクスポートに失敗しました')
     }
   }
@@ -106,7 +106,7 @@ class DataExportManager {
    */
   async exportWorkReports(options: ExportOptions): Promise<void> {
     try {
-      console.log('🚀 作業報告データエクスポート開始:', options.format)
+      
       
       const companyId = 'a1111111-1111-1111-1111-111111111111'
       let url = `/api/reports?company_id=${companyId}&limit=1000`
@@ -140,7 +140,7 @@ class DataExportManager {
       }
       
     } catch (error) {
-      console.error('作業報告データエクスポートエラー:', error)
+      
       alert('作業報告データのエクスポートに失敗しました')
     }
   }
@@ -150,7 +150,7 @@ class DataExportManager {
    */
   async exportAnalytics(options: ExportOptions): Promise<void> {
     try {
-      console.log('🚀 分析データエクスポート開始:', options.format)
+      
       
       // 分析データを生成
       const analyticsData = await this.generateAnalyticsData(options)
@@ -162,7 +162,7 @@ class DataExportManager {
       }
       
     } catch (error) {
-      console.error('分析データエクスポートエラー:', error)
+      
       alert('分析データのエクスポートに失敗しました')
     }
   }
@@ -172,7 +172,7 @@ class DataExportManager {
    */
   async exportAllData(options: ExportOptions): Promise<void> {
     try {
-      console.log('🚀 全データエクスポート開始:', options.format)
+      
       
       // 全データを並行取得
       const [vegetables, workReports, analytics] = await Promise.all([
@@ -188,7 +188,7 @@ class DataExportManager {
       }
       
     } catch (error) {
-      console.error('全データエクスポートエラー:', error)
+      
       alert('全データのエクスポートに失敗しました')
     }
   }
@@ -387,7 +387,7 @@ class DataExportManager {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
-    console.log('📊 CSVエクスポート完了:', filename)
+    
   }
 
   /**

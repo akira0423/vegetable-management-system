@@ -154,7 +154,7 @@ export default function PlotDrawingTools({
 
       onPolygonComplete(newPolygon)
     } catch (error) {
-      console.error('ポリゴン作成エラー:', error)
+      
       alert('ポリゴンの作成に失敗しました')
     }
   }, [drawingState.currentPoints, drawingState.completedPolygons.length, onPolygonComplete])
@@ -165,20 +165,20 @@ export default function PlotDrawingTools({
       // 自己交差チェック
       const selfIntersects = turf.kinks(polygon)
       if (selfIntersects.features.length > 0) {
-        console.warn('ポリゴンに自己交差があります')
+        
         return false
       }
 
       // 面積チェック（最小面積: 1㎡）
       const area = turf.area(polygon)
       if (area < 1) {
-        console.warn('ポリゴンの面積が小さすぎます')
+        
         return false
       }
 
       return true
     } catch (error) {
-      console.error('ポリゴン検証エラー:', error)
+      
       return false
     }
   }, [])

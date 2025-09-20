@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching demo vegetables:', error)
+      
       return NextResponse.json({
         success: false,
         error: error.message
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       data: data || []
     })
   } catch (error) {
-    console.error('Error in demo vegetables API:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

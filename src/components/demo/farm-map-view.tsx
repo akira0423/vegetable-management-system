@@ -139,7 +139,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     const newState = !showSidebar
     setShowSidebar(newState)
     sessionStorage.setItem('farmMapSidebarVisible', JSON.stringify(newState))
-    console.log('🔄 サイドバー表示切り替え:', newState ? '表示' : '非表示')
+    
   }, [showSidebar])
 
   // デモ版：demo_vegetablesテーブルからデータ取得
@@ -147,7 +147,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     if (showLoading) setIsLoadingVegetables(true)
 
     try {
-      console.log('🔄 デモ野菜データをロード中...')
+      
 
       const response = await fetch('/api/demo/vegetables')
       
@@ -163,7 +163,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
               
               // deleted_atがあれば除外（ソフト削除済み）
               if (vegetable.deleted_at) {
-                console.log('🗑️ 削除済みデータをスキップ:', vegetable.name)
+                
                 return false
               }
               
@@ -177,7 +177,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
               polygon_color: vegetable.polygon_color || '#22c55e' // データベースから取得
             }))
           
-          console.log(`✅ ${processedVegetables.length}件の野菜データを取得`)
+          
           setRegisteredVegetables(processedVegetables)
           
           // 他のページにもデータ更新を通知
@@ -185,15 +185,15 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
             detail: { vegetables: processedVegetables, source: 'farm-map-view' }
           }))
         } else {
-          console.warn('⚠️ 野菜データが空です')
+          
           setRegisteredVegetables([])
         }
       } else {
-        console.error('❌ APIレスポンスエラー:', response.status)
+        
         setRegisteredVegetables([])
       }
     } catch (error) {
-      console.error('❌ 栽培野菜データの取得に失敗:', error)
+      
       setRegisteredVegetables([])
     } finally {
       if (showLoading) setIsLoadingVegetables(false)
@@ -207,21 +207,21 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
 
   // 農地エリア保存完了ハンドラー
   const handleAreaSaved = useCallback((areaData: any) => {
-    console.log('🎯 [FarmMapView] handleAreaSaved が呼び出されました')
-    console.log('📊 受信したエリアデータ:', areaData)
+    
+    
     
     try {
       // 新規エリアデータを保存
-      console.log('💾 新規エリアデータを保存中...')
+      
       setNewAreaData(areaData)
       
       // 栽培情報入力モーダルを表示
-      console.log('🚀 栽培情報入力モーダルを表示中...')
+      
       setShowNewVegetableModal(true)
       
-      console.log('✅ モーダル表示完了 - showNewVegetableModal = true')
+      
     } catch (error) {
-      console.error('❌ [FarmMapView] handleAreaSaved エラー:', error)
+      
     }
     
     // 農地情報を表示用に更新
@@ -248,8 +248,8 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
   // 新規栽培情報保存ハンドラー（プロフェッショナル版）
   const handleNewVegetableSave = useCallback(async (vegetableData: any) => {
     try {
-      console.log('🌱 新規栽培情報を保存します:', vegetableData)
-      console.log('🗺️ 紐づけるエリアデータ:', newAreaData)
+      
+      
       
       // 現在のユーザー情報を取得
       const userResponse = await fetch('/api/auth/user')
@@ -261,7 +261,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         if (userData.success && userData.user) {
           companyId = userData.user.company_id || companyId
           createdBy = userData.user.id
-          console.log('✅ 保存用ユーザー情報:', { companyId, createdBy })
+          
         }
       }
 
@@ -279,7 +279,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       // plot_sizeフィールドを削除（新しいスキーマにはない）
       delete completeData.plot_size
       
-      console.log('📤 完全なデータペイロード:', completeData)
+      
       
       // デモ版：実際には保存せずモーダル表示
       // ダミーのレスポンスを作成
@@ -318,7 +318,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       const result = await response.json()
       
       if (result.success) {
-        console.log('✅ 栽培情報保存成功:', result.data)
+        
         
         // リアルタイム同期通知を送信
         notifyVegetableChange('created', result.data)
@@ -332,7 +332,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         
         // 成功通知とデータ確認
         const savedVegetable = result.data
-        console.log('💾 保存された野菜データ:', savedVegetable)
+        
         
         // 新しく登録された野菜を地図上に表示（オプション）
         if (savedVegetable) {
@@ -345,10 +345,8 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
           setTimeout(() => {
             if (mapEditorRef.current?.showPolygon) {
               mapEditorRef.current.showPolygon(vegetableToShow)
-              console.log('🟢 新規野菜をポリゴン表示:', savedVegetable.name)
             } else if (mapEditorRef.current?.showVegetablePolygon) {
               mapEditorRef.current.showVegetablePolygon(vegetableToShow)
-              console.log('🟢 (レガシー) 新規野菜をポリゴン表示:', savedVegetable.name)
             }
           }, 1000)
         }
@@ -360,11 +358,11 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         
         alert(`栽培情報「${savedVegetable.name}」を登録しました！\n面積: ${(savedVegetable.area_size / 10000).toFixed(3)} ha`)
       } else {
-        console.error('❌ API保存失敗:', result)
+        
         throw new Error(result.error || '栽培情報の保存に失敗しました')
       }
     } catch (error) {
-      console.error('❌ 栽培情報保存エラー:', error)
+      
       alert(`栽培情報の保存に失敗しました: ${error.message}`)
     }
   }, [newAreaData, loadRegisteredVegetables])
@@ -377,12 +375,12 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
 
   // モーダル状態の変更を監視
   useEffect(() => {
-    console.log('🔍 [useEffect] showNewVegetableModal が変更されました:', showNewVegetableModal)
+    
     if (showNewVegetableModal) {
-      console.log('✅ 栽培情報入力モーダルが表示されました')
-      console.log('📊 表示中のエリアデータ:', newAreaData)
+      
+      
     } else {
-      console.log('❌ 栽培情報入力モーダルが非表示です')
+      
     }
   }, [showNewVegetableModal, newAreaData])
 
@@ -395,28 +393,28 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
   useEffect(() => {
     // 野菜データ変更イベントの監視
     const unsubscribeVegetableCreated = onDataChange('vegetable_created', () => {
-      console.log('🔔 野菜作成イベント受信 - データを再読み込み')
+      
       loadRegisteredVegetables(false)
     })
 
     const unsubscribeVegetableUpdated = onDataChange('vegetable_updated', () => {
-      console.log('🔔 野菜更新イベント受信 - データを再読み込み')
+      
       loadRegisteredVegetables(false)
     })
 
     const unsubscribeVegetableDeleted = onDataChange('vegetable_deleted', () => {
-      console.log('🔔 野菜削除イベント受信 - データを再読み込み')
+      
       loadRegisteredVegetables(false)
     })
 
     const unsubscribeVegetableArchived = onDataChange('vegetable_archived', () => {
-      console.log('🔔 野菜アーカイブイベント受信 - データを再読み込み')
+      
       loadRegisteredVegetables(false)
     })
 
     // 全体データ更新イベントの監視
     const unsubscribeAnalyticsUpdated = onDataChange('analytics_updated', () => {
-      console.log('🔔 アナリティクス更新イベント受信 - データを再読み込み')
+      
       loadRegisteredVegetables(false)
     })
 
@@ -433,19 +431,19 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
   // イベント監視：他のページからの更新通知を受信（プロフェッショナル版）
   useEffect(() => {
     const handleVegetableRegistered = (event: CustomEvent) => {
-      console.log('🔔 野菜登録イベント受信:', event.detail)
+      
       loadRegisteredVegetables(false) // ローディング表示なしで更新
     }
 
     const handleVegetableUpdated = (event: CustomEvent) => {
-      console.log('🔔 野菜更新イベント受信:', event.detail)
+      
       if (event.detail.source !== 'farm-map-view') {
         loadRegisteredVegetables(false)
       }
     }
 
     const handleDataRefresh = (event: CustomEvent) => {
-      console.log('🔔 データ全体更新イベント受信:', event.detail)
+      
       loadRegisteredVegetables(false)
     }
 
@@ -464,15 +462,13 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
   // 野菜エリアへの移動
   const handleCreateVegetable = useCallback(() => {
     // 選択されたセルを使った野菜登録の処理
-    console.log('野菜登録画面へ移動:', selectedCells)
+    
   }, [selectedCells])
 
   // 🆕 複数ポリゴン表示対応の野菜エリアクリックハンドラー
   const handleVegetableAreaClick = useCallback((vegetable: any) => {
-    console.log('🥕 野菜エリアをクリック (複数表示モード):', vegetable)
-    
     if (!vegetable.farm_area_data?.geometry || !mapEditorRef.current) {
-      console.warn('⚠️ 野菜の位置情報が見つからません:', vegetable)
+      
       alert('この野菜の位置情報が登録されていないため、地図に移動できません。')
       return
     }
@@ -481,7 +477,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     
     // 既に表示されている場合はトグル動作（非表示にする）
     if (visiblePolygons.has(vegetableId)) {
-      console.log('🔄 既に表示中のポリゴンを非表示にします:', vegetableId)
+      
       
       // 表示リストから削除
       setVisiblePolygons(prev => {
@@ -494,14 +490,14 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       if (mapEditorRef.current?.hidePolygon) {
         mapEditorRef.current.hidePolygon(vegetableId)
       } else {
-        console.warn('⚠️ ポリゴン非表示メソッドが利用できません')
+        
       }
       
       return
     }
 
     // 新しいポリゴンを表示リストに追加
-    console.log('➕ 新しいポリゴンを表示リストに追加:', vegetableId)
+    
     setVisiblePolygons(prev => new Set([...prev, vegetableId]))
     
     // ポリゴンの色を管理
@@ -513,13 +509,10 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     // 地図上にポリゴンを表示（新しいメソッドを優先）
     if (mapEditorRef.current?.showPolygon) {
       mapEditorRef.current.showPolygon(vegetable)
-      console.log('🟢 ポリゴンを表示しました:', vegetableId)
+      
     } else if (mapEditorRef.current?.showVegetablePolygon) {
       // レガシーメソッドのフォールバック
       mapEditorRef.current.showVegetablePolygon(vegetable)
-      console.log('🟢 (レガシー) ポリゴンを表示しました:', vegetableId)
-    } else {
-      console.warn('⚠️ ポリゴン表示メソッドが利用できません')
     }
     
     // ポリゴン表示後、該当位置に地図を移動
@@ -548,7 +541,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       centerLat /= coordinates.length
       
       mapEditorRef.current.flyToLocation(centerLng, centerLat, 18)
-      console.log('📍 地図を野菜位置に移動しました:', centerLng, centerLat)
+      
     }
   }, [])
 
@@ -556,7 +549,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
   const handleMapRightClick = useCallback((event: any) => {
     event.preventDefault() // コンテキストメニューを無効化
     
-    console.log('🖱️ 地図右クリック: 全ポリゴンを削除します')
+    
     
     // 全てのポリゴンを非表示
     setVisiblePolygons(new Set())
@@ -572,12 +565,12 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       (mapEditorRef.current as any).clearVegetablePolygons()
     }
     
-    console.log('✨ 全ポリゴンを削除しました')
+    
   }, [])
 
   // 🆕 個別ポリゴンダブルクリック削除ハンドラー
   const handlePolygonDoubleClick = useCallback((vegetableId: string) => {
-    console.log('🖱️ ポリゴンダブルクリック: 個別削除します:', vegetableId)
+    
     
     // 表示リストから削除
     setVisiblePolygons(prev => {
@@ -591,7 +584,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       (mapEditorRef.current as any).hidePolygon(vegetableId)
     }
     
-    console.log('✨ ポリゴンを個別削除しました:', vegetableId)
+    
   }, [])
 
   // 🆕 全ポリゴン表示/非表示切り替えヘルパー
@@ -602,7 +595,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       if (mapEditorRef.current && (mapEditorRef.current as any).clearAllPolygons) {
         (mapEditorRef.current as any).clearAllPolygons()
       }
-      console.log('👁️ 全ポリゴンを非表示にしました')
+      
     } else {
       // 全て表示
       const allVegetableIds = registeredVegetables
@@ -614,13 +607,13 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       if (mapEditorRef.current && (mapEditorRef.current as any).showMultiplePolygons) {
         (mapEditorRef.current as any).showMultiplePolygons(registeredVegetables.filter(v => v.has_spatial_data || v.spatial_data || v.polygon_coordinates || v.farm_area_data))
       }
-      console.log('👁️ 全ポリゴンを表示しました')
+      
     }
   }, [visiblePolygons.size, registeredVegetables])
 
   // 野菜詳細確認ハンドラー
   const handleVegetableDetailClick = useCallback((vegetable: any) => {
-    console.log('📋 野菜詳細確認をクリック:', vegetable)
+    
     setSelectedVegetable(vegetable)
     setShowDetailModal(true)
   }, [])
@@ -651,8 +644,8 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       polygon_color: selectedVegetable.polygon_color || '#22c55e'
     }
     
-    console.log('📝 編集モード開始 - 選択された野菜:', selectedVegetable)
-    console.log('📝 編集フォームデータ:', formData)
+    
+    
     
     setEditFormData(formData)
     setIsEditMode(true)
@@ -661,14 +654,13 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     if (selectedVegetable.has_spatial_data || selectedVegetable.spatial_data || selectedVegetable.polygon_coordinates || selectedVegetable.farm_area_data) {
       if (mapEditorRef.current?.showPolygon) {
         mapEditorRef.current.showPolygon(selectedVegetable)
-        console.log('🟢 編集対象をポリゴン表示:', selectedVegetable.name)
+        
       } else if (mapEditorRef.current?.showVegetablePolygon) {
         mapEditorRef.current.showVegetablePolygon(selectedVegetable)
-        console.log('🟢 (レガシー) 編集対象をポリゴン表示:', selectedVegetable.name)
       }
     }
     
-    console.log('✏️ 編集モード開始:', selectedVegetable)
+    
   }, [selectedVegetable])
 
   // 編集フォーム更新
@@ -690,7 +682,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
     
     setIsSaving(true)
     try {
-      console.log('💾 [デモ版] 野菜データ更新中...', editFormData)
+      
 
       // デモ版：編集もモーダル表示のみ
       alert(`[デモ版] 「${editFormData.name}」の情報を更新しました！\n\n※これはデモ版のため、実際には保存されません。`)
@@ -727,7 +719,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ 野菜データ更新成功:', result)
+        
         
         // リアルタイム同期通知を送信
         notifyVegetableChange('updated', result.data)
@@ -752,23 +744,13 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         alert('野菜データを更新しました！')
       } else {
         const error = await response.json()
-        console.error('❌ 野菜データ更新失敗:', error)
-        console.error('❌ レスポンスステータス:', response.status)
-        console.error('❌ 送信データ:', {
-          id: selectedVegetable.id,
-          name: editFormData.name,
-          variety_name: editFormData.variety_name,
-          plot_name: editFormData.plot_name,
-          area_size: editFormData.area_size,
-          planting_date: editFormData.planting_date || null,
-          expected_harvest_start: editFormData.expected_harvest_start || null,
-          expected_harvest_end: editFormData.expected_harvest_end || null,
-          status: editFormData.status
-        })
+        
+        
+        
         alert(`更新に失敗しました: ${error.message || error.error || '不明なエラー'}`)
       }
     } catch (error) {
-      console.error('❌ 野菜データ更新エラー:', error)
+      
       alert('更新中にエラーが発生しました')
     } finally {
       setIsSaving(false)
@@ -802,7 +784,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       mapEditorRef.current.enablePolygonEditMode(selectedVegetable)
     }
     
-    console.log('🗺️ ポリゴン編集モード開始:', selectedVegetable.name)
+    
   }, [selectedVegetable])
 
   // ポリゴン編集保存
@@ -819,7 +801,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         return
       }
       
-      console.log('💾 ポリゴンデータ更新中...', editedGeometry)
+      
       
       // デモ版：ポリゴン編集もモーダル表示のみ
       alert(`[デモ版] 地図エリアを更新しました！\n\n※これはデモ版のため、実際には保存されません。`)
@@ -847,7 +829,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ ポリゴンデータ更新成功')
+        
         
         // リアルタイム同期通知を送信
         notifyVegetableChange('updated', result.data)
@@ -860,7 +842,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         throw new Error('ポリゴンデータの更新に失敗しました')
       }
     } catch (error) {
-      console.error('❌ ポリゴン編集保存エラー:', error)
+      
       alert('ポリゴン編集の保存に失敗しました')
     }
   }, [selectedVegetable, loadRegisteredVegetables])
@@ -904,8 +886,6 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
 
   const handleExecuteMultipleDelete = useCallback(async () => {
     try {
-      console.log('🗑️ 野菜削除処理を開始:', Array.from(selectedVegetableIds))
-      
       // デモ版：削除もモーダル表示のみ
       alert(`[デモ版] ${selectedVegetableIds.size}件の野菜を削除しました！\n\n※これはデモ版のため、実際には削除されません。`)
 
@@ -926,7 +906,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
         }
         
         const result = await response.json()
-        console.log(`✅ 野菜削除成功:`, result)
+        
         return result
       })
       
@@ -944,7 +924,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       })
       
       // 時限ソフトデリート戦略：ローカル状態の即座更新を削除し、API再読み込みに統一
-      console.log('🔄 削除完了 - 野菜データを再読み込み中...')
+      
       
       // 削除後にAPI経由で最新データを取得（ソフトデリートされたデータは自動的に除外される）
       await loadRegisteredVegetables(false)
@@ -966,7 +946,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
       alert(message)
       
     } catch (error) {
-      console.error('❌ 削除エラー:', error)
+      
       alert(`削除に失敗しました: ${error.message}`)
     }
   }, [selectedVegetableIds, loadRegisteredVegetables])
@@ -1912,7 +1892,7 @@ export default function DemoFarmMapView({ onClose }: FarmMapViewProps) {
                             id="status"
                             value={editFormData?.status || 'planning'}
                             onChange={(e) => {
-                              console.log('📝 ステータス変更:', e.target.value)
+                              
                               handleEditFormChange('status', e.target.value)
                             }}
                             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -2283,7 +2263,7 @@ function NewVegetableForm({ areaData, onSave, onCancel }: NewVegetableFormProps)
         plot_size: parseFloat(formData.plot_size.toString()) || 0
       }
       
-      console.log('📤 送信するデータ:', submitData)
+      
       await onSave(submitData)
     } finally {
       setIsSaving(false)

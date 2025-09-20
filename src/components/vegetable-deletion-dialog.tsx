@@ -109,7 +109,7 @@ export function VegetableDeletionDialog({
       const result = await response.json()
       setImpact(result.data)
     } catch (error) {
-      console.error('Failed to fetch deletion impact:', error)
+      
       // Show error message to user
     } finally {
       setLoading(false)
@@ -155,7 +155,7 @@ export function VegetableDeletionDialog({
       })
       onOpenChange(false)
     } catch (error) {
-      console.error('Deletion failed:', error)
+      
     } finally {
       setDeleting(false)
     }

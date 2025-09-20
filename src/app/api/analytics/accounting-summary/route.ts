@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    console.log('📊 会計サマリーAPI - パラメータ:', {
-      companyId, startDate, endDate
-    })
+    
 
     // 作業レポートと会計データを取得
     let query = supabase
@@ -64,7 +62,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('❌ 会計サマリーAPI - データベースエラー:', error)
+      
       return NextResponse.json(
         { error: 'Database error', details: error },
         { status: 500 }
@@ -72,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data || data.length === 0) {
-      console.log('ℹ️ 会計サマリーAPI - データが見つかりません')
+      
       return NextResponse.json({
         success: true,
         accountingSummary: {
@@ -114,11 +112,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log('✅ 会計サマリーAPI - データ取得成功:', {
-      reportsCount: data.length,
-      accountingEntriesCount: data.reduce((sum, r) => sum + (r.work_report_accounting?.length || 0), 0)
-    })
-
     // プロフェッショナル会計分析プロセッサーを使用
     const accountingSummary = accountingAnalyticsProcessor.generateAccountingSummary(data)
     const categoryAnalysis = accountingAnalyticsProcessor.generateCategoryAnalysis(data)
@@ -128,14 +121,7 @@ export async function GET(request: NextRequest) {
     const currentMonth = new Date().toISOString().substring(0, 7)
     const monthlyCostData = accountingAnalyticsProcessor.generateMonthlyCostFromAccounting(data, currentMonth)
 
-    console.log('📈 会計サマリーAPI - 処理完了:', {
-      actualIncome: accountingSummary.actualIncome,
-      actualExpense: accountingSummary.actualExpense,
-      netIncome: accountingSummary.netIncome,
-      aiUsageRate: accountingSummary.aiUsageRate,
-      recordCount: accountingSummary.recordCount,
-      categoryCount: categoryAnalysis.length
-    })
+    
 
     return NextResponse.json({
       success: true,
@@ -148,7 +134,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ 会計サマリーAPI - 内部エラー:', error)
+    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }

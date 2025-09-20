@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    console.log('🏢 サインアップ完了処理開始:', { user_id, email, company_name })
+    
 
     // 1. 会社作成
     const company_id = crypto.randomUUID()
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (companyError) {
-      console.error('会社作成エラー:', companyError)
+      
       return NextResponse.json({
         success: false,
         error: '会社情報の作成に失敗しました'
@@ -48,14 +48,14 @@ export async function POST(request: NextRequest) {
       })
 
     if (userError) {
-      console.error('ユーザー作成エラー:', userError)
+      
       return NextResponse.json({
         success: false,
         error: 'ユーザー情報の作成に失敗しました'
       }, { status: 500 })
     }
 
-    console.log('✅ サインアップ完了:', { company_id, user_id })
+    
 
     return NextResponse.json({
       success: true,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('サインアップ完了APIエラー:', error)
+    
     return NextResponse.json({
       success: false,
       error: 'システムエラーが発生しました'
