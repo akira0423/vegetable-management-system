@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MultiSelectDropdown } from '@/components/ui/multi-select-dropdown'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   BarChart3,
@@ -181,13 +182,118 @@ interface AnalyticsData {
 export default function AnalyticsDemoPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedVegetable, setSelectedVegetable] = useState('all')
+  const [selectedVegetables, setSelectedVegetables] = useState<string[]>([])
+  const [availableVegetables, setAvailableVegetables] = useState<Array<{id: string, name: string, variety?: string}>>([])
+  const [vegetablesLoading, setVegetablesLoading] = useState(false)
+  const [filteredData, setFilteredData] = useState<AnalyticsData | null>(null) // フィルタリング後のデータ
+  // 後方互換性のための単一選択値
+  const selectedVegetable = selectedVegetables.length === 0 ? 'all' :
+                           selectedVegetables.length === 1 ? selectedVegetables[0] :
+                           selectedVegetables[0] // 複数選択時は最初の値を使用
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // localStorageから前回選択したタブを取得
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('analytics-demo-active-tab')
+      return savedTab || 'performance'
+    }
+    return 'performance'
+  })
 
   // デモデータの取得
   useEffect(() => {
+    // 野菜データをセットアップ
+    const vegetables = [
+      { id: 'tomato', name: 'トマト', variety: '桃太郎' },
+      { id: 'cucumber', name: 'きゅうり', variety: '夏すずみ' },
+      { id: 'lettuce', name: 'レタス', variety: 'サニーレタス' },
+      { id: 'spinach', name: 'ほうれんそう', variety: '強力オーライ' },
+      { id: 'carrot', name: 'にんじん', variety: '五寸人参' }
+    ]
+    setAvailableVegetables(vegetables)
+
     fetchDemoAnalyticsData()
-  }, [selectedVegetable])
+  }, [])
+
+  // 選択変更時のデータ更新
+  useEffect(() => {
+    fetchDemoAnalyticsData()
+  }, [selectedVegetables])
+
+  // フィルタリング処理
+  useEffect(() => {
+    if (!data) return
+
+    if (selectedVegetables.length === 0) {
+      // 全野菜選択時は元データをそのまま使用
+      setFilteredData(data)
+    } else {
+      // 選択された野菜でフィルタリング
+      const vegetableMap = {
+        'tomato': { name: 'トマト', harvest: 450, revenue: 680000, cost: 280000, area: 120, workHours: 180 },
+        'cucumber': { name: 'きゅうり', harvest: 320, revenue: 480000, cost: 220000, area: 80, workHours: 150 },
+        'lettuce': { name: 'レタス', harvest: 280, revenue: 420000, cost: 250000, area: 100, workHours: 140 },
+        'spinach': { name: 'ほうれんそう', harvest: 200, revenue: 320000, cost: 180000, area: 60, workHours: 120 },
+        'carrot': { name: 'にんじん', harvest: 150, revenue: 250000, cost: 150000, area: 40, workHours: 100 }
+      }
+
+      // 選択された野菜の合計を計算
+      let totalRevenue = 0
+      let totalCost = 0
+      let totalHarvest = 0
+      let totalWorkHours = 0
+      let totalArea = 0
+
+      selectedVegetables.forEach(vegId => {
+        const veg = vegetableMap[vegId as keyof typeof vegetableMap]
+        if (veg) {
+          totalRevenue += veg.revenue
+          totalCost += veg.cost
+          totalHarvest += veg.harvest
+          totalWorkHours += veg.workHours
+          totalArea += veg.area
+        }
+      })
+
+      // フィルタリングされたデータを作成
+      const filtered: AnalyticsData = {
+        ...data,
+        summary: {
+          ...data.summary,
+          total_revenue: totalRevenue,
+          total_cost: totalCost,
+          profit_margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
+          total_harvest: totalHarvest,
+          total_work_hours: totalWorkHours,
+          avg_yield_per_sqm: totalArea > 0 ? totalHarvest / totalArea : 0,
+          vegetable_count: selectedVegetables.length,
+          total_area: totalArea,
+          active_plots: selectedVegetables.length
+        },
+        vegetable_performance: data.vegetable_performance.filter(vp => {
+          // 野菜名でフィルタリング
+          const vegName = vp.name.toLowerCase()
+          return selectedVegetables.some(id => {
+            const veg = vegetableMap[id as keyof typeof vegetableMap]
+            return veg && veg.name === vp.name
+          })
+        })
+      }
+      setFilteredData(filtered)
+    }
+  }, [data, selectedVegetables])
+
+  // 自動更新
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      fetchDemoAnalyticsData()
+    }, 5 * 60 * 1000) // 5分ごと
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, selectedVegetables])
 
   const fetchDemoAnalyticsData = async () => {
     try {
@@ -249,7 +355,7 @@ export default function AnalyticsDemoPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-[1400px] mx-auto space-y-6">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -261,10 +367,13 @@ export default function AnalyticsDemoPage() {
     )
   }
 
-  if (!data) {
+  // 表示用データ（フィルタリング後データを優先）
+  const displayData = filteredData || data
+
+  if (!displayData) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -283,7 +392,7 @@ export default function AnalyticsDemoPage() {
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
       {/* デモ警告バナー */}
       <div className="bg-purple-600 text-white px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Info className="w-5 h-5" />
             <span className="text-sm font-medium">
@@ -299,7 +408,7 @@ export default function AnalyticsDemoPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-[1400px] mx-auto p-6 space-y-6">
         {/* ヘッダー */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -308,32 +417,34 @@ export default function AnalyticsDemoPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="野菜を選択" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">すべての野菜</SelectItem>
-                <SelectItem value="tomato">トマト</SelectItem>
-                <SelectItem value="cucumber">キュウリ</SelectItem>
-                <SelectItem value="eggplant">ナス</SelectItem>
-                <SelectItem value="lettuce">レタス</SelectItem>
-                <SelectItem value="pepper">ピーマン</SelectItem>
-              </SelectContent>
-            </Select>
+            <MultiSelectDropdown
+              options={availableVegetables}
+              selected={selectedVegetables}
+              onChange={setSelectedVegetables}
+              placeholder="すべての野菜"
+              className="w-60"
+              isLoading={vegetablesLoading}
+            />
 
             <div className="flex items-center gap-2">
               <div className="text-xs text-gray-500">
                 最終更新: {lastUpdated.toLocaleTimeString('ja-JP')}
               </div>
               <Button
+                variant={autoRefresh ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+                自動更新（デモ）
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={fetchDemoAnalyticsData}
-                disabled
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                更新（デモ版では無効）
+                手動更新
               </Button>
             </div>
           </div>
@@ -348,18 +459,20 @@ export default function AnalyticsDemoPage() {
                 <div className="relative z-10">
                   <p className="text-sm text-green-700 font-medium mb-2">登録野菜数</p>
                   <p className="text-2xl font-bold text-green-900">
-                    {data.summary.vegetable_count}
+                    {displayData.summary.vegetable_count}
                     <span className="text-base ml-2">品種</span>
                   </p>
                   <p className="text-xs text-green-600 flex items-center mt-2">
                     <Sprout className="w-3 h-3 mr-1" />
-                    {selectedVegetable === 'all' ? '全野菜' : '選択中'}
+                    {selectedVegetables.length === 0 ? '全野菜' :
+                     selectedVegetables.length === 1 ? '選択中' :
+                     `${selectedVegetables.length}品種選択`}
                   </p>
                 </div>
                 <div className="relative">
                   <Sprout className="w-10 h-10 text-green-600 opacity-90 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-125">
-                    <span className="text-xs text-white font-bold">{data.summary.vegetable_count}</span>
+                    <span className="text-xs text-white font-bold">{displayData.summary.vegetable_count}</span>
                   </div>
                 </div>
               </div>
@@ -373,12 +486,14 @@ export default function AnalyticsDemoPage() {
                 <div className="relative z-10">
                   <p className="text-sm text-blue-700 font-medium mb-2">総栽培面積</p>
                   <p className="text-2xl font-bold text-blue-900">
-                    {formatNumber(data.summary.total_area, 0)}
+                    {formatNumber(displayData.summary.total_area, 0)}
                     <span className="text-base ml-2">㎡</span>
                   </p>
                   <p className="text-xs text-blue-600 flex items-center mt-2">
                     <MapPin className="w-3 h-3 mr-1" />
-                    {data.summary.active_plots} 区画
+                    {selectedVegetables.length === 0 ? `${displayData.summary.active_plots} 区画` :
+                     selectedVegetables.length === 1 ? '選択品種' :
+                     `${selectedVegetables.length} 品種選択`}
                   </p>
                 </div>
                 <div className="relative">
@@ -397,10 +512,10 @@ export default function AnalyticsDemoPage() {
               <div className="flex items-center justify-between">
                 <div className="relative z-10">
                   <p className="text-sm text-blue-700 font-medium mb-2">総収穫量（直近12カ月）</p>
-                  <p className="text-2xl font-bold text-blue-900">{formatNumber(data.summary.total_harvest, 0)}kg</p>
+                  <p className="text-2xl font-bold text-blue-900">{formatNumber(displayData.summary.total_harvest, 0)}kg</p>
                   <p className="text-xs text-blue-600 flex items-center mt-2">
                     <Sprout className="w-3 h-3 mr-1" />
-                    平均 {formatNumber(data.summary.avg_yield_per_sqm)}kg/㎡
+                    平均 {formatNumber(displayData.summary.avg_yield_per_sqm)}kg/㎡
                   </p>
                 </div>
                 <div className="relative">
@@ -422,7 +537,7 @@ export default function AnalyticsDemoPage() {
               <div className="flex items-center justify-between">
                 <div className="relative z-10">
                   <p className="text-sm text-amber-700 font-medium mb-2">総作業時間（直近12カ月）</p>
-                  <p className="text-2xl font-bold text-amber-900">{formatNumber(data.summary.total_work_hours, 1)}h</p>
+                  <p className="text-2xl font-bold text-amber-900">{formatNumber(displayData.summary.total_work_hours, 1)}h</p>
                   <p className="text-xs text-amber-600 flex items-center mt-2">
                     <Clock className="w-3 h-3 mr-1" />
                     人時ベース
@@ -453,7 +568,7 @@ export default function AnalyticsDemoPage() {
                     <p className="text-sm text-emerald-700 font-medium">総収入（直近12カ月）</p>
                     <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
                   </div>
-                  <p className="text-2xl font-bold text-emerald-900">{formatCurrency(data.summary.total_revenue)}</p>
+                  <p className="text-2xl font-bold text-emerald-900">{formatCurrency(displayData.summary.total_revenue)}</p>
                   <p className="text-xs text-emerald-600 flex items-center mt-2">
                     <TrendingUp className="w-3 h-3 mr-1" />
                     会計連携済（デモ）
@@ -481,7 +596,7 @@ export default function AnalyticsDemoPage() {
                     <p className="text-sm text-red-700 font-medium">総支出（直近12カ月）</p>
                     <Badge className="text-xs bg-green-500 text-white px-2 py-0.5">実績</Badge>
                   </div>
-                  <p className="text-2xl font-bold text-red-900">{formatCurrency(data.summary.total_cost)}</p>
+                  <p className="text-2xl font-bold text-red-900">{formatCurrency(displayData.summary.total_cost)}</p>
                   <p className="text-xs text-red-600 flex items-center mt-2">
                     <TrendingDown className="w-3 h-3 mr-1" />
                     会計連携済（デモ）
@@ -512,12 +627,12 @@ export default function AnalyticsDemoPage() {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-blue-900">
-                        {formatCurrency(data.summary.total_revenue - data.summary.total_cost)}
+                        {formatCurrency(displayData.summary.total_revenue - displayData.summary.total_cost)}
                       </span>
                     </div>
                     <p className="text-xs text-blue-600 flex items-center">
                       <DollarSign className="w-3 h-3 mr-1" />
-                      利益率: {formatNumber(data.summary.profit_margin, 1)}%
+                      利益率: {formatNumber(displayData.summary.profit_margin, 1)}%
                     </p>
                   </div>
                 </div>
@@ -540,8 +655,8 @@ export default function AnalyticsDemoPage() {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-purple-900">
-                        {data.summary.total_cost > 0
-                          ? `${(((data.summary.total_revenue - data.summary.total_cost) / data.summary.total_cost) * 100).toFixed(1)}%`
+                        {displayData.summary.total_cost > 0
+                          ? `${(((displayData.summary.total_revenue - displayData.summary.total_cost) / displayData.summary.total_cost) * 100).toFixed(1)}%`
                           : 'N/A'}
                       </span>
                     </div>
@@ -549,13 +664,13 @@ export default function AnalyticsDemoPage() {
                       <div className="flex justify-between">
                         <span>収益</span>
                         <span className="font-medium">
-                          {`${(data.summary.total_revenue / 10000).toFixed(0)}万円`}
+                          {`${(displayData.summary.total_revenue / 10000).toFixed(0)}万円`}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>コスト</span>
                         <span className="font-medium">
-                          {`${(data.summary.total_cost / 10000).toFixed(0)}万円`}
+                          {`${(displayData.summary.total_cost / 10000).toFixed(0)}万円`}
                         </span>
                       </div>
                     </div>
@@ -569,8 +684,14 @@ export default function AnalyticsDemoPage() {
           </Card>
         </div>
 
-        {/* メインコンテンツタブ */}
-        <Tabs defaultValue="performance" className="space-y-6">
+        {/* メインコンテンツタブ - 金融系プロフェッショナルデザイン */}
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value)
+          // localStorageに保存
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('analytics-demo-active-tab', value)
+          }
+        }} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-1">
             <TabsTrigger
               value="performance"
@@ -609,22 +730,22 @@ export default function AnalyticsDemoPage() {
           {/* パフォーマンスタブ */}
           <TabsContent value="performance" className="space-y-6">
             {/* 作業別収支分析レポート（デモ版） */}
-            <WorkTypeAnalysisReportDemo />
+            <WorkTypeAnalysisReportDemo selectedVegetables={selectedVegetables} />
           </TabsContent>
 
           {/* 収益コスト分析タブ */}
           <TabsContent value="harvest-revenue" className="space-y-6">
             {/* 月次キャッシュフロー推移（デモ版） */}
-            <MonthlyCashflowChartDemo />
+            <MonthlyCashflowChartDemo selectedVegetables={selectedVegetables} />
 
             {/* 収支構造×効率性×成長分析（デモ版） */}
-            <FinancialPerformanceChartDemoEnhanced />
+            <FinancialPerformanceChartDemoEnhanced selectedVegetables={selectedVegetables} />
           </TabsContent>
 
           {/* 作業時間分析タブ */}
           <TabsContent value="worklog-cost" className="space-y-6">
             {/* 月次作業時間分析（デモ版） */}
-            <MonthlyWorkHoursChartDemo />
+            <MonthlyWorkHoursChartDemo selectedVegetables={selectedVegetables} />
           </TabsContent>
         </Tabs>
       </div>

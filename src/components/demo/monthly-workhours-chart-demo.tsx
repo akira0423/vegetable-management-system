@@ -96,7 +96,7 @@ interface WorkDetail {
 }
 
 interface MonthlyWorkHoursChartDemoProps {
-  // デモ版ではcompanyIdとselectedVegetableは使用しない
+  selectedVegetables?: string[]
 }
 
 interface WeatherDisplayOptions {
@@ -269,7 +269,7 @@ function generateWorkHoursData(startMonth: Date, period: number): WorkHoursData[
     const humidity = getSeasonalHumidity(season)
 
     data.push({
-      month: format(currentMonth, 'yyyy年M月', { locale: ja }),
+      month: format(currentMonth, 'M月', { locale: ja }),
       year: currentMonth.getFullYear(),
       month_num: currentMonth.getMonth() + 1,
       work_types,
@@ -334,7 +334,7 @@ function generateWorkDetails(type: string, month: Date, totalHours: number): Wor
   return details
 }
 
-export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoProps) {
+export default function MonthlyWorkHoursChartDemo({ selectedVegetables }: MonthlyWorkHoursChartDemoProps) {
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
@@ -372,6 +372,53 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
   const chartRef = useRef<ChartJS<'bar'>>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [chartDimensions, setChartDimensions] = useState({ left: 0, right: 0, width: 0 })
+
+  // チャートエリア寸法の更新
+  const updateChartDimensions = useCallback(() => {
+    if (chartRef.current) {
+      const chart = chartRef.current
+      const chartArea = chart.chartArea
+      if (chartArea) {
+        const meta = chart.getDatasetMeta(0)
+        if (meta && meta.data && meta.data.length > 0) {
+          const firstBar = meta.data[0] as any
+          const lastBar = meta.data[meta.data.length - 1] as any
+
+          // バーの実際の位置を取得
+          const actualLeft = firstBar.x - (firstBar.width || 0) / 2
+          const actualRight = lastBar.x + (lastBar.width || 0) / 2
+          const actualWidth = actualRight - actualLeft
+
+          setChartDimensions({
+            left: Math.round(actualLeft),
+            right: Math.round(chart.width - actualRight),
+            width: Math.round(actualWidth)
+          })
+        }
+      }
+    }
+  }, [])
+
+  // チャートが描画された後にchartDimensionsを更新
+  useEffect(() => {
+    if (chartRef.current && workHoursData.length > 0) {
+      // チャートの描画完了を待つ
+      const timeoutId = setTimeout(updateChartDimensions, 100)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [workHoursData, updateChartDimensions])
+
+  // リサイズ時にもchartDimensionsを更新
+  useEffect(() => {
+    const handleResize = () => {
+      if (chartRef.current && workHoursData.length > 0) {
+        updateChartDimensions()
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [workHoursData, updateChartDimensions])
 
   // 作業種別の表示/非表示をトグル
   const toggleWorkType = useCallback((workType: string) => {
@@ -704,7 +751,9 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
             drawTicks: false
           },
           ticks: {
-            display: false
+            display: false,
+            maxRotation: 0,
+            minRotation: 0
           },
           border: {
             display: true,
@@ -717,6 +766,7 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
           bounds: 'ticks',
           afterFit: function(scale: any) {
             scale.paddingBottom = 60
+            // 左右のパディングは固定（動的調整しない）
             scale.paddingLeft = 0
             scale.paddingRight = 0
           }
@@ -903,64 +953,44 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
             }
           }
         }
+      },
+      animation: {
+        duration: 600,
+        easing: 'easeOutQuart',
+        onComplete: function(animation: any) {
+          setTimeout(updateChartDimensions, 50)
+        }
+      },
+      onResize: function(chart: any, size: any) {
+        setTimeout(updateChartDimensions, 50)
       }
     })
-  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange, responsiveDimensions])
-
-  // チャートエリア寸法の更新
-  const updateChartDimensions = useCallback(() => {
-    if (chartRef.current) {
-      const chart = chartRef.current
-      const chartArea = chart.chartArea
-      const meta = chart.getDatasetMeta(0)
-
-      if (chartArea && meta && meta.data.length > 0) {
-        const firstBar = meta.data[0]
-        const lastBar = meta.data[meta.data.length - 1]
-
-        if (firstBar && lastBar) {
-          const actualLeft = firstBar.x - (firstBar.width || 0) / 2
-          const actualRight = lastBar.x + (lastBar.width || 0) / 2
-          const actualWidth = actualRight - actualLeft
-
-          setChartDimensions({
-            left: Math.round(actualLeft),
-            right: Math.round(chart.width - actualRight),
-            width: Math.round(actualWidth)
-          })
-        }
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (chartRef.current && workHoursData.length > 0) {
-      setTimeout(updateChartDimensions, 100)
-    }
-  }, [workHoursData, updateChartDimensions])
+  }, [workHoursData, weatherDisplayOptions, showCumulativeWorkTime, yAxisRange, cumulativeYAxisRange, responsiveDimensions, updateChartDimensions])
 
   return (
     <>
       <Card className="w-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Clock className="h-6 w-6 text-indigo-600" />
-              <CardTitle className="text-xl font-bold">⏰ 月次作業時間分析（デモ版）</CardTitle>
-              <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                デモ版
-              </Badge>
+              <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-md">
+                <Clock className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  ⏰ 月次作業時間分析
+                </CardTitle>
+                <p className="text-green-100 text-sm">
+                  収益性と効率性を月別に可視化
+                </p>
+              </div>
             </div>
-            <Badge variant="secondary" className="text-xs">
-              サンプルデータ表示中
-            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4">
             {/* フィルター＆オプション */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4" style={{ marginTop: '11px' }}>
               <div className="flex flex-wrap items-center gap-2">
                 {/* 期間選択 */}
                 <div className="flex items-center gap-1 bg-white rounded-lg p-1 shadow-sm border">
@@ -982,49 +1012,60 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
                 </div>
 
                 {/* データ表示オプション */}
-                <div className="flex items-center gap-1 bg-white rounded-lg p-1 shadow-sm border">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* 累積作業時間線トグル */}
                   <Button
-                    variant={showCumulativeWorkTime ? 'default' : 'ghost'}
+                    variant={showCumulativeWorkTime ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setShowCumulativeWorkTime(!showCumulativeWorkTime)}
-                    className={`px-3 h-7 text-xs ${
-                      showCumulativeWorkTime
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-emerald-600 hover:bg-emerald-50'
-                    }`}
+                    className={showCumulativeWorkTime ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-gray-600'}
                   >
-                    📊 累積
+                    📊 累積時間線
                   </Button>
+
+                  {/* 前年比較トグル */}
                   <Button
-                    variant={weatherDisplayOptions.showTemperature ? 'default' : 'ghost'}
+                    variant={showComparison ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setWeatherDisplayOptions(prev => ({
-                      ...prev,
-                      showTemperature: !prev.showTemperature
-                    }))}
-                    className={`px-3 h-7 text-xs ${
-                      weatherDisplayOptions.showTemperature
-                        ? 'bg-orange-500 text-white shadow-sm'
-                        : 'text-orange-600 hover:bg-orange-50'
-                    }`}
+                    onClick={() => setShowComparison(!showComparison)}
+                    className={showComparison ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-gray-600'}
                   >
-                    🌡️ 気温
+                    📈 前年比較
                   </Button>
-                  <Button
-                    variant={weatherDisplayOptions.showHumidity ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setWeatherDisplayOptions(prev => ({
-                      ...prev,
-                      showHumidity: !prev.showHumidity
-                    }))}
-                    className={`px-3 h-7 text-xs ${
-                      weatherDisplayOptions.showHumidity
-                        ? 'bg-blue-500 text-white shadow-sm'
-                        : 'text-blue-600 hover:bg-blue-50'
-                    }`}
-                  >
-                    💧 湿度
-                  </Button>
+
+                  {/* 🌡️💧 気象データ表示トグル */}
+                  <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm">
+                    <Button
+                      variant={weatherDisplayOptions.showTemperature ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setWeatherDisplayOptions(prev => ({
+                        ...prev,
+                        showTemperature: !prev.showTemperature
+                      }))}
+                      className={`px-3 h-7 text-xs ${
+                        weatherDisplayOptions.showTemperature
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'text-orange-600 hover:bg-orange-50'
+                      }`}
+                    >
+                      🌡️ 気温
+                    </Button>
+                    <Button
+                      variant={weatherDisplayOptions.showHumidity ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setWeatherDisplayOptions(prev => ({
+                        ...prev,
+                        showHumidity: !prev.showHumidity
+                      }))}
+                      className={`px-3 h-7 text-xs ${
+                        weatherDisplayOptions.showHumidity
+                          ? 'bg-blue-500 text-white shadow-sm'
+                          : 'text-blue-600 hover:bg-blue-50'
+                      }`}
+                    >
+                      💧 湿度
+                    </Button>
+                  </div>
                 </div>
 
                 {/* 年月選択 */}
@@ -1135,6 +1176,118 @@ export default function MonthlyWorkHoursChartDemo({}: MonthlyWorkHoursChartDemoP
                     aspectRatio: undefined
                   }}
                 />
+              </div>
+            )}
+
+            {/* カスタムX軸ラベル */}
+            {chartDimensions.width > 0 && (
+              <div
+                className="absolute bottom-0 pointer-events-none z-0"
+                style={{
+                  left: `${chartDimensions.left}px`,
+                  right: `${chartDimensions.right}px`,
+                  width: `${chartDimensions.width}px`
+                }}
+              >
+                {/* 月表示層 */}
+                <div className="relative bg-white border-t border-gray-300" style={{ height: '40px' }}>
+                  {workHoursData.map((data, index) => {
+                    const chart = chartRef.current
+                    let barLeftX = chartDimensions.width / workHoursData.length * index
+                    let barWidth = chartDimensions.width / workHoursData.length
+
+                    if (chart) {
+                      const meta = chart.getDatasetMeta(0)
+                      if (meta && meta.data[index]) {
+                        const bar = meta.data[index] as any
+                        barLeftX = (bar.x - (bar.width || 0) / 2) - chartDimensions.left
+                        barWidth = bar.width || barWidth
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={`month-${index}`}
+                        className="absolute text-center text-sm font-medium text-gray-800 py-2 flex items-center justify-center"
+                        style={{
+                          left: `${barLeftX}px`,
+                          width: `${barWidth}px`,
+                          top: '0px',
+                          height: '40px'
+                        }}
+                      >
+                        {data.month}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 年表示層 */}
+                <div className="relative border-t-2 border-gray-400 bg-gray-100" style={{ height: '40px' }}>
+                  {(() => {
+                    const yearGroups = []
+                    let currentYear = null
+                    let yearStartIndex = 0
+
+                    workHoursData.forEach((data, index) => {
+                      if (data.year !== currentYear) {
+                        if (currentYear !== null) {
+                          yearGroups.push({
+                            year: currentYear,
+                            startIndex: yearStartIndex,
+                            endIndex: index - 1
+                          })
+                        }
+                        currentYear = data.year
+                        yearStartIndex = index
+                      }
+                    })
+
+                    if (currentYear !== null) {
+                      yearGroups.push({
+                        year: currentYear,
+                        startIndex: yearStartIndex,
+                        endIndex: workHoursData.length - 1
+                      })
+                    }
+
+                    return yearGroups.map((yearData) => {
+                      const chart = chartRef.current
+                      let startX = 0
+                      let endX = chartDimensions.width
+
+                      if (chart) {
+                        const meta = chart.getDatasetMeta(0)
+                        if (meta && meta.data.length > 0) {
+                          const startBar = meta.data[yearData.startIndex] as any
+                          const endBar = meta.data[yearData.endIndex] as any
+
+                          if (startBar && endBar) {
+                            startX = (startBar.x - (startBar.width || 0) / 2) - chartDimensions.left
+                            endX = (endBar.x + (endBar.width || 0) / 2) - chartDimensions.left
+                          }
+                        }
+                      }
+
+                      const yearWidth = endX - startX
+
+                      return (
+                        <div
+                          key={`year-${yearData.year}`}
+                          className="absolute text-center text-sm font-bold text-gray-900 py-2 bg-gray-50 flex items-center justify-center border-r border-gray-400"
+                          style={{
+                            left: `${startX}px`,
+                            width: `${yearWidth}px`,
+                            top: '0px',
+                            height: '40px'
+                          }}
+                        >
+                          {yearData.year}年
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
               </div>
             )}
           </div>

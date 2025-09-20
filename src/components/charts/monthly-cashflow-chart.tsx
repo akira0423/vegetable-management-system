@@ -75,7 +75,7 @@ interface AccountingItem {
 
 interface MonthlyCashflowChartProps {
   companyId: string
-  selectedVegetable?: string
+  selectedVegetables?: string[]
 }
 
 // 作業種別の色定義（プロフェッショナル農業×金融デザイン）
@@ -161,7 +161,7 @@ function LargeDialogContent({
   )
 }
 
-export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'all' }: MonthlyCashflowChartProps) {
+export default function MonthlyCashflowChart({ companyId, selectedVegetables = [] }: MonthlyCashflowChartProps) {
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
@@ -442,8 +442,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       
       // 現在年と前年データを並行取得
       let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
-      if (selectedVegetable && selectedVegetable !== 'all') {
-        apiUrl += `&vegetable_id=${selectedVegetable}`
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        apiUrl += `&vegetable_ids=${selectedVegetables.join(',')}`
       }
       
       // 前年同期のデータも取得
@@ -453,8 +453,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       const lastDayOfPreviousYearEndMonth = new Date(previousYearEndMonth.getFullYear(), previousYearEndMonth.getMonth() + 1, 0)
       const previousYearEnd = format(lastDayOfPreviousYearEndMonth, 'yyyy-MM-dd')
       let previousYearApiUrl = `/api/reports?company_id=${companyId}&start_date=${previousYearStart}&end_date=${previousYearEnd}&limit=1000`
-      if (selectedVegetable && selectedVegetable !== 'all') {
-        previousYearApiUrl += `&vegetable_id=${selectedVegetable}`
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        previousYearApiUrl += `&vegetable_ids=${selectedVegetables.join(',')}`
       }
       
       const [reportsResponse, previousYearResponse] = await Promise.all([
@@ -473,7 +473,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       const previousYearReports = previousYearResult.success ? previousYearResult.data : []
       
       console.log('🥬 キャッシュフロー: フィルター適用', {
-        選択野菜: selectedVegetable,
+        選択野菜数: selectedVegetables.length,
+        選択野菜ID: selectedVegetables,
         取得レポート数: reports.length,
         前年レポート数: previousYearReports.length
       })
@@ -722,7 +723,7 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
     } finally {
       setLoading(false)
     }
-  }, [companyId, startMonth, selectedVegetable, responsiveDimensions])
+  }, [companyId, startMonth, selectedVegetables, responsiveDimensions])
 
   // データフェッチ実行
   React.useEffect(() => {
@@ -1414,8 +1415,8 @@ export default function MonthlyCashflowChart({ companyId, selectedVegetable = 'a
       const endDate = format(lastDayOfEndMonth, 'yyyy-MM-dd')
 
       let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=1000`
-      if (selectedVegetable && selectedVegetable !== 'all') {
-        apiUrl += `&vegetable_id=${selectedVegetable}`
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        apiUrl += `&vegetable_ids=${selectedVegetables.join(',')}`
       }
 
       const response = await fetch(apiUrl)

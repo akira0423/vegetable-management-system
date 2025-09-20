@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     let companyId = searchParams.get('company_id')
     const vegetableId = searchParams.get('vegetable_id')
+    const vegetableIds = searchParams.get('vegetable_ids') // 複数ID対応
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
     const workType = searchParams.get('work_type')
@@ -123,7 +124,12 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     // フィルター条件の適用
-    if (vegetableId) {
+    if (vegetableIds) {
+      // 複数IDの場合（カンマ区切り）
+      const ids = vegetableIds.split(',')
+      query = query.in('vegetable_id', ids)
+    } else if (vegetableId) {
+      // 単一IDの場合（後方互換性）
       query = query.eq('vegetable_id', vegetableId)
     }
 

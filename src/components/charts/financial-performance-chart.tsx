@@ -105,7 +105,7 @@ interface FinancialPerformanceData {
 
 interface FinancialPerformanceChartProps {
   companyId: string
-  selectedVegetable?: string
+  selectedVegetables?: string[]
 }
 
 // 表示オプション
@@ -157,7 +157,7 @@ const CATEGORY_COLORS = {
   }
 }
 
-export default function FinancialPerformanceChart({ companyId, selectedVegetable = 'all' }: FinancialPerformanceChartProps) {
+export default function FinancialPerformanceChart({ companyId, selectedVegetables = [] }: FinancialPerformanceChartProps) {
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
@@ -408,8 +408,9 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     try {
       console.log('💰 財務データを取得中...', {
         companyId,
-        startMonth: startMonth.toISOString(), 
-        displayPeriod
+        startMonth: startMonth.toISOString(),
+        displayPeriod,
+        selectedVegetables
       })
       
       setLoading(true)
@@ -417,7 +418,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       const allData: FinancialPerformanceData[] = []
       
       // work_reportsから財務データを取得
-      const { data: workReports, error } = await supabase
+      let workReportsQuery = supabase
         .from('work_reports')
         .select(`
           id, work_date, duration_hours, work_type,
@@ -430,6 +431,13 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         .lt('work_date', endMonth.toISOString().split('T')[0])
         .is('deleted_at', null)
         .order('work_date', { ascending: true })
+
+      // 選択野菜でフィルタリング
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        workReportsQuery = workReportsQuery.in('vegetable_id', selectedVegetables)
+      }
+
+      const { data: workReports, error } = await workReportsQuery
       
       if (error) {
         console.error('🚨 財務データ取得エラー:', error)
@@ -444,11 +452,18 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       }
       
       // vegetablesテーブルから面積情報を取得
-      const { data: vegetables } = await supabase
+      let vegetablesQuery = supabase
         .from('vegetables')
         .select('id, area_size')
         .eq('company_id', companyId)
         .is('deleted_at', null)
+
+      // 選択野菜でフィルタリング
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        vegetablesQuery = vegetablesQuery.in('id', selectedVegetables)
+      }
+
+      const { data: vegetables } = await vegetablesQuery
       
       const totalArea = vegetables?.reduce((sum, v) => sum + (v.area_size || 0), 0) || 1000 // デフォルト1000㎡
       
@@ -466,16 +481,23 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       const prevYearStart = addMonths(startMonth, -12)
       const prevYearEnd = addMonths(endMonth, -12)
       
-      const { data: prevYearReports } = await supabase
+      let prevYearQuery = supabase
         .from('work_reports')
         .select(`
           work_date, income_total, expense_total, net_income,
-          duration_hours
+          duration_hours, vegetable_id
         `)
         .eq('company_id', companyId)
         .gte('work_date', prevYearStart.toISOString().split('T')[0])
         .lt('work_date', prevYearEnd.toISOString().split('T')[0])
         .is('deleted_at', null)
+
+      // 選択野菜でフィルタリング
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        prevYearQuery = prevYearQuery.in('vegetable_id', selectedVegetables)
+      }
+
+      const { data: prevYearReports } = await prevYearQuery
       
       prevYearReports?.forEach(record => {
         const monthKey = format(new Date(record.work_date), 'yyyy-MM')
@@ -616,7 +638,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     } finally {
       setLoading(false)
     }
-  }, [companyId, startMonth, displayPeriod, processRealAccountingItems, processEstimatedAccountingItems])
+  }, [companyId, startMonth, displayPeriod, processRealAccountingItems, processEstimatedAccountingItems, selectedVegetables])
 
   // 累積データ計算機能（選択された項目のみを含む）
   const calculateCumulativeData = useCallback((

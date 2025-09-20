@@ -56,14 +56,19 @@ const WORK_TYPE_LABELS = {
 }
 
 // デモ用のサンプルデータ生成関数
-function generateDemoWorkAnalysisData(): GroupedVegetableData[] {
-  const vegetables = [
-    { id: 'veg_1', name: 'トマト', variety: '桃太郎', size: 120, unit: 'kg' },
-    { id: 'veg_2', name: 'キュウリ', variety: '夏すずみ', size: 80, unit: 'kg' },
-    { id: 'veg_3', name: 'ナス', variety: '千両', size: 60, unit: 'kg' },
-    { id: 'veg_4', name: 'レタス', variety: 'シスコ', size: 100, unit: '個' },
-    { id: 'veg_5', name: 'ピーマン', variety: 'カリフォルニアワンダー', size: 40, unit: 'kg' }
+function generateDemoWorkAnalysisData(selectedVegetables?: string[]): GroupedVegetableData[] {
+  const allVegetables = [
+    { id: 'tomato', name: 'トマト', variety: '桃太郎', size: 120, unit: 'kg' },
+    { id: 'cucumber', name: 'きゅうり', variety: '夏すずみ', size: 80, unit: 'kg' },
+    { id: 'lettuce', name: 'レタス', variety: 'サニーレタス', size: 100, unit: '個' },
+    { id: 'spinach', name: 'ほうれんそう', variety: '強力オーライ', size: 60, unit: 'kg' },
+    { id: 'carrot', name: 'にんじん', variety: '五寸人参', size: 40, unit: 'kg' }
   ]
+
+  // 選択された野菜でフィルタリング
+  const vegetables = selectedVegetables && selectedVegetables.length > 0
+    ? allVegetables.filter(v => selectedVegetables.includes(v.id))
+    : allVegetables
 
   const workTypes = Object.keys(WORK_TYPE_LABELS)
 
@@ -118,7 +123,11 @@ function generateDemoWorkAnalysisData(): GroupedVegetableData[] {
   })
 }
 
-export default function WorkTypeAnalysisReportDemo() {
+interface WorkTypeAnalysisReportDemoProps {
+  selectedVegetables?: string[]
+}
+
+export default function WorkTypeAnalysisReportDemo({ selectedVegetables }: WorkTypeAnalysisReportDemoProps) {
   const [data, setData] = useState<GroupedVegetableData[]>([])
   const [loading, setLoading] = useState(true)
   const [tempStartDate, setTempStartDate] = useState(() => {
@@ -140,13 +149,13 @@ export default function WorkTypeAnalysisReportDemo() {
   // 初期データロード
   useEffect(() => {
     fetchDemoData()
-  }, [])
+  }, [selectedVegetables])
 
   const fetchDemoData = () => {
     setLoading(true)
     // 疑似的な遅延を追加してローディング感を演出
     setTimeout(() => {
-      const demoData = generateDemoWorkAnalysisData()
+      const demoData = generateDemoWorkAnalysisData(selectedVegetables)
       setData(demoData)
       setLastUpdated(new Date())
       // 全ての野菜をデフォルトで展開

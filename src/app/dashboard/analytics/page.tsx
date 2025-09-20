@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MultiSelectDropdown } from '@/components/ui/multi-select-dropdown'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
@@ -177,15 +178,29 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedVegetable, setSelectedVegetable] = useState('all')
+  const [selectedVegetables, setSelectedVegetables] = useState<string[]>([])
   const [availableVegetables, setAvailableVegetables] = useState<Array<{id: string, name: string}>>([])
   const [vegetableOptions, setVegetableOptions] = useState<Array<{id: string, name: string}>>([{id: 'all', name: 'すべての野菜'}])
   const [vegetablesData, setVegetablesData] = useState<any[]>([])
+  const [vegetablesLoading, setVegetablesLoading] = useState(false) // 野菜データのローディング状態
+
+  // 後方互換性のための単一選択値
+  const selectedVegetable = selectedVegetables.length === 0 ? 'all' :
+                           selectedVegetables.length === 1 ? selectedVegetables[0] :
+                           selectedVegetables[0] // 複数選択時は最初の値を使用
   const [selectedPlot, setSelectedPlot] = useState('all')
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // localStorageから前回選択したタブを取得
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('analytics-active-tab')
+      return savedTab || 'performance'
+    }
+    return 'performance'
+  })
 
   // サンプルデータは削除済み - 実データのみを使用
 
@@ -225,7 +240,7 @@ export default function AnalyticsPage() {
       console.log('📊 Analytics: companyId取得完了、データフェッチ開始:', companyId)
       fetchAnalyticsData()
     }
-  }, [companyId, selectedVegetable, selectedPlot])
+  }, [companyId, selectedVegetables, selectedPlot])
 
   // リアルタイムデータ同期リスナー
   const handleAnalyticsUpdate = useCallback((updateData: any) => {
@@ -278,7 +293,7 @@ export default function AnalyticsPage() {
     }, 5 * 60 * 1000) // 5分ごと
     
     return () => clearInterval(interval)
-  }, [autoRefresh, companyId, selectedVegetable, selectedPlot])
+  }, [autoRefresh, companyId, selectedVegetables, selectedPlot])
 
   const fetchAnalyticsData = async () => {
     if (!companyId) {
@@ -316,19 +331,24 @@ export default function AnalyticsPage() {
       
       // 野菜データの取得
       if (vegetablesResponse.ok) {
+        setVegetablesLoading(true) // 野菜データローディング開始
         const vegetablesResult = await vegetablesResponse.json()
         if (vegetablesResult.success && vegetablesResult.data.vegetables) {
+          // 少し遅延を入れてアニメーションを見せる
+          await new Promise(resolve => setTimeout(resolve, 300))
           vegetables = vegetablesResult.data.vegetables
           setVegetablesData(vegetables) // 完全な野菜データを保存
 
           // 野菜オプションリストを更新
           const vegOptions = vegetables.map((veg: any) => ({
             id: veg.id,
-            name: veg.name.split('（')[0] || veg.name
+            name: veg.name.split('（')[0] || veg.name,
+            variety: veg.name.includes('（') ? veg.name.split('（')[1]?.replace('）', '') : undefined
           }))
           setAvailableVegetables(vegOptions)
           setVegetableOptions([{id: 'all', name: 'すべての野菜'}, ...vegOptions])
         }
+        setVegetablesLoading(false) // 野菜データローディング終了
       }
       
       // タスクデータの取得
@@ -346,19 +366,25 @@ export default function AnalyticsPage() {
         タスクデータ数: tasks.length
       })
       
-      // 選択された野菜によるフィルタリング
+      // 選択された野菜によるフィルタリング（複数選択対応）
       let filteredWorkReports = workReports
       let filteredVegetables = vegetables
 
-      if (selectedVegetable !== 'all') {
-        const selectedVegId = selectedVegetable
-        filteredWorkReports = workReports.filter((report: any) => report.vegetable_id === selectedVegId)
-        filteredVegetables = vegetables && vegetables.length > 0 ? vegetables.filter((veg: any) => veg.id === selectedVegId) : []
+      if (selectedVegetables.length > 0) {
+        filteredWorkReports = workReports.filter((report: any) =>
+          selectedVegetables.includes(report.vegetable_id)
+        )
+        filteredVegetables = vegetables && vegetables.length > 0
+          ? vegetables.filter((veg: any) => selectedVegetables.includes(veg.id))
+          : []
       }
 
       console.log('🔍 Analytics: フィルター後のデータ', {
-        選択野菜: selectedVegetable,
+        選択野菜数: selectedVegetables.length,
+        選択野菜ID: selectedVegetables,
+        全作業レポート数: workReports.length,
         フィルター後作業レポート数: filteredWorkReports.length,
+        全野菜数: vegetables ? vegetables.length : 0,
         フィルター後野菜数: filteredVegetables.length
       })
 
@@ -380,7 +406,7 @@ export default function AnalyticsPage() {
         
         const analyticsFromReports = generateDetailedAnalyticsFromReports(last12MonthsReports, filteredVegetables)
         // サンプルデータは使用せず、実データのみを使用
-        const realData = createRealAnalyticsData(analyticsFromReports)
+        const realData = createRealAnalyticsData(analyticsFromReports, selectedVegetables)
         setData(realData)
       } else {
         // データがない場合は null を設定（空状態表示用）
@@ -616,7 +642,7 @@ export default function AnalyticsPage() {
   }
 
   // 実データのみから分析データを作成
-  const createRealAnalyticsData = (reportsData: any): AnalyticsData => {
+  const createRealAnalyticsData = (reportsData: any, selectedVegIds: string[] = []): AnalyticsData => {
     // 月別収穫量データ
     const harvestAnalysis = Object.keys(reportsData.harvestByMonth || {}).length > 0
       ? Object.entries(reportsData.harvestByMonth).map(([month, amount]) => ({
@@ -644,9 +670,13 @@ export default function AnalyticsPage() {
         }))
       : []
 
-    // 実際の総栽培面積を計算
-    const totalArea = vegetablesData && vegetablesData.length > 0
-      ? vegetablesData.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
+    // 実際の総栽培面積を計算（選択野菜でフィルタリング）
+    const filteredVegetablesForArea = selectedVegIds.length === 0
+      ? vegetablesData
+      : vegetablesData?.filter((veg: any) => selectedVegIds.includes(veg.id)) || []
+
+    const totalArea = filteredVegetablesForArea && filteredVegetablesForArea.length > 0
+      ? filteredVegetablesForArea.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
       : 300 // デフォルト値
 
     // サマリー情報（実データのみ）
@@ -684,7 +714,7 @@ export default function AnalyticsPage() {
   }
 
   // 分析データをマージ（データ整合性を確保）
-  const mergeAnalyticsData = (baseData: AnalyticsData, reportsData: any) => {
+  const mergeAnalyticsData = (baseData: AnalyticsData, reportsData: any, selectedVegIds: string[] = []) => {
     if (!reportsData) return baseData
 
     // 月別収穫量データを更新（実データ優先）
@@ -714,9 +744,13 @@ export default function AnalyticsPage() {
         }))
       : [] // 空配列を返す
 
-    // 実際の総栽培面積を計算
-    const totalArea = vegetablesData && vegetablesData.length > 0
-      ? vegetablesData.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
+    // 実際の総栽培面積を計算（選択野菜でフィルタリング）
+    const filteredVegetablesForArea = selectedVegIds.length === 0
+      ? vegetablesData
+      : vegetablesData?.filter((veg: any) => selectedVegIds.includes(veg.id)) || []
+
+    const totalArea = filteredVegetablesForArea && filteredVegetablesForArea.length > 0
+      ? filteredVegetablesForArea.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
       : 300 // デフォルト値
 
     // サマリー情報の更新（数値の整合性を保証）
@@ -846,18 +880,14 @@ export default function AnalyticsPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <Select value={selectedVegetable} onValueChange={setSelectedVegetable}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="野菜を選択" />
-            </SelectTrigger>
-            <SelectContent>
-              {vegetableOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectDropdown
+            options={availableVegetables}
+            selected={selectedVegetables}
+            onChange={setSelectedVegetables}
+            placeholder="すべての野菜"
+            className="w-60"
+            isLoading={vegetablesLoading}
+          />
           
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500">
@@ -897,7 +927,9 @@ export default function AnalyticsPage() {
                 </p>
                 <p className="text-xs text-green-600 flex items-center mt-2">
                   <Sprout className="w-3 h-3 mr-1" />
-                  {selectedVegetable === 'all' ? '全野菜' : '選択中'}
+                  {selectedVegetables.length === 0 ? '全野菜' :
+                   selectedVegetables.length === 1 ? '選択中' :
+                   `${selectedVegetables.length}品種選択`}
                 </p>
               </div>
               <div className="relative">
@@ -918,20 +950,29 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-blue-700 font-medium mb-2">総栽培面積</p>
                 <p className="text-2xl font-bold text-blue-900">
                   {formatNumber(
-                    vegetablesData && vegetablesData.length > 0
-                      ? vegetablesData.reduce((sum: number, veg: any) => {
-                          return sum + (veg.area_size || 0)
-                        }, 0)
-                      : 0,
+                    (() => {
+                      const filtered = selectedVegetables.length === 0
+                        ? vegetablesData
+                        : vegetablesData?.filter((veg: any) => selectedVegetables.includes(veg.id)) || []
+                      return filtered && filtered.length > 0
+                        ? filtered.reduce((sum: number, veg: any) => sum + (veg.area_size || 0), 0)
+                        : 0
+                    })(),
                     0
                   )}
                   <span className="text-base ml-2">㎡</span>
                 </p>
                 <p className="text-xs text-blue-600 flex items-center mt-2">
                   <MapPin className="w-3 h-3 mr-1" />
-                  {vegetablesData && vegetablesData.length > 0
-                    ? vegetablesData.filter((veg: any) => veg.area_size > 0).length
-                    : 0} 野菜
+                  {(() => {
+                    const filtered = selectedVegetables.length === 0
+                      ? vegetablesData
+                      : vegetablesData?.filter((veg: any) => selectedVegetables.includes(veg.id)) || []
+                    return filtered && filtered.length > 0
+                      ? filtered.filter((veg: any) => veg.area_size > 0).length
+                      : 0
+                  })()} {selectedVegetables.length === 0 ? '野菜' :
+                        selectedVegetables.length === 1 ? '品種' : '品種選択'}
                 </p>
               </div>
               <div className="relative">
@@ -1147,7 +1188,13 @@ export default function AnalyticsPage() {
 
 
       {/* メインコンテンツタブ - 金融系プロフェッショナルデザイン */}
-      <Tabs defaultValue="performance" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value)
+        // localStorageに保存
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('analytics-active-tab', value)
+        }
+      }} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-1">
             <TabsTrigger
               value="performance"
@@ -1213,22 +1260,22 @@ export default function AnalyticsPage() {
         {/* パフォーマンスタブ */}
         <TabsContent value="performance" className="space-y-6">
           {/* AI的洞察機能付き作業種類別統合レポート */}
-          <WorkTypeAnalysisReport companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          <WorkTypeAnalysisReport companyId={companyId || ''} selectedVegetables={selectedVegetables} />
         </TabsContent>
 
         {/* 作業時間分析タブ */}
         <TabsContent value="worklog-cost" className="space-y-6">
           {/* AI予測作業時間分析チャート */}
-          <MonthlyWorkHoursChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          <MonthlyWorkHoursChart companyId={companyId || ''} selectedVegetables={selectedVegetables} />
         </TabsContent>
 
         {/* 収益コスト分析タブ */}
         <TabsContent value="harvest-revenue" className="space-y-6">
           {/* 月次キャッシュフロー推移グラフ */}
-          <MonthlyCashflowChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
-          
+          <MonthlyCashflowChart companyId={companyId || ''} selectedVegetables={selectedVegetables} />
+
           {/* 収支構造×効率性×成長分析チャート */}
-          <FinancialPerformanceChart companyId={companyId || ''} selectedVegetable={selectedVegetable} />
+          <FinancialPerformanceChart companyId={companyId || ''} selectedVegetables={selectedVegetables} />
         </TabsContent>
 
       </Tabs>

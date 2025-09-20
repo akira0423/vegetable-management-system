@@ -106,7 +106,7 @@ interface ResponsiveDimensions {
 }
 
 // デモデータ生成関数（拡張版）
-function generateDemoCashflowData(startMonth: Date, period: number): CashFlowData[] {
+function generateDemoCashflowData(startMonth: Date, period: number, selectedVegetables?: string[]): CashFlowData[] {
   const data: CashFlowData[] = []
   let cumulativeProfit = 0
   let cumulativeIncome = 0
@@ -138,7 +138,9 @@ function generateDemoCashflowData(startMonth: Date, period: number): CashFlowDat
         amount: harvestIncome,
         category: 'income' as const,
         work_date: format(currentMonth, 'yyyy-MM-dd'),
-        description: 'トマト、キュウリ、ナス等の収穫'
+        description: selectedVegetables && selectedVegetables.length > 0
+          ? `選択中の野菜 (${selectedVegetables.length}品種)`
+          : 'トマト、きゅうり、レタス等の収穫'
       }]
     }
     monthlyIncome += harvestIncome
@@ -227,7 +229,11 @@ function generateDemoCashflowData(startMonth: Date, period: number): CashFlowDat
   return data
 }
 
-export default function MonthlyCashflowChartDemo() {
+interface MonthlyCashflowChartDemoProps {
+  selectedVegetables?: string[]
+}
+
+export default function MonthlyCashflowChartDemo({ selectedVegetables }: MonthlyCashflowChartDemoProps) {
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
@@ -268,11 +274,11 @@ export default function MonthlyCashflowChartDemo() {
   // データ生成
   useEffect(() => {
     setLoading(true)
-    setCashflowData(generateDemoCashflowData(startMonth, displayPeriod))
-    setPreviousYearData(generateDemoCashflowData(subMonths(startMonth, 12), displayPeriod))
+    setCashflowData(generateDemoCashflowData(startMonth, displayPeriod, selectedVegetables))
+    setPreviousYearData(generateDemoCashflowData(subMonths(startMonth, 12), displayPeriod, selectedVegetables))
     setLastUpdated(new Date())
     setLoading(false)
-  }, [startMonth, displayPeriod])
+  }, [startMonth, displayPeriod, selectedVegetables])
 
   // グラフクリックハンドラー
   const handleChartClick = (event: ChartEvent, elements: InteractionItem[]) => {
@@ -799,7 +805,7 @@ export default function MonthlyCashflowChartDemo() {
           </div>
 
           {/* グラフ */}
-          <div ref={containerRef} className="relative" style={{ height: '400px' }}>
+          <div ref={containerRef} className="relative" style={{ height: '500px' }}>
             <Bar ref={chartRef} data={chartData} options={chartOptions} />
           </div>
 

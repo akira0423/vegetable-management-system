@@ -101,7 +101,7 @@ interface WorkDetail {
 
 interface MonthlyWorkHoursChartProps {
   companyId: string
-  selectedVegetable?: string
+  selectedVegetables?: string[]
 }
 
 // 🌡️💧 気象データ表示オプション
@@ -189,7 +189,7 @@ function LargeDialogContent({
   )
 }
 
-export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = 'all' }: MonthlyWorkHoursChartProps) {
+export default function MonthlyWorkHoursChart({ companyId, selectedVegetables = [] }: MonthlyWorkHoursChartProps) {
   // Supabaseクライアント初期化
   const supabase = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -519,16 +519,16 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       const endDate = format(endMonth, 'yyyy-MM-dd')
       
       let apiUrl = `/api/reports?company_id=${companyId}&start_date=${startDate}&end_date=${endDate}&limit=999999`  // 実質無制限
-      if (selectedVegetable && selectedVegetable !== 'all') {
-        apiUrl += `&vegetable_id=${selectedVegetable}`
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        apiUrl += `&vegetable_ids=${selectedVegetables.join(',')}`
       }
       
       // 前年同期のデータも取得
       const previousYearStart = format(subMonths(startMonth, 12), 'yyyy-MM-01')
       const previousYearEnd = format(subMonths(endMonth, 12), 'yyyy-MM-dd')
       let previousYearApiUrl = `/api/reports?company_id=${companyId}&start_date=${previousYearStart}&end_date=${previousYearEnd}&limit=999999`  // 実質無制限
-      if (selectedVegetable && selectedVegetable !== 'all') {
-        previousYearApiUrl += `&vegetable_id=${selectedVegetable}`
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        previousYearApiUrl += `&vegetable_ids=${selectedVegetables.join(',')}`
       }
       
       const [reportsResponse, previousYearResponse] = await Promise.all([
@@ -547,7 +547,8 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
       const previousYearReports = previousYearResult.success ? previousYearResult.data : []
       
       console.log('⏰ 作業時間: フィルター適用', {
-        選択野菜: selectedVegetable,
+        選択野菜数: selectedVegetables.length,
+        選択野菜ID: selectedVegetables,
         取得レポート数: reports.length,
         前年レポート数: previousYearReports.length
       })
@@ -721,7 +722,7 @@ export default function MonthlyWorkHoursChart({ companyId, selectedVegetable = '
     } finally {
       setLoading(false)
     }
-  }, [companyId, startMonth, selectedVegetable, responsiveDimensions])
+  }, [companyId, startMonth, selectedVegetables, responsiveDimensions])
 
   // データフェッチ実行
   React.useEffect(() => {

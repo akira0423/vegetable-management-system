@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,7 @@ import {
 
 interface WorkTypeAnalysisProps {
   companyId: string
-  selectedVegetable: string
+  selectedVegetables?: string[]
 }
 
 interface WorkAnalysisData {
@@ -61,7 +61,7 @@ const WORK_TYPE_LABELS = {
   other: 'その他'
 }
 
-export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }: WorkTypeAnalysisProps) {
+export default function WorkTypeAnalysisReport({ companyId, selectedVegetables = [] }: WorkTypeAnalysisProps) {
   const [data, setData] = useState<GroupedVegetableData[]>([])
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(() => {
@@ -155,21 +155,8 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
     URL.revokeObjectURL(url)
   }
 
-  // データ集計の実行（startDate, endDateを除外）
-  useEffect(() => {
-    if (companyId) {
-      fetchWorkAnalysisData()
-    }
-  }, [companyId, selectedVegetable])
-
-  // 日付を適用してデータを更新
-  const applyDateFilter = () => {
-    setStartDate(tempStartDate)
-    setEndDate(tempEndDate)
-    fetchWorkAnalysisData(tempStartDate, tempEndDate)
-  }
-
-  const fetchWorkAnalysisData = async (dateStart?: string, dateEnd?: string) => {
+  // データ取得関数の定義（useEffectより前に定義）
+  const fetchWorkAnalysisData = useCallback(async (dateStart?: string, dateEnd?: string) => {
     try {
       setLoading(true)
 
@@ -201,9 +188,9 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
       }
 
       // フィルタリング
-      if (selectedVegetable !== 'all') {
-        workReports = workReports.filter((report: any) => report.vegetable_id === selectedVegetable)
-        vegetables = vegetables.filter((veg: any) => veg.id === selectedVegetable)
+      if (selectedVegetables.length > 0) {
+        workReports = workReports.filter((report: any) => selectedVegetables.includes(report.vegetable_id))
+        vegetables = vegetables.filter((veg: any) => selectedVegetables.includes(veg.id))
       }
 
       // データ集計処理（グループ化）
@@ -236,6 +223,20 @@ export default function WorkTypeAnalysisReport({ companyId, selectedVegetable }:
     } finally {
       setLoading(false)
     }
+  }, [companyId, selectedVegetables, startDate, endDate])
+
+  // データ集計の実行（startDate, endDateを除外）
+  useEffect(() => {
+    if (companyId) {
+      fetchWorkAnalysisData()
+    }
+  }, [companyId, selectedVegetables, fetchWorkAnalysisData])
+
+  // 日付を適用してデータを更新
+  const applyDateFilter = () => {
+    setStartDate(tempStartDate)
+    setEndDate(tempEndDate)
+    fetchWorkAnalysisData(tempStartDate, tempEndDate)
   }
 
   const generateGroupedWorkAnalysisData = (reports: any[], vegetables: any[]): GroupedVegetableData[] => {

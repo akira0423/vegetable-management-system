@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sprout, Users, BarChart3, Shield, Calendar, Camera, Map, GanttChart } from "lucide-react"
+import { Sprout, Users, BarChart3, Shield, Map, GanttChart } from "lucide-react"
 import DemoFarmMapView from '@/components/demo/farm-map-view'
 
 export default function Home() {
@@ -77,38 +77,70 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card>
-              <CardHeader>
-                <Calendar className="h-12 w-12 text-green-600 mb-4" />
-                <CardTitle>ガントチャート管理</CardTitle>
+          {/* デモ機能ボタン */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <Card className="border-2 border-green-500 bg-green-50 flex flex-col">
+              <CardHeader className="flex-grow">
+                <Map className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>栽培野菜・農地ポリゴン管理</CardTitle>
                 <CardDescription>
                   作物ごとの進行状況をカレンダー・ガントチャート形式で視覚的に管理
                 </CardDescription>
               </CardHeader>
+              <CardContent>
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => setShowDemoFarmMap(true)}
+                >
+                  <Map className="mr-2 h-4 w-4 text-white" />
+                  デモ機能を体験する
+                </Button>
+              </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <Camera className="h-12 w-12 text-green-600 mb-4" />
-                <CardTitle>写真付き作業記録</CardTitle>
+            <Card className="border-2 border-green-500 bg-green-50 flex flex-col">
+              <CardHeader className="flex-grow">
+                <GanttChart className="h-12 w-12 text-green-600 mb-4" />
+                <CardTitle>栽培野菜スケジュール管理</CardTitle>
                 <CardDescription>
                   日次作業と写真をかんたんアップロード。現場の状況を即座に共有
                 </CardDescription>
               </CardHeader>
+              <CardContent>
+                <Link href="/gantt-demo">
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <GanttChart className="mr-2 h-4 w-4 text-white" />
+                    デモ機能を体験する
+                  </Button>
+                </Link>
+              </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
+            <Card className="border-2 border-green-500 bg-green-50 flex flex-col">
+              <CardHeader className="flex-grow">
                 <BarChart3 className="h-12 w-12 text-green-600 mb-4" />
-                <CardTitle>データ自動集計</CardTitle>
+                <CardTitle>データ自動主計分析</CardTitle>
                 <CardDescription>
                   投入肥料量、土壌データ、収穫量を自動でガントチャートに反映
                 </CardDescription>
               </CardHeader>
+              <CardContent>
+                <Link href="/analytics-demo">
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4 text-white" />
+                    デモ機能を体験する
+                  </Button>
+                </Link>
+              </CardContent>
             </Card>
+          </div>
 
-            <Card>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="border-2 border-green-500 bg-green-50">
               <CardHeader>
                 <Users className="h-12 w-12 text-green-600 mb-4" />
                 <CardTitle>企業別管理</CardTitle>
@@ -118,7 +150,7 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card>
+            <Card className="border-2 border-green-500 bg-green-50">
               <CardHeader>
                 <Shield className="h-12 w-12 text-green-600 mb-4" />
                 <CardTitle>セキュア認証</CardTitle>
@@ -128,7 +160,7 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card>
+            <Card className="border-2 border-green-500 bg-green-50">
               <CardHeader>
                 <Sprout className="h-12 w-12 text-green-600 mb-4" />
                 <CardTitle>AIアドバイス</CardTitle>
@@ -136,71 +168,6 @@ export default function Home() {
                   栽培データに基づくAIチャットボットが最適な栽培アドバイスを提供
                 </CardDescription>
               </CardHeader>
-            </Card>
-          </div>
-
-          {/* デモ機能ボタン */}
-          <div className="mt-12 text-center space-y-6">
-            <Card className="max-w-2xl mx-auto border-2 border-green-500 bg-green-50">
-              <CardHeader>
-                <Map className="h-12 w-12 text-green-600 mb-4 mx-auto" />
-                <CardTitle className="text-2xl">栽培野菜・農地ポリゴン管理</CardTitle>
-                <CardDescription className="text-base">
-                  地図上で農地を描画し、野菜の栽培情報を管理できるデモ機能です
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  size="lg"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setShowDemoFarmMap(true)}
-                >
-                  <Map className="mr-2 h-5 w-5" />
-                  デモ機能を体験する
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="max-w-2xl mx-auto border-2 border-blue-500 bg-blue-50">
-              <CardHeader>
-                <GanttChart className="h-12 w-12 text-blue-600 mb-4 mx-auto" />
-                <CardTitle className="text-2xl">栽培野菜スケジュール管理</CardTitle>
-                <CardDescription className="text-base">
-                  栽培野菜の進行状況をカレンダー・ガントチャート形式で統合管理するデモ機能です
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/gantt-demo">
-                  <Button
-                    size="lg"
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <GanttChart className="mr-2 h-5 w-5" />
-                    デモ機能を体験する
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Card className="max-w-2xl mx-auto border-2 border-purple-500 bg-purple-50">
-              <CardHeader>
-                <BarChart3 className="h-12 w-12 text-purple-600 mb-4 mx-auto" />
-                <CardTitle className="text-2xl">データ自動主計分析</CardTitle>
-                <CardDescription className="text-base">
-                  栽培データから収益・コスト・効率をAIが自動分析するデモ機能です
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/analytics-demo">
-                  <Button
-                    size="lg"
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    <BarChart3 className="mr-2 h-5 w-5" />
-                    デモ機能を体験する
-                  </Button>
-                </Link>
-              </CardContent>
             </Card>
           </div>
         </div>

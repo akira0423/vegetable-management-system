@@ -245,7 +245,11 @@ function generateCategoryData(financialData: FinancialPerformanceData[]): { [mon
   return categoryData
 }
 
-export default function FinancialPerformanceChartDemoEnhanced() {
+interface FinancialPerformanceChartDemoEnhancedProps {
+  selectedVegetables?: string[]
+}
+
+export default function FinancialPerformanceChartDemoEnhanced({ selectedVegetables }: FinancialPerformanceChartDemoEnhancedProps) {
   const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
@@ -974,7 +978,7 @@ export default function FinancialPerformanceChartDemoEnhanced() {
           </div>
 
           {/* グラフ */}
-          <div className="relative" style={{ height: '400px' }}>
+          <div className="relative" style={{ height: '500px' }}>
             <Bar ref={chartRef} data={chartData} options={chartOptions} />
           </div>
 

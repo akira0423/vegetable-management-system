@@ -166,7 +166,7 @@ export default function GanttDemoPage() {
   })
 
   // タブ状態管理
-  const [activeTab, setActiveTab] = useState('list')
+  const [activeTab, setActiveTab] = useState('gantt')
 
   // フィルター展開状態
   const [isFilterExpanded, setIsFilterExpanded] = useState(false)
