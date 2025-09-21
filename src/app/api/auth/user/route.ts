@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
     if (!finalCompanyId) {
       console.log('[Auth/User] Company ID is null, checking profile...')
 
-      const serviceSupabase = await createServiceClient()
+      const supabase = await createClient()
 
       // プロファイルを再取得
-      const { data: profile } = await serviceSupabase
+      const { data: profile } = await supabase
         .from('users')
         .select('company_id')
         .eq('id', user.id)
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         const newCompanyId = crypto.randomUUID()
 
         // 会社作成
-        await serviceSupabase
+        await supabase
           .from('companies')
           .insert({
             id: newCompanyId,
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
           })
 
         // プロファイル更新または作成
-        await serviceSupabase
+        await supabase
           .from('users')
           .upsert({
             id: user.id,

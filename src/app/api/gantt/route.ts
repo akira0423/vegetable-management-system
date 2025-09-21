@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    // Service roleクライアントを使用してRLS問題を回避
-    const serviceSupabase = await createServiceClient()
-
-    // 通常のクライアントで認証確認
-    const authSupabase = await createClient()
-    const { data: { user }, error: authError } = await authSupabase.auth.getUser()
+    // 通常のクライアントを使用（RLSが修正されたため）
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -51,7 +48,7 @@ export async function GET(request: NextRequest) {
     
     
     // 統一アーキテクチャのベースクエリ（work_reportsと同じ直接フィルタリング）
-    let query = serviceSupabase
+    let query = supabase
       .from('growing_tasks')
       .select(`
         id,
@@ -354,9 +351,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // 認証済みクライアントを使用（セキュリティ強化）
+    // 認証済みクライアントを使用
     const supabase = await createClient()
-    const serviceSupabase = await createServiceClient()
 
     // ユーザー認証確認
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -428,7 +424,7 @@ export async function PUT(request: NextRequest) {
         updateData.assigned_to = null
       } else if (assigned_user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assigned_user_id)) {
         // 有効なUUIDの場合、ユーザーが存在するか確認 (serviceSupabaseを使用してRLSをバイパス)
-        const { data: userExists } = await serviceSupabase
+        const { data: userExists } = await supabase
           .from('users')
           .select('id')
           .eq('id', assigned_user_id)

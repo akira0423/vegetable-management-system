@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    // Service roleクライアントを使用してRLS問題を回避
-    const serviceSupabase = await createServiceClient()
-
-    // 通常のクライアントで認証確認
-    const authSupabase = await createClient()
-    const { data: { user }, error: authError } = await authSupabase.auth.getUser()
+    // 通常のクライアントを使用
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -49,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ベースクエリ（アーカイブ済みデータを除外）
-    let query = serviceSupabase
+    let query = supabase
       .from('vegetables')
       .select(`
         id,
@@ -209,7 +206,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     const body = await request.json()
     
     const {
@@ -442,7 +439,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     const body = await request.json()
     
     const { 
@@ -556,7 +553,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     
     // クエリパラメータからIDを取得
     const { searchParams } = new URL(request.url)
