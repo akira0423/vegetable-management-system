@@ -50,8 +50,9 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
-        
-        router.push('/dashboard/gantt')
+        // ログイン成功後、リダイレクト
+        // Next.js のルーターが動作しない場合は window.location を使用
+        window.location.href = '/dashboard/gantt'
       }
     } catch (err) {
       
