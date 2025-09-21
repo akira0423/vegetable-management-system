@@ -12,6 +12,8 @@ import {
   Legend,
   PointElement,
   LineElement,
+  LineController,
+  BarController,
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import {
@@ -36,7 +38,9 @@ ChartJS.register(
   Tooltip,
   Legend,
   PointElement,
-  LineElement
+  LineElement,
+  LineController,
+  BarController
 )
 
 interface FinancialPerformanceChartProps {
