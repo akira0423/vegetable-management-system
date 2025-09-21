@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AuthUser, AuthUserWithMembership } from '@/types'
 
@@ -24,8 +24,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
-    // Get user profile from database
-    const { data: profile, error } = await supabase
+    // Service roleを使用して確実にプロファイルを取得
+    const serviceSupabase = await createServiceClient()
+
+    const { data: profile, error } = await serviceSupabase
       .from('users')
       .select('company_id, full_name, settings')
       .eq('id', user.id)
@@ -38,6 +40,18 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         company_id: profile.company_id,
         role: 'user', // 1企業1アカウントモデルでは全員user
         full_name: profile.full_name,
+      }
+    } else {
+      // プロファイルが存在しない場合でも、基本的なユーザー情報を返す
+      console.error('[Auth] Profile not found for user:', user.email, 'Error:', error?.message)
+
+      // デフォルト値で返す（リダイレクトループを防ぐ）
+      return {
+        id: user.id,
+        email: user.email!,
+        company_id: null, // 後で修正される
+        role: 'user',
+        full_name: user.email!,
       }
     }
   }
