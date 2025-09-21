@@ -34,32 +34,11 @@ export async function ensureUserMembership(
 
 
     if (userError || !user) {
-      // ユーザーが見つからない場合、自動的に作成
-      const { data: newUser, error: createError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          company_id: companyId,
-          is_active: true
-        })
-        .select()
-        .single()
-
-      if (createError || !newUser) {
-        return {
-          success: false,
-          error: `User not found and could not create: ${createError?.message || userError?.message || 'No user data'}`
-        }
-      }
-
+      // ユーザーレコードが存在しない場合はエラー
+      // （本来はauth.usersトリガーで自動作成されるはず）
       return {
-        success: true,
-        membership: {
-          user_id: userId,
-          company_id: companyId,
-          role: 'member',
-          status: 'active'
-        }
+        success: false,
+        error: `User record not found in users table. Please contact administrator.`
       }
     }
 
