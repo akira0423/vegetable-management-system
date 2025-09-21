@@ -17,15 +17,15 @@ export async function POST(request: NextRequest) {
 
     
 
-    // 1. 会社作成
+    // 1. 会社作成（実際のテーブル構造に合わせて修正）
     const company_id = crypto.randomUUID()
     const { error: companyError } = await supabase
       .from('companies')
       .insert({
         id: company_id,
         name: company_name,
-        contact_email: email,
-        is_active: true
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
 
     if (companyError) {
@@ -36,15 +36,15 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // 2. アプリユーザー作成
+    // 2. アプリユーザー作成（実際のテーブル構造に合わせて修正）
     const { error: userError } = await supabase
       .from('users')
       .insert({
         id: user_id,
         company_id: company_id,
-        email: email,
-        full_name: full_name || 'ユーザー',
-        is_active: true
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
 
     if (userError) {
