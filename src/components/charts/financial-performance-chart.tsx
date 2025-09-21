@@ -8,7 +8,9 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  BarController,
   LineElement,
+  LineController,
   PointElement,
   Title,
   Tooltip,
@@ -18,6 +20,20 @@ import {
   ChartEvent
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+
+// Chart.jsコンポーネントを登録
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  BarController,
+  LineElement,
+  LineController,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend
+)
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

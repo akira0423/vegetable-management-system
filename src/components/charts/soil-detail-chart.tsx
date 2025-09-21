@@ -9,6 +9,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  LineController,
   Title,
   Tooltip,
   Legend,
@@ -22,11 +23,18 @@ import { ja } from 'date-fns/locale'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  
-} else {
-  
-}
+// Chart.jsのコンポーネントを登録
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  LineController,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!)
 
