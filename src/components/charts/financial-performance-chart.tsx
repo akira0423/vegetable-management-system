@@ -8,7 +8,9 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  BarController,
   LineElement,
+  LineController,
   PointElement,
   Title,
   Tooltip,
@@ -18,6 +20,20 @@ import {
   ChartEvent
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+
+// Chart.jsコンポーネントを登録
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  BarController,
+  LineElement,
+  LineController,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend
+)
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,9 +57,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ FinancialPerformanceChart: Supabase環境変数が設定されていません')
+  
 } else {
-  console.log('✅ FinancialPerformanceChart: Supabase環境変数確認済み')
+  
 }
 
 const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!)
@@ -240,13 +256,13 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         .order('work_report_id')
       
       if (error) {
-        console.error('🚨 勘定項目データ取得エラー:', error)
+        
         // エラー時は推定データを返す
         return processEstimatedAccountingItems(workReportIds)
       }
       
       if (!accountingData || accountingData.length === 0) {
-        console.log('⚠️ 勘定項目データが見つかりません。推定データを使用します。')
+        
         return processEstimatedAccountingItems(workReportIds)
       }
       
@@ -303,11 +319,11 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         })
       })
       
-      console.log('💰 実データ勘定項目処理完了:', monthlyData)
+      
       return monthlyData
       
     } catch (error) {
-      console.error('🚨 勘定項目データ処理エラー:', error)
+      
       return processEstimatedAccountingItems(workReportIds)
     }
   }, [])
@@ -401,17 +417,11 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // Supabaseから財務データを取得
   const fetchFinancialData = useCallback(async () => {
     if (!companyId) {
-      console.log('⚠️ FinancialPerformanceChart: companyIdが未設定')
+      
       return []
     }
     
     try {
-      console.log('💰 財務データを取得中...', {
-        companyId,
-        startMonth: startMonth.toISOString(),
-        displayPeriod,
-        selectedVegetables
-      })
       
       setLoading(true)
       const endMonth = addMonths(startMonth, displayPeriod * 12)
@@ -440,14 +450,14 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       const { data: workReports, error } = await workReportsQuery
       
       if (error) {
-        console.error('🚨 財務データ取得エラー:', error)
+        
         return []
       }
       
-      console.log('💰 取得した作業記録数:', workReports?.length || 0)
+      
       
       if (!workReports || workReports.length === 0) {
-        console.log('⚠️ 財務データが見つかりません')
+        
         return []
       }
       
@@ -580,13 +590,13 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         })
       }
       
-      console.log('💰 処理済み財務データ:', { count: allData.length, data: allData })
+      
       
       // 実際の勘定項目データを取得して処理
       const workReportIds = workReports.map(r => r.id).filter(id => id != null)
       const categoryData = await processRealAccountingItems(workReportIds)
       setCategoryData(categoryData)
-      console.log('📊 勘定項目データ（yyyy-MM形式）:', categoryData)
+      
       
       // 全利用可能項目を生成（分離型凡例用）
       const allItems: { [key: string]: LegendItemInfo } = {}
@@ -628,12 +638,12 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       setAllAvailableItems(sortedAllItems)
       setVisibleItems(initialVisibleItems)
       
-      console.log('🎯 全利用可能項目:', sortedAllItems)
+      
       
       return allData
       
     } catch (error) {
-      console.error('🚨 財務データ取得エラー:', error)
+      
       return []
     } finally {
       setLoading(false)
@@ -711,15 +721,15 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // データ取得実行
   useEffect(() => {
     if (companyId) {
-      console.log('🔄 財務データ取得開始')
+      
       fetchFinancialData()
         .then(data => {
           setFinancialData(data)
           setLastUpdated(new Date())
-          console.log('✅ 財務データ取得完了:', { count: data.length })
+          
         })
         .catch(error => {
-          console.error('🚨 財務データ取得エラー:', error)
+          
           setFinancialData([])
         })
     }
