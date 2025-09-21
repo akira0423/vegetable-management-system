@@ -108,11 +108,7 @@ export async function GET(request: NextRequest) {
     // ソフトデリートフィルタによりアクティブな野菜のみ取得済み
     const activeVegetables = vegetables || []
     if (process.env.NODE_ENV === 'development') {
-      
-      
-      // 面積データの詳細ログ
-      ` : '面積データなし'
-      })))
+
     }
 
     // 各野菜の統計情報を取得
@@ -530,22 +526,7 @@ export async function PUT(request: NextRequest) {
       .from('vegetables')
       .update(updateData)
       .eq('id', id)
-      .select(`
-        id,
-        name,
-        variety_name,
-        plot_name,
-        area_size,
-        planting_date,
-        expected_harvest_start,
-        expected_harvest_end,
-        actual_harvest_start,
-        actual_harvest_end,
-        status,
-        notes,
-        polygon_color,
-        updated_at
-      `)
+      .select('id, name, variety_name, plot_name, area_size, planting_date, expected_harvest_start, expected_harvest_end, actual_harvest_start, actual_harvest_end, status, notes, polygon_color, updated_at')
       .single()
 
     if (error) {

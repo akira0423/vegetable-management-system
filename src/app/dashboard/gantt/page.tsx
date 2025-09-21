@@ -633,7 +633,7 @@ export default function GanttPage() {
           start: t.start_date,
           end: t.end_date,
           vegetable_id: t.vegetable_id
-        })))
+        }))
         setTasks(ganttResult.data.tasks || [])
       } else {
         
@@ -697,9 +697,7 @@ export default function GanttPage() {
       }
 
       params.append('active_only', 'true')
-      
-      )
-      
+
       // ガントチャートデータ、作業レポートデータ、野菜データを並行取得
       
       
@@ -761,8 +759,6 @@ export default function GanttPage() {
 
       // タスクデータの設定（実データのみ）
       if (ganttResult.success) {
-        
-        ) || [])
         setTasks(ganttResult.data.tasks || [])
       } else {
         
@@ -770,10 +766,8 @@ export default function GanttPage() {
       }
 
       // 野菜データは専用APIから取得（実データのみ）
-      
+
       if (vegetablesResult.success && vegetablesResult.data) {
-        
-         => ({ id: v.id, name: v.name, company_id: v.company_id })))
         const vegetableData = vegetablesResult.data.map((v: any) => ({
           id: v.id,
           name: v.name,
@@ -794,8 +788,6 @@ export default function GanttPage() {
 
       // 作業レポートデータの設定（実データのみ）
       if (reportsResult.success) {
-        ) || [])
-         || [])
         setWorkReports(reportsResult.data || [])
       } else {
         
@@ -1356,10 +1348,6 @@ export default function GanttPage() {
         requestBody.assigned_user_id = updates.assignedUser?.id || null
       }
 
-      
-      )
-      .filter(key => key !== 'id'))
-
       const response = await fetch('/api/gantt', {
         method: 'PUT',
         headers: {
@@ -1496,10 +1484,6 @@ export default function GanttPage() {
         description: error instanceof Error ? error.message : 'タスクの削除に失敗しました',
         type: 'error',
         duration: 6000
-      })
-
-      // 詳細エラー情報をログ出力
-      .toISOString()
       })
 
     } finally {
@@ -2522,8 +2506,6 @@ export default function GanttPage() {
                         const updates: any = {}
 
                         // デバッグ: pendingTaskChangesの内容を確認
-                        
-                        )
 
                         // assigned_user_idを直接チェック
                         if ('assigned_user_id' in pendingTaskChanges) {
@@ -2545,10 +2527,6 @@ export default function GanttPage() {
                           updates.status = pendingTaskChanges.status
                           
                         }
-
-                        
-                        )
-                        .length)
 
                         // 更新データが空でない場合のみ送信
                         if (Object.keys(updates).length > 0) {

@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // セキュリティ強化設定
   poweredByHeader: false, // X-Powered-By ヘッダーを削除
-  
+
   // 本番環境でのセキュリティヘッダー
   async headers() {
     return [

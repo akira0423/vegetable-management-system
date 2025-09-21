@@ -332,7 +332,6 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
               
             } else if (mapEditorRef.current?.showVegetablePolygon) {
               mapEditorRef.current.showVegetablePolygon(vegetableToShow)
-               新規野菜をポリゴン表示:', savedVegetable.name)
             }
           }, 1000)
         }
@@ -453,7 +452,6 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
 
   // 🆕 複数ポリゴン表示対応の野菜エリアクリックハンドラー
   const handleVegetableAreaClick = useCallback((vegetable: any) => {
-    :', vegetable)
     
     if (!vegetable.farm_area_data?.geometry || !mapEditorRef.current) {
       
@@ -501,7 +499,6 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
     } else if (mapEditorRef.current?.showVegetablePolygon) {
       // レガシーメソッドのフォールバック
       mapEditorRef.current.showVegetablePolygon(vegetable)
-       ポリゴンを表示しました:', vegetableId)
     } else {
       
     }
@@ -648,7 +645,6 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
         
       } else if (mapEditorRef.current?.showVegetablePolygon) {
         mapEditorRef.current.showVegetablePolygon(selectedVegetable)
-         編集対象をポリゴン表示:', selectedVegetable.name)
       }
     }
     
@@ -858,7 +854,6 @@ export default function FarmMapView({ onClose }: FarmMapViewProps) {
 
   const handleExecuteMultipleDelete = useCallback(async () => {
     try {
-      )
       
       // APIで各野菜を削除
       const deletePromises = Array.from(selectedVegetableIds).map(async (vegetableId) => {

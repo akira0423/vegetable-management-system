@@ -687,7 +687,7 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
           }
       }
     } catch (error) {
-      :`, error)
+      // Error handling removed
     }
   }, [currentMode])
 
@@ -810,7 +810,6 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       
       // 既存のレイヤー一覧をログ出力
       const allLayers = map.current.getStyle().layers
-      )
       
       // 既存の背景レイヤーとソースを削除
       const currentStyleConfig = getMapStyle(mapStyle)
@@ -848,7 +847,6 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       
       // レイヤーの現在の順序を確認
       const layersAfterAdd = map.current.getStyle().layers
-      )
       
       // 実際に存在するレイヤーをすべて取得して、描画レイヤーを特定
       const currentLayers = map.current.getStyle().layers
@@ -857,8 +855,6 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
         layer.id === 'mesh-cells-fill' || 
         layer.id === 'mesh-cells-stroke' || 
         layer.id === 'mesh-cells-highlight'
-      )
-      
       )
       
       // 描画レイヤーとメッシュレイヤーを最上位に移動
@@ -875,7 +871,6 @@ const ProfessionalFarmEditor = forwardRef<ProfessionalFarmEditorRef, Professiona
       setTimeout(() => {
         if (map.current) {
           const finalLayers = map.current.getStyle().layers
-          )
           
           // 描画データの存在を再確認
           const finalDrawings = draw.current ? draw.current.getAll() : null

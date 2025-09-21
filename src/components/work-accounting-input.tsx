@@ -93,9 +93,7 @@ export default function WorkAccountingInput({
     
     if (amount > 0 && accountingItems.length > 0) {
       // デバッグ: 全会計項目を確認
-      )
-      )
-      
+
       // 販売金額の会計項目を探す（複数のパターンで検索）
       let salesItem = accountingItems.find(item => item.code === '101' && item.type === 'income')
       
