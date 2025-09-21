@@ -16,8 +16,18 @@ export async function POST(request: NextRequest) {
 
     console.log('[EnsureProfile] Processing user:', email)
 
-    // 通常のクライアントを使用
-    const supabase = await createClient()
+    // Service Roleクライアントを使用（プロファイル作成時は認証前のため）
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     // 既存のプロファイルをチェック
     const { data: existingProfile } = await supabase

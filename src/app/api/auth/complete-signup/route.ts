@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+// Service Roleが必要（認証前のプロファイル作成のため）
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // Service Roleクライアントを使用（認証前のプロファイル作成のため）
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
     const body = await request.json()
     
     const { user_id, email, full_name, company_name } = body
