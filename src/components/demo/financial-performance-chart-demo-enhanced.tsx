@@ -13,7 +13,9 @@ import {
   Legend,
   ChartOptions,
   InteractionItem,
-  ChartEvent
+  ChartEvent,
+  LineController,
+  BarController
 } from 'chart.js'
 import { Bar, getElementAtEvent } from 'react-chartjs-2'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,7 +43,9 @@ ChartJS.register(
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  LineController,
+  BarController
 )
 
 // データ型定義（本番と同じ）
