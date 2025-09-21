@@ -78,12 +78,22 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request
   const url = new URL(request.url)
-  
+
   // POST/PUT/DELETE は キャッシュしない（作業記録等の更新）
   if (request.method !== 'GET') {
     return
   }
-  
+
+  // 認証関連のページはService Workerをバイパス
+  if (url.pathname.includes('/login') || url.pathname.includes('/signup') || url.pathname.includes('/auth')) {
+    return
+  }
+
+  // ナビゲーションリクエスト（ページ遷移）はService Workerをバイパス
+  if (request.mode === 'navigate') {
+    return
+  }
+
   // 農作業に特化したキャッシュ戦略
   if (url.pathname.startsWith('/api/')) {
     // API: ネットワーク優先、フォールバックでキャッシュ
@@ -100,10 +110,12 @@ self.addEventListener('fetch', (event) => {
 // ネットワーク優先戦略（リアルタイム性重視）
 async function networkFirstStrategy(request) {
   const cache = await caches.open(CACHE_NAME)
-  
+
   try {
-    // ネットワークから取得を試行
-    const networkResponse = await fetch(request)
+    // ネットワークから取得を試行（リダイレクトを適切に処理）
+    const networkResponse = await fetch(request, {
+      redirect: 'follow'
+    })
     
     if (networkResponse.ok) {
       // 成功時はキャッシュに保存
@@ -141,10 +153,10 @@ async function networkFirstStrategy(request) {
 async function cacheFirstStrategy(request) {
   const cache = await caches.open(CACHE_NAME)
   const cachedResponse = await cache.match(request)
-  
+
   if (cachedResponse) {
-    // バックグラウンドでネットワークから更新
-    fetch(request).then((networkResponse) => {
+    // バックグラウンドでネットワークから更新（リダイレクトを適切に処理）
+    fetch(request, { redirect: 'follow' }).then((networkResponse) => {
       if (networkResponse.ok) {
         cache.put(request, networkResponse.clone())
       }
@@ -157,7 +169,7 @@ async function cacheFirstStrategy(request) {
   
   // キャッシュにない場合はネットワークから取得
   try {
-    const networkResponse = await fetch(request)
+    const networkResponse = await fetch(request, { redirect: 'follow' })
     if (networkResponse.ok) {
       cache.put(request, networkResponse.clone())
     }
