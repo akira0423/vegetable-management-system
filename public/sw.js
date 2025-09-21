@@ -7,16 +7,7 @@ const CACHE_VERSION = '1.0.0'
 // キャッシュするリソース（農作業に必要な最小限）
 const STATIC_CACHE = [
   '/',
-  '/dashboard',
-  '/dashboard/gantt',
-  '/dashboard/analytics', 
-  '/dashboard/photos',
-  '/dashboard/users',
-  '/manifest.json',
-  // 基本的なスタイルとスクリプト
-  '/globals.css',
-  // アイコンフォント（オフラインでも表示）
-  'https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css'
+  '/manifest.json'
 ]
 
 // API キャッシュ対象（読み取り専用データ）
@@ -76,35 +67,8 @@ self.addEventListener('activate', (event) => {
 
 // フェッチイベント（リクエスト処理）
 self.addEventListener('fetch', (event) => {
-  const request = event.request
-  const url = new URL(request.url)
-
-  // POST/PUT/DELETE は キャッシュしない（作業記録等の更新）
-  if (request.method !== 'GET') {
-    return
-  }
-
-  // 認証関連のページはService Workerをバイパス
-  if (url.pathname.includes('/login') || url.pathname.includes('/signup') || url.pathname.includes('/auth')) {
-    return
-  }
-
-  // ナビゲーションリクエスト（ページ遷移）はService Workerをバイパス
-  if (request.mode === 'navigate') {
-    return
-  }
-
-  // 農作業に特化したキャッシュ戦略
-  if (url.pathname.startsWith('/api/')) {
-    // API: ネットワーク優先、フォールバックでキャッシュ
-    event.respondWith(networkFirstStrategy(request))
-  } else if (url.pathname.includes('/dashboard/')) {
-    // ダッシュボード: キャッシュ優先、フォールバックでネットワーク
-    event.respondWith(cacheFirstStrategy(request))
-  } else {
-    // その他: ネットワーク優先
-    event.respondWith(networkFirstStrategy(request))
-  }
+  // 一時的にService Workerを完全にバイパス
+  return
 })
 
 // ネットワーク優先戦略（リアルタイム性重視）

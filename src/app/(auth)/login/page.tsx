@@ -50,9 +50,14 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
+        console.log('Login successful, redirecting to dashboard...')
         // ログイン成功後、リダイレクト
-        // Next.js のルーターが動作しない場合は window.location を使用
-        window.location.href = '/dashboard/gantt'
+        // window.location.replace を使用してより確実にリダイレクト
+        window.location.replace('/dashboard/gantt')
+        return // 追加の処理を防ぐ
+      } else {
+        console.log('Login response but no user data')
+        setError('ログインに失敗しました。もう一度お試しください。')
       }
     } catch (err) {
       
