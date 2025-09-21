@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Database, AlertTriangle, CheckCircle } from 'lucide-react'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 interface MigrationResult {
   success: boolean
@@ -24,6 +25,7 @@ interface MigrationResult {
 }
 
 export default function DataMigrationPanel() {
+  const { user } = useCurrentUser()
   const [isRunning, setIsRunning] = useState(false)
   const [result, setResult] = useState<MigrationResult | null>(null)
   const [showDetails, setShowDetails] = useState(false)
@@ -39,7 +41,7 @@ export default function DataMigrationPanel() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          company_id: '4cb3e254-9d73-4d67-b9ae-433bf249fe38', // 実際のcompany_idを使用
+          company_id: user?.company_id, // 動的にユーザーのcompany_idを使用
           dry_run: dryRun
         })
       })

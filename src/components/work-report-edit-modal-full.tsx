@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  Save, 
+import {
+  Save,
   X,
   Edit,
   Calendar,
@@ -28,6 +28,7 @@ import {
 import { format } from 'date-fns'
 import PhotoUpload from '@/components/photo-upload'
 import WorkAccountingInput from '@/components/work-accounting-input'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 interface WorkReportEditModalFullProps {
   workReport: any
@@ -62,6 +63,7 @@ export default function WorkReportEditModalFull({
   onSave,
   onCancel
 }: WorkReportEditModalFullProps) {
+  const { user } = useCurrentUser()
   const [editData, setEditData] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [soilInfoVisible, setSoilInfoVisible] = useState(false)
@@ -318,7 +320,7 @@ export default function WorkReportEditModalFull({
             },
             body: JSON.stringify({
               work_report_id: editData.id,
-              company_id: editData.company_id || '4cb3e254-9d73-4d67-b9ae-433bf249fe38',
+              company_id: editData.company_id || user?.company_id,
               work_type: editData.work_type,
               income_items: editData.income_items || [],
               expense_items: editData.expense_items || []
@@ -776,7 +778,7 @@ export default function WorkReportEditModalFull({
             {editData.id && (
               <WorkAccountingInput
                 workType={editData.work_type || ''}
-                companyId={editData.company_id || '4cb3e254-9d73-4d67-b9ae-433bf249fe38'}
+                companyId={editData.company_id || user?.company_id}
                 workReportId={editData.id || editData.report_id}
                 onDataChange={handleAccountingDataChange}
               />
