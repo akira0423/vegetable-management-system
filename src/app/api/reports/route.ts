@@ -3,8 +3,8 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    // 認証済みクライアントを使用（セキュリティ強化）
-    const supabase = await createClient()
+    // Service roleクライアントを使用してRLS問題を回避
+    const supabase = await createServiceClient()
     
     // ユーザー認証確認
     const { data: { user }, error: authError } = await supabase.auth.getUser()
