@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    // リクエストボディを取得
+    const body = await request.json()
+    const { userId, email, metadata } = body
 
-    // 現在のユーザーを取得
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !authUser) {
+    if (!userId || !email) {
       return NextResponse.json({
         success: false,
-        error: '認証されていません'
-      }, { status: 401 })
+        error: '必須パラメータが不足しています'
+      }, { status: 400 })
     }
 
+    console.log('[EnsureProfile] Processing user:', email)
+
+    // Service roleクライアントを使用してプロファイル操作
+    const serviceSupabase = await createServiceClient()
+
     // 既存のプロファイルをチェック
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile } = await serviceSupabase
       .from('users')
       .select('*')
-      .eq('id', authUser.id)
+      .eq('id', userId)
       .single()
 
     if (existingProfile) {
-      console.log('[EnsureProfile] Profile already exists:', authUser.email)
+      console.log('[EnsureProfile] Profile already exists:', email)
       return NextResponse.json({
         success: true,
         profile: existingProfile,
@@ -31,23 +36,23 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log('[EnsureProfile] Creating new profile for:', authUser.email)
+    console.log('[EnsureProfile] Creating new profile for:', email)
 
     // プロファイルが存在しない場合は作成
     // 1. まず会社を作成（またはデフォルト会社を使用）
-    const companyName = authUser.user_metadata?.company_name ||
-                       authUser.email?.split('@')[1]?.split('.')[0] ||
+    const companyName = metadata?.company_name ||
+                       email?.split('@')[1]?.split('.')[0] ||
                        'My Farm'
 
     const company_id = crypto.randomUUID()
 
     // 会社作成
-    const { error: companyError } = await supabase
+    const { error: companyError } = await serviceSupabase
       .from('companies')
       .insert({
         id: company_id,
         name: companyName,
-        contact_email: authUser.email!,
+        contact_email: email,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (companyError) {
       console.error('[EnsureProfile] Company creation error:', companyError)
       // 既存の会社がある場合は、デモ会社を使用
-      const { data: demoCompany } = await supabase
+      const { data: demoCompany } = await serviceSupabase
         .from('companies')
         .select('id')
         .eq('is_active', true)
@@ -69,13 +74,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. ユーザープロファイル作成
-    const { data: newProfile, error: profileError } = await supabase
+    const { data: newProfile, error: profileError } = await serviceSupabase
       .from('users')
       .insert({
-        id: authUser.id,
+        id: userId,
         company_id: company_id,
-        email: authUser.email!,
-        full_name: authUser.user_metadata?.full_name || authUser.email!,
+        email: email,
+        full_name: metadata?.full_name || email,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

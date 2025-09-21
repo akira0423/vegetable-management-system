@@ -58,7 +58,12 @@ export default function LoginPage() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+              userId: data.user.id,
+              email: data.user.email,
+              metadata: data.user.user_metadata
+            })
           })
 
           const profileData = await profileResponse.json()
