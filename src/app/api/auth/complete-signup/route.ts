@@ -29,29 +29,33 @@ export async function POST(request: NextRequest) {
       })
 
     if (companyError) {
-      
+      console.error('Company creation error:', companyError)
       return NextResponse.json({
         success: false,
-        error: '会社情報の作成に失敗しました'
+        error: '会社情報の作成に失敗しました',
+        details: companyError.message
       }, { status: 500 })
     }
 
-    // 2. アプリユーザー作成（実際のテーブル構造に合わせて修正）
+    // 2. アプリユーザー作成
     const { error: userError } = await supabase
       .from('users')
       .insert({
         id: user_id,
         company_id: company_id,
+        email: email,
+        full_name: full_name || null,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
 
     if (userError) {
-      
+      console.error('User creation error:', userError)
       return NextResponse.json({
         success: false,
-        error: 'ユーザー情報の作成に失敗しました'
+        error: 'ユーザー情報の作成に失敗しました',
+        details: userError.message
       }, { status: 500 })
     }
 
