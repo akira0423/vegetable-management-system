@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Database } from '@/types/database'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,11 +23,10 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Download, FileSpreadsheet, FileImage, RefreshCw, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, FileImage, RefreshCw, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Skeleton } from '@/components/ui/skeleton'
-import FinancialTooltip from '@/components/financial-tooltip'
+import { createClient } from '@/lib/supabase/client'
 
 ChartJS.register(
   CategoryScale,
@@ -44,9 +42,9 @@ ChartJS.register(
 )
 
 interface FinancialPerformanceChartProps {
-  workReports: any[]
-  selectedVegetables: string[]
-  dateRange: { start: string; end: string }
+  companyId: string
+  selectedVegetables?: string[]
+  dateRange?: { start: string; end: string }
 }
 
 interface AccountingItem {
@@ -83,33 +81,76 @@ const CATEGORY_COLORS = {
 }
 
 export default function FinancialPerformanceChart({
-  workReports,
-  selectedVegetables,
+  companyId,
+  selectedVegetables = [],
   dateRange
 }: FinancialPerformanceChartProps) {
   const chartRef = useRef<ChartJS<'bar'>>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [monthlyData, setMonthlyData] = useState<{ [month: string]: CategoryData }>({})
 
-  // APIからデータを取得する関数
-  const fetchAccountingData = useCallback(async () => {
-    if (!workReports || workReports.length === 0) {
-      console.log('No work reports to process')
+  // データを取得する関数
+  const fetchData = useCallback(async () => {
+    if (!companyId) {
+      console.log('No company ID provided')
       setMonthlyData({})
       return
     }
 
     setIsLoadingData(true)
+    console.log('Starting data fetch for company:', companyId)
 
     try {
+      // 1. まずwork_reportsを取得
+      const supabase = createClient()
+
+      let query = supabase
+        .from('work_reports')
+        .select('id, work_date, company_id, vegetable_id')
+        .eq('company_id', companyId)
+
+      // 日付範囲の適用
+      if (dateRange) {
+        if (dateRange.start) {
+          query = query.gte('work_date', dateRange.start)
+        }
+        if (dateRange.end) {
+          query = query.lte('work_date', dateRange.end)
+        }
+      } else {
+        // デフォルトで過去6ヶ月のデータを取得
+        const sixMonthsAgo = new Date()
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+        query = query.gte('work_date', sixMonthsAgo.toISOString().split('T')[0])
+      }
+
+      // 野菜でフィルタ
+      if (selectedVegetables && selectedVegetables.length > 0) {
+        query = query.in('vegetable_id', selectedVegetables)
+      }
+
+      const { data: workReports, error: workReportsError } = await query
+
+      if (workReportsError) {
+        console.error('Error fetching work reports:', workReportsError)
+        setMonthlyData({})
+        return
+      }
+
+      console.log('Fetched work reports:', workReports?.length || 0, 'reports')
+
+      if (!workReports || workReports.length === 0) {
+        console.log('No work reports found for the selected criteria')
+        setMonthlyData({})
+        return
+      }
+
+      // 2. work_report_idsを使ってAPIを呼び出し
       const workReportIds = workReports.map(r => r.id)
-      const companyId = workReports[0]?.company_id
 
-      console.log('Fetching accounting data for:', { workReportIds, companyId })
+      console.log('Calling API with work report IDs:', workReportIds.length, 'IDs')
 
-      // Phase 1 APIエンドポイントを使用
       const response = await fetch('/api/financial-performance', {
         method: 'POST',
         headers: {
@@ -118,21 +159,24 @@ export default function FinancialPerformanceChart({
         body: JSON.stringify({
           workReportIds,
           companyId,
-          dateRange
+          dateRange: dateRange || {
+            start: new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString().split('T')[0],
+            end: new Date().toISOString().split('T')[0]
+          }
         })
       })
 
       const result = await response.json()
+      console.log('API response:', result)
 
       if (!response.ok) {
-        console.error('API Error:', result.error)
-        // エラー時は空データを設定
+        console.error('API Error:', result.error || 'Unknown error')
         setMonthlyData({})
         return
       }
 
       if (result.success && result.data) {
-        console.log('Received data from API:', result.data)
+        console.log('Processing API data:', Object.keys(result.data).length, 'months')
 
         // APIから整形済みのデータを受け取る
         const formattedData: { [month: string]: CategoryData } = {}
@@ -176,6 +220,7 @@ export default function FinancialPerformanceChart({
           })
         })
 
+        console.log('Formatted data ready:', Object.keys(formattedData).length, 'months with data')
         setMonthlyData(formattedData)
       } else {
         console.log('No data or unsuccessful response:', result)
@@ -183,32 +228,19 @@ export default function FinancialPerformanceChart({
       }
 
     } catch (error) {
-      console.error('Failed to fetch accounting data:', error)
+      console.error('Failed to fetch data:', error)
       setMonthlyData({})
     } finally {
       setIsLoadingData(false)
     }
-  }, [workReports, dateRange])
+  }, [companyId, selectedVegetables, dateRange])
 
-  // workReportsが変更されたらデータを取得
+  // コンポーネントマウント時とパラメータ変更時にデータを取得
   useEffect(() => {
-    fetchAccountingData()
-  }, [fetchAccountingData])
-
-  // フィルタリング済みのレポート
-  const filteredReports = useMemo(() => {
-    if (!workReports) return []
-
-    let filtered = workReports
-
-    if (selectedVegetables.length > 0) {
-      filtered = filtered.filter(report =>
-        selectedVegetables.includes(report.vegetable_id)
-      )
+    if (companyId) {
+      fetchData()
     }
-
-    return filtered
-  }, [workReports, selectedVegetables])
+  }, [fetchData])
 
   // チャートデータの準備
   const chartData = useMemo(() => {
@@ -382,7 +414,7 @@ export default function FinancialPerformanceChart({
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchAccountingData}
+              onClick={fetchData}
               disabled={isLoadingData}
             >
               {isLoadingData ? (
@@ -424,6 +456,7 @@ export default function FinancialPerformanceChart({
             <div className="text-center">
               <p className="text-lg mb-2">データがありません</p>
               <p className="text-sm">選択された期間に会計データが登録されていません</p>
+              <p className="text-xs mt-2">Company ID: {companyId || 'Not provided'}</p>
             </div>
           </div>
         )}
