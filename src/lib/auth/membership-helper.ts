@@ -31,12 +31,35 @@ export async function ensureUserMembership(
       .eq('id', userId)
       .single()
 
-    
+
 
     if (userError || !user) {
+      // ユーザーが見つからない場合、自動的に作成
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          company_id: companyId,
+          is_active: true
+        })
+        .select()
+        .single()
+
+      if (createError || !newUser) {
+        return {
+          success: false,
+          error: `User not found and could not create: ${createError?.message || userError?.message || 'No user data'}`
+        }
+      }
+
       return {
-        success: false,
-        error: `User not found: ${userError?.message || 'No user data'}`
+        success: true,
+        membership: {
+          user_id: userId,
+          company_id: companyId,
+          role: 'member',
+          status: 'active'
+        }
       }
     }
 
