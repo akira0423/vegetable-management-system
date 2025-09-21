@@ -18,14 +18,10 @@ function getDevUser(): AuthUser | null {
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  console.log('[Auth] getCurrentUser called')
-
   // 開発環境では、まず Supabase 認証をチェックして、失敗したら開発用認証を使用
   const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  console.log('[Auth] Supabase auth result:', !!user, authError?.message)
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
     // Get user profile from database
@@ -35,8 +31,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       .eq('id', user.id)
       .single()
 
-    console.log('[Auth] User profile found:', !!profile, error?.message)
-
     if (profile) {
       return {
         id: user.id,
@@ -44,16 +38,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         company_id: profile.company_id,
         role: 'user', // 1企業1アカウントモデルでは全員user
         full_name: profile.full_name,
-      }
-    } else {
-      // プロファイルが存在しない場合、基本情報で返す
-      console.log('[Auth] No profile found, returning basic user info')
-      return {
-        id: user.id,
-        email: user.email!,
-        company_id: null,
-        role: 'user',
-        full_name: user.email!,
       }
     }
   }
@@ -86,13 +70,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 export async function requireAuth(): Promise<AuthUser> {
-  console.log('[Auth] requireAuth called')
   const user = await getCurrentUser()
 
-  console.log('[Auth] requireAuth - user found:', !!user, user?.email)
-
   if (!user) {
-    console.log('[Auth] No user found - redirecting to login')
     redirect('/login')
   }
 

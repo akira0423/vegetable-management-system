@@ -50,11 +50,32 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
-        console.log('Login successful, redirecting to dashboard...')
+        console.log('Login successful, ensuring profile exists...')
+
+        // プロファイルの確認・作成
+        try {
+          const profileResponse = await fetch('/api/auth/ensure-profile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+
+          const profileData = await profileResponse.json()
+          console.log('Profile status:', profileData)
+
+          if (!profileData.success) {
+            setError('プロファイル作成に失敗しました。もう一度お試しください。')
+            return
+          }
+        } catch (profileError) {
+          console.error('Profile check error:', profileError)
+        }
 
         // ミドルウェアに認証直後であることを通知
         document.cookie = `auth_timestamp=${Date.now()}; path=/; max-age=10`
 
+        console.log('Redirecting to dashboard...')
         // 少し待ってからリダイレクト（セッション同期を待つ）
         setTimeout(() => {
           window.location.href = '/dashboard/gantt'
