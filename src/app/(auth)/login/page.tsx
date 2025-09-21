@@ -51,9 +51,15 @@ export default function LoginPage() {
 
       if (data?.user) {
         console.log('Login successful, redirecting to dashboard...')
-        // ログイン成功後、リダイレクト
-        // window.location.replace を使用してより確実にリダイレクト
-        window.location.replace('/dashboard/gantt')
+
+        // ミドルウェアに認証直後であることを通知
+        document.cookie = `auth_timestamp=${Date.now()}; path=/; max-age=10`
+
+        // 少し待ってからリダイレクト（セッション同期を待つ）
+        setTimeout(() => {
+          window.location.href = '/dashboard/gantt'
+        }, 500)
+
         return // 追加の処理を防ぐ
       } else {
         console.log('Login response but no user data')

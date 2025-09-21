@@ -32,10 +32,16 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // ログイン直後の認証同期待ち時間を考慮
+  const authTimestamp = request.cookies.get('auth_timestamp')?.value
+  const isRecentAuth = authTimestamp && (Date.now() - parseInt(authTimestamp) < 3000) // 3秒の猶予
+
   if (
     !user &&
+    !isRecentAuth && // 最近の認証試行がない場合のみリダイレクト
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/signup') &&
+    !request.nextUrl.pathname.startsWith('/api/auth') && // 認証APIを除外
     request.nextUrl.pathname !== '/'
   ) {
     // no user, potentially respond by redirecting the user to the login page
