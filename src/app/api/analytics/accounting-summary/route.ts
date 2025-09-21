@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { accountingAnalyticsProcessor } from '@/lib/accounting-analytics-processor'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('company_id')
     const startDate = searchParams.get('start_date')

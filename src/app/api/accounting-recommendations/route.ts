@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('company_id')
@@ -108,7 +108,7 @@ async function getDefaultRecommendations(supabase: any, workType: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServiceClient()
+    const supabase = await createClient()
     const body = await request.json()
     
     const { 
