@@ -4,10 +4,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   try {
     // Service roleクライアントを使用してRLS問題を回避
-    const supabase = await createServiceClient()
-    
-    // ユーザー認証確認
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const serviceSupabase = await createServiceClient()
+
+    // 通常のクライアントで認証確認
+    const authSupabase = await createClient()
+    const { data: { user }, error: authError } = await authSupabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     
     
     // 統一アーキテクチャのベースクエリ（work_reportsと同じ直接フィルタリング）
-    let query = supabase
+    let query = serviceSupabase
       .from('growing_tasks')
       .select(`
         id,
