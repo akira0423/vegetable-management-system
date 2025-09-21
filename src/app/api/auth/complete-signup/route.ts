@@ -17,13 +17,15 @@ export async function POST(request: NextRequest) {
 
     
 
-    // 1. 会社作成（実際のテーブル構造に合わせて修正）
+    // 1. 会社作成（必須フィールドを含める）
     const company_id = crypto.randomUUID()
     const { error: companyError } = await supabase
       .from('companies')
       .insert({
         id: company_id,
         name: company_name,
+        contact_email: email,  // 必須
+        is_active: true,       // 必須
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
