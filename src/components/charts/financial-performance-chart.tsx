@@ -417,10 +417,19 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // Supabaseから財務データを取得
   const fetchFinancialData = useCallback(async () => {
     if (!companyId) {
-      
+      console.warn('⚠️ 収支構造分析: companyIdが未設定')
       return []
     }
-    
+
+    // 認証状態を確認
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('🔐 収支構造分析: 認証状態確認', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      companyId
+    })
+
     try {
       
       setLoading(true)
@@ -441,7 +450,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         .gte('work_date', startMonth.toISOString().split('T')[0])
         .lt('work_date', endMonth.toISOString().split('T')[0])
         .is('deleted_at', null)
-        .not('income_total', 'is', null)  // income_totalがNULLでないデータのみ
+        // .not('income_total', 'is', null)  // 一旦コメントアウトしてすべてのデータを取得
         .order('work_date', { ascending: true })
 
       // 選択野菜でフィルタリング
@@ -462,6 +471,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         endDate: endMonth.toISOString().split('T')[0],
         companyId,
         selectedVegetables,
+        firstRecords: workReports?.slice(0, 3),
         query: `SELECT * FROM work_reports WHERE company_id='${companyId}' AND work_date >= '${startMonth.toISOString().split('T')[0]}' AND work_date < '${endMonth.toISOString().split('T')[0]}' AND deleted_at IS NULL`
       })
 
