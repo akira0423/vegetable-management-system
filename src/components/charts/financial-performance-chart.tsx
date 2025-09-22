@@ -262,9 +262,10 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       }
       
       if (!accountingData || accountingData.length === 0) {
-        
+        console.warn('⚠️ 収支構造分析: accountingDataが空のため推定データを使用')
         return processEstimatedAccountingItems(workReportIds)
       }
+      console.log('📝 収支構造分析: accounting_itemsデータ取得', accountingData.length, '件')
       
       // 月別・項目別にデータを集約（年月で区別）
       accountingData.forEach((record: any) => {
@@ -594,10 +595,16 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       
       // 実際の勘定項目データを取得して処理
       const workReportIds = workReports.map(r => r.id).filter(id => id != null)
+      console.log('📋 収支構造分析: work_report_ids', workReportIds)
       const categoryData = await processRealAccountingItems(workReportIds)
+      console.log('📊 収支構造分析: カテゴリデータ処理完了', categoryData)
       setCategoryData(categoryData)
-      
-      
+
+      console.log('💰 収支構造分析: 財務データ集計', {
+        totalReports: workReports.length,
+        monthlyData: Object.keys(dataByMonth),
+        categoryDataKeys: Object.keys(categoryData)
+      })
       // 全利用可能項目を生成（分離型凡例用）
       const allItems: { [key: string]: LegendItemInfo } = {}
       const initialVisibleItems: { [key: string]: boolean } = {}
@@ -638,8 +645,12 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       setAllAvailableItems(sortedAllItems)
       setVisibleItems(initialVisibleItems)
       
-      
-      
+      console.log('🎯 収支構造分析: fetchFinancialData完了', {
+        allDataLength: allData.length,
+        months: allData.map(d => d.month),
+        categoryDataSize: Object.keys(categoryData).length
+      })
+
       return allData
       
     } catch (error) {
@@ -721,15 +732,23 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
   // データ取得実行
   useEffect(() => {
     if (companyId) {
-      
+      console.log('🔄 収支構造分析: データ取得開始', {
+        companyId,
+        startMonth: format(startMonth, 'yyyy-MM'),
+        displayPeriod
+      })
       fetchFinancialData()
         .then(data => {
           setFinancialData(data)
           setLastUpdated(new Date())
-          
+          console.log('✅ 収支構造分析: データ取得完了', {
+            dataLength: data.length,
+            categoryDataKeys: Object.keys(categoryData),
+            categoryData
+          })
         })
         .catch(error => {
-          
+          console.error('❌ 収支構造分析: データ取得エラー', error)
           setFinancialData([])
         })
     }
@@ -900,7 +919,14 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
 
   // チャートデータの準備（全カテゴリ同時表示、費用はマイナス）
   const chartData = useMemo(() => {
-    if (!categoryData) return null
+    console.log('🔄 収支構造分析: chartData生成開始', {
+      hasCategoryData: !!categoryData,
+      categoryDataKeys: Object.keys(categoryData || {})
+    })
+    if (!categoryData) {
+      console.warn('⚠️ 収支構造分析: categoryDataが存在しないためnullを返す')
+      return null
+    }
     
     // ユーザーが指定した期間のすべての月を生成（内部は yyyy-MM、表示は M月）
     const allMonthLabels: string[] = []
@@ -1639,6 +1665,18 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       </Card>
     )
   }
+
+  // デバッグ用ログ
+  console.log('🌐 収支構造分析: レンダリング状態', {
+    loading,
+    hasChartData: !!chartData,
+    chartDataLabels: chartData?.labels,
+    chartDatasets: chartData?.datasets?.length,
+    categoryDataKeys: Object.keys(categoryData || {}),
+    financialDataLength: financialData.length,
+    visibleItems,
+    selectedCategories
+  })
 
   return (
     <>
