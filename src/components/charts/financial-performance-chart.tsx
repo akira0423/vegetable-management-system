@@ -235,6 +235,10 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
     
     try {
       // work_report_accountingと accounting_itemsを結合して取得
+      console.log('🔍 収支構造分析: work_report_accountingクエリ実行', {
+        workReportIds: workReportIds.slice(0, 3)
+      })
+
       const { data: accountingData, error } = await supabase
         .from('work_report_accounting')
         .select(`
@@ -254,9 +258,9 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         `)
         .in('work_report_id', workReportIds)
         .order('work_report_id')
-      
+
       if (error) {
-        
+        console.error('❌ 収支構造分析: accountingクエリエラー', error)
         // エラー時は推定データを返す
         return processEstimatedAccountingItems(workReportIds)
       }
@@ -449,16 +453,22 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       }
 
       const { data: workReports, error } = await workReportsQuery
-      
+
       if (error) {
-        
+        console.error('❌ 収支構造分析: work_reportsクエリエラー', error)
         return []
       }
-      
-      
-      
+
+      console.log('📦 収支構造分析: work_reports取得', {
+        count: workReports?.length || 0,
+        startDate: startMonth.toISOString().split('T')[0],
+        endDate: endMonth.toISOString().split('T')[0],
+        companyId,
+        selectedVegetables
+      })
+
       if (!workReports || workReports.length === 0) {
-        
+        console.warn('⚠️ 収支構造分析: work_reportsが0件')
         return []
       }
       
@@ -595,9 +605,18 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       
       // 実際の勘定項目データを取得して処理
       const workReportIds = workReports.map(r => r.id).filter(id => id != null)
-      console.log('📋 収支構造分析: work_report_ids', workReportIds)
+      console.log('📋 収支構造分析: work_report_ids', {
+        count: workReportIds.length,
+        ids: workReportIds.slice(0, 3), // 最初の3件を表示
+        hasData: workReportIds.length > 0
+      })
       const categoryData = await processRealAccountingItems(workReportIds)
-      console.log('📊 収支構造分析: カテゴリデータ処理完了', categoryData)
+      console.log('📊 収支構造分析: カテゴリデータ処理完了', {
+        keys: Object.keys(categoryData),
+        isEmpty: Object.keys(categoryData).length === 0,
+        sampleMonth: Object.keys(categoryData)[0],
+        data: categoryData
+      })
       setCategoryData(categoryData)
 
       console.log('💰 収支構造分析: 財務データ集計', {
@@ -751,8 +770,10 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
           console.error('❌ 収支構造分析: データ取得エラー', error)
           setFinancialData([])
         })
+    } else {
+      console.warn('⚠️ 収支構造分析: companyIdが未設定')
     }
-  }, [fetchFinancialData])
+  }, [fetchFinancialData, companyId, selectedVegetables])
 
   // 複数右軸表示用のカスタムプラグイン
   const multipleRightAxisPlugin = {

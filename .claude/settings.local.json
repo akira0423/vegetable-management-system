@@ -41,7 +41,8 @@
       "Bash(timeout 3 sleep 3)",
       "Bash(cmd /c:*)",
       "Read(//c/Users/akira/OneDrive/Data Base/なんでもフォルダー/**)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "additionalDirectories": [
