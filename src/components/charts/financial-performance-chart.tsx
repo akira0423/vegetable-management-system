@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database'
 import {
   Chart as ChartJS,
@@ -52,17 +52,9 @@ import {
 import { format, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
-// Supabaseクライアント
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  
-} else {
-  
-}
-
-const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!)
+// Supabaseクライアントは共通のものを使用（認証情報を含む）
+// 削除: 独自のsupabaseクライアントを作成していたのが問題の原因
+// const supabase = createClient<Database>(supabaseUrl!, supabaseAnonKey!)
 
 // Chart.jsの登録
 ChartJS.register(
