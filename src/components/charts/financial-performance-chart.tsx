@@ -1,7 +1,10 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createBrowserClientSingleton } from '@/lib/supabase/client'
+
+// 認証情報を含むシングルトンクライアントを使用
+const supabase = createBrowserClientSingleton()
 import { Database } from '@/types/database'
 import {
   Chart as ChartJS,
