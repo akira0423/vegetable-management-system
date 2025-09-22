@@ -169,10 +169,8 @@ const CATEGORY_COLORS = {
 }
 
 export default function FinancialPerformanceChart({ companyId, selectedVegetables = [] }: FinancialPerformanceChartProps) {
-  // 現在の年月から過去1年を表示するように設定
-  const currentDate = new Date()
-  const defaultStartMonth = new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1)
-  const [startMonth, setStartMonth] = useState<Date>(defaultStartMonth)
+  // 月次キャッシュフロー推移グラフと同じ開始月設定（現在年の1月から開始）
+  const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonthNum, setSelectedMonthNum] = useState<number>(1)
