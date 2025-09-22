@@ -174,7 +174,10 @@ const CATEGORY_COLORS = {
 }
 
 export default function FinancialPerformanceChart({ companyId, selectedVegetables = [] }: FinancialPerformanceChartProps) {
-  const [startMonth, setStartMonth] = useState<Date>(new Date(2025, 4, 1)) // 2025年5月から開始（データが存在する月）
+  // 現在の年月から過去1年を表示するように設定
+  const currentDate = new Date()
+  const defaultStartMonth = new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1)
+  const [startMonth, setStartMonth] = useState<Date>(defaultStartMonth)
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonthNum, setSelectedMonthNum] = useState<number>(1)
@@ -433,6 +436,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
       const allData: FinancialPerformanceData[] = []
       
       // work_reportsから財務データを取得
+      // 注意：income_totalとexpense_totalがNULLではないデータのみ取得
       let workReportsQuery = supabase
         .from('work_reports')
         .select(`
@@ -445,6 +449,7 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         .gte('work_date', startMonth.toISOString().split('T')[0])
         .lt('work_date', endMonth.toISOString().split('T')[0])
         .is('deleted_at', null)
+        .not('income_total', 'is', null)  // income_totalがNULLでないデータのみ
         .order('work_date', { ascending: true })
 
       // 選択野菜でフィルタリング
@@ -464,7 +469,8 @@ export default function FinancialPerformanceChart({ companyId, selectedVegetable
         startDate: startMonth.toISOString().split('T')[0],
         endDate: endMonth.toISOString().split('T')[0],
         companyId,
-        selectedVegetables
+        selectedVegetables,
+        query: `SELECT * FROM work_reports WHERE company_id='${companyId}' AND work_date >= '${startMonth.toISOString().split('T')[0]}' AND work_date < '${endMonth.toISOString().split('T')[0]}' AND deleted_at IS NULL`
       })
 
       if (!workReports || workReports.length === 0) {
