@@ -174,7 +174,7 @@ const CATEGORY_COLORS = {
 }
 
 export default function FinancialPerformanceChart({ companyId, selectedVegetables = [] }: FinancialPerformanceChartProps) {
-  const [startMonth, setStartMonth] = useState<Date>(new Date(new Date().getFullYear(), 0, 1))
+  const [startMonth, setStartMonth] = useState<Date>(new Date(2025, 4, 1)) // 2025年5月から開始（データが存在する月）
   const [yearMonthPickerOpen, setYearMonthPickerOpen] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonthNum, setSelectedMonthNum] = useState<number>(1)
