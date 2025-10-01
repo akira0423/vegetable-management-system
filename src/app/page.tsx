@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sprout, Users, BarChart3, Shield, Map, GanttChart } from "lucide-react"
 import DemoFarmMapView from '@/components/demo/farm-map-view'
+import QASection from '@/components/home/QASection'
 
 export default function Home() {
   const [showDemoFarmMap, setShowDemoFarmMap] = useState(false)
@@ -18,10 +19,13 @@ export default function Home() {
             <Sprout className="h-8 w-8 text-green-600" />
             <span className="text-xl font-bold text-gray-900">野菜栽培管理システム</span>
           </div>
-          
+
           <nav className="hidden md:flex items-center space-x-6">
             <a href="#features" className="text-gray-600 hover:text-green-600 transition-colors">
               機能
+            </a>
+            <a href="#qa" className="text-gray-600 hover:text-green-600 transition-colors">
+              Q&A
             </a>
             <a href="#about" className="text-gray-600 hover:text-green-600 transition-colors">
               会社情報
@@ -172,6 +176,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Q&A Section */}
+      <QASection />
 
       {/* About Section */}
       <section id="about" className="py-20 px-4 bg-green-50">

@@ -1,0 +1,588 @@
+-- 懸賞金型Q&Aプラットフォーム データベーススキーマ
+-- Version: 1.0.0
+-- Date: 2025-09-22
+
+-- =====================================================
+-- 1. 拡張機能の有効化
+-- =====================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- =====================================================
+-- 2. 列挙型の定義
+-- =====================================================
+
+-- 質問ステータス
+CREATE TYPE qa_question_status AS ENUM (
+    'DRAFT',        -- 下書き
+    'FUNDED',       -- 入金済み
+    'ANSWERING',    -- 回答受付中
+    'SELECTING',    -- ベスト選定中
+    'CLOSED',       -- 終了
+    'CANCELLED'     -- キャンセル
+);
+
+-- 回答ステータス
+CREATE TYPE qa_answer_status AS ENUM (
+    'DRAFT',        -- 下書き
+    'SUBMITTED',    -- 提出済み
+    'BEST',         -- ベスト選定
+    'REJECTED'      -- 却下
+);
+
+-- 決済タイプ
+CREATE TYPE qa_payment_type AS ENUM (
+    'ESCROW',       -- エスクロー（懸賞金）
+    'PPV',          -- PPV解錠
+    'TIP',          -- 投げ銭
+    'REFUND'        -- 返金
+);
+
+-- 出金ステータス
+CREATE TYPE qa_payout_status AS ENUM (
+    'REQUESTED',    -- 申請済み
+    'PROCESSING',   -- 処理中
+    'SENT',         -- 送金済み
+    'FAILED',       -- 失敗
+    'CANCELLED'     -- キャンセル
+);
+
+-- アクセス権限理由
+CREATE TYPE qa_access_reason AS ENUM (
+    'ASKER',        -- 質問者
+    'RESPONDER',    -- 回答者
+    'PPV',          -- PPV購入
+    'ADMIN'         -- 管理者
+);
+
+-- =====================================================
+-- 3. メインテーブル
+-- =====================================================
+
+-- ユーザープロフィール拡張（既存のusersテーブルに追加）
+CREATE TABLE qa_user_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+    -- Stripe情報
+    stripe_customer_id VARCHAR(255),
+    stripe_account_id VARCHAR(255),  -- Connect Express Account ID
+    stripe_account_status VARCHAR(50), -- KYC状態
+
+    -- 税務情報
+    is_taxable BOOLEAN DEFAULT true,  -- 課税事業者フラグ
+    invoice_registration_no VARCHAR(50), -- 適格請求書発行事業者登録番号
+    tax_rate DECIMAL(5,2) DEFAULT 10.00, -- 税率（%）
+
+    -- プロフィール情報
+    display_name VARCHAR(100),
+    bio TEXT,
+    expertise_areas TEXT[], -- 専門分野
+
+    -- 統計情報
+    total_questions_asked INTEGER DEFAULT 0,
+    total_answers_given INTEGER DEFAULT 0,
+    total_best_answers INTEGER DEFAULT 0,
+    reputation_score INTEGER DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(user_id),
+    UNIQUE(stripe_customer_id),
+    UNIQUE(stripe_account_id)
+);
+
+-- 質問テーブル
+CREATE TABLE qa_questions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    asker_id UUID NOT NULL REFERENCES auth.users(id),
+
+    -- 基本情報
+    title VARCHAR(200) NOT NULL,
+    body_teaser TEXT, -- 公開プレビュー（最初の100文字程度）
+    body_secure TEXT NOT NULL, -- 本文（暗号化保存推奨）
+
+    -- カテゴリ情報
+    crop VARCHAR(100),  -- 作物
+    disease VARCHAR(100), -- 病害
+    region VARCHAR(100),  -- 地域
+    season VARCHAR(50),   -- 時期
+    tags TEXT[],         -- タグ
+
+    -- 懸賞金情報
+    bounty_amount DECIMAL(10,2) NOT NULL CHECK (bounty_amount >= 10),
+    platform_fee DECIMAL(10,2), -- プラットフォーム手数料
+    card_fee DECIMAL(10,2),     -- カード手数料
+
+    -- ステータス
+    status qa_question_status DEFAULT 'DRAFT',
+    deadline_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    best_answer_id UUID,
+    best_selected_at TIMESTAMP WITH TIME ZONE,
+
+    -- メタデータ
+    view_count INTEGER DEFAULT 0,
+    ppv_count INTEGER DEFAULT 0,
+    total_ppv_revenue DECIMAL(10,2) DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    closed_at TIMESTAMP WITH TIME ZONE,
+
+    CONSTRAINT valid_deadline CHECK (deadline_at > CURRENT_TIMESTAMP),
+    CONSTRAINT valid_bounty CHECK (bounty_amount >= 10)
+);
+
+-- 回答テーブル
+CREATE TABLE qa_answers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    question_id UUID NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
+    responder_id UUID NOT NULL REFERENCES auth.users(id),
+
+    -- 回答内容
+    body_secure TEXT NOT NULL, -- 暗号化保存推奨
+    attachments JSONB, -- 添付ファイル情報
+
+    -- ステータス
+    status qa_answer_status DEFAULT 'DRAFT',
+    is_best BOOLEAN DEFAULT false,
+
+    -- 評価
+    likes_count INTEGER DEFAULT 0,
+    tips_received DECIMAL(10,2) DEFAULT 0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(question_id, responder_id), -- 1質問に1人1回答
+    INDEX idx_answer_question (question_id),
+    INDEX idx_answer_responder (responder_id)
+);
+
+-- 購入・決済履歴
+CREATE TABLE qa_purchases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    question_id UUID NOT NULL REFERENCES qa_questions(id),
+    answer_id UUID REFERENCES qa_answers(id), -- TIPの場合
+
+    -- 決済情報
+    type qa_payment_type NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'JPY',
+
+    -- Stripe情報
+    stripe_payment_intent_id VARCHAR(255),
+    stripe_charge_id VARCHAR(255),
+    stripe_transfer_id VARCHAR(255),
+
+    -- 手数料内訳
+    platform_fee DECIMAL(10,2) DEFAULT 0,
+    tax_on_platform_fee DECIMAL(10,2) DEFAULT 0, -- プラットフォーム手数料への消費税
+    card_fee DECIMAL(10,2) DEFAULT 0,
+
+    -- 分配情報（PPVの場合）
+    split_to_asker DECIMAL(10,2) DEFAULT 0,
+    split_to_best DECIMAL(10,2) DEFAULT 0,
+    split_pending BOOLEAN DEFAULT false, -- ベスト未確定時の保留フラグ
+
+    -- ステータス
+    status VARCHAR(50) DEFAULT 'PENDING',
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE,
+
+    INDEX idx_purchase_user (user_id),
+    INDEX idx_purchase_question (question_id),
+    INDEX idx_purchase_stripe (stripe_payment_intent_id)
+);
+
+-- ウォレット（残高管理）
+CREATE TABLE qa_wallets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+    -- 残高
+    balance_available DECIMAL(10,2) DEFAULT 0, -- 出金可能残高
+    balance_pending DECIMAL(10,2) DEFAULT 0,   -- 保留中残高
+
+    -- 累計
+    total_earned DECIMAL(10,2) DEFAULT 0,      -- 総収入
+    total_withdrawn DECIMAL(10,2) DEFAULT 0,   -- 総出金額
+    total_fees_paid DECIMAL(10,2) DEFAULT 0,   -- 総手数料
+
+    -- 出金設定
+    auto_payout_enabled BOOLEAN DEFAULT false,
+    min_payout_amount DECIMAL(10,2) DEFAULT 3000, -- 最低出金額
+
+    last_payout_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(user_id)
+);
+
+-- ウォレット取引履歴
+CREATE TABLE qa_wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wallet_id UUID NOT NULL REFERENCES qa_wallets(id) ON DELETE CASCADE,
+
+    -- 取引情報
+    type VARCHAR(50) NOT NULL, -- CREDIT, DEBIT, PAYOUT, FEE
+    amount DECIMAL(10,2) NOT NULL,
+    balance_after DECIMAL(10,2) NOT NULL,
+
+    -- 関連情報
+    reference_type VARCHAR(50), -- QUESTION, ANSWER, PPV, TIP, PAYOUT
+    reference_id UUID,
+    description TEXT,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_wallet_tx_wallet (wallet_id),
+    INDEX idx_wallet_tx_created (created_at DESC)
+);
+
+-- アクセス権限
+CREATE TABLE qa_access_grants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    question_id UUID NOT NULL REFERENCES qa_questions(id) ON DELETE CASCADE,
+
+    reason qa_access_reason NOT NULL,
+    granted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE, -- NULLの場合は無期限
+
+    -- PPV購入の場合の支払い情報
+    purchase_id UUID REFERENCES qa_purchases(id),
+
+    UNIQUE(user_id, question_id, reason),
+    INDEX idx_access_user_question (user_id, question_id)
+);
+
+-- 出金申請
+CREATE TABLE qa_payouts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    wallet_id UUID NOT NULL REFERENCES qa_wallets(id),
+
+    -- 金額情報
+    amount DECIMAL(10,2) NOT NULL,
+    fee_fixed DECIMAL(10,2) DEFAULT 250,    -- 固定手数料
+    fee_rate_amt DECIMAL(10,2) DEFAULT 0,   -- 料率手数料
+    net_amount DECIMAL(10,2) NOT NULL,      -- 実際の振込額
+
+    -- Stripe情報
+    stripe_payout_id VARCHAR(255),
+    stripe_transfer_id VARCHAR(255),
+
+    -- ステータス
+    status qa_payout_status DEFAULT 'REQUESTED',
+
+    -- 銀行情報（暗号化推奨）
+    bank_info JSONB,
+
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+
+    INDEX idx_payout_user (user_id),
+    INDEX idx_payout_status (status)
+);
+
+-- 請求書
+CREATE TABLE qa_invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- 発行者・受領者
+    issuer_id UUID REFERENCES auth.users(id),
+    recipient_id UUID NOT NULL REFERENCES auth.users(id),
+
+    -- 請求書番号（連番）
+    invoice_no VARCHAR(50) UNIQUE NOT NULL,
+
+    -- 金額情報
+    subtotal DECIMAL(10,2) NOT NULL,
+    tax_rate DECIMAL(5,2) NOT NULL,
+    tax_amount DECIMAL(10,2) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+
+    -- 適格請求書情報
+    issuer_registration_no VARCHAR(50), -- 登録番号
+
+    -- 明細
+    line_items JSONB NOT NULL,
+
+    -- 期間
+    period_start DATE,
+    period_end DATE,
+
+    -- ステータス
+    status VARCHAR(50) DEFAULT 'DRAFT',
+
+    issued_at TIMESTAMP WITH TIME ZONE,
+    due_at TIMESTAMP WITH TIME ZONE,
+    paid_at TIMESTAMP WITH TIME ZONE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_invoice_recipient (recipient_id),
+    INDEX idx_invoice_no (invoice_no)
+);
+
+-- 通知
+CREATE TABLE qa_notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+
+    -- 通知内容
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body TEXT,
+
+    -- 関連エンティティ
+    reference_type VARCHAR(50),
+    reference_id UUID,
+
+    -- ステータス
+    is_read BOOLEAN DEFAULT false,
+    read_at TIMESTAMP WITH TIME ZONE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_notification_user_unread (user_id, is_read)
+);
+
+-- 評判・評価
+CREATE TABLE qa_reputation (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+    -- ティア
+    tier VARCHAR(50) DEFAULT 'BRONZE', -- BRONZE, SILVER, GOLD, PLATINUM
+    score INTEGER DEFAULT 0,
+
+    -- 実績統計
+    total_questions INTEGER DEFAULT 0,
+    total_answers INTEGER DEFAULT 0,
+    best_answers INTEGER DEFAULT 0,
+    best_rate DECIMAL(5,2) DEFAULT 0, -- ベスト率
+
+    -- 応答性
+    avg_response_time_hours DECIMAL(10,2),
+    sla_achievement_rate DECIMAL(5,2), -- SLA達成率
+
+    -- 品質指標
+    avg_rating DECIMAL(3,2),
+    total_tips_received DECIMAL(10,2) DEFAULT 0,
+
+    -- 違反・報告
+    reports_count INTEGER DEFAULT 0,
+    violations_count INTEGER DEFAULT 0,
+
+    last_calculated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(user_id)
+);
+
+-- 監査ログ
+CREATE TABLE qa_audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- アクター情報
+    actor_id UUID REFERENCES auth.users(id),
+    actor_ip INET,
+    actor_user_agent TEXT,
+
+    -- アクション情報
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id UUID,
+
+    -- 詳細データ
+    old_values JSONB,
+    new_values JSONB,
+    metadata JSONB,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_audit_actor (actor_id),
+    INDEX idx_audit_entity (entity_type, entity_id),
+    INDEX idx_audit_created (created_at DESC)
+);
+
+-- =====================================================
+-- 4. インデックス
+-- =====================================================
+
+-- 質問検索用
+CREATE INDEX idx_question_status ON qa_questions(status);
+CREATE INDEX idx_question_deadline ON qa_questions(deadline_at);
+CREATE INDEX idx_question_asker ON qa_questions(asker_id);
+CREATE INDEX idx_question_crop ON qa_questions(crop);
+CREATE INDEX idx_question_tags ON qa_questions USING gin(tags);
+
+-- 回答検索用
+CREATE INDEX idx_answer_best ON qa_answers(is_best) WHERE is_best = true;
+
+-- ウォレット処理用
+CREATE INDEX idx_wallet_payout ON qa_wallets(auto_payout_enabled, last_payout_at);
+
+-- 請求書処理用
+CREATE INDEX idx_invoice_period ON qa_invoices(period_start, period_end);
+
+-- =====================================================
+-- 5. トリガー関数
+-- =====================================================
+
+-- updated_atの自動更新
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- トリガー適用
+CREATE TRIGGER update_qa_user_profiles_updated_at BEFORE UPDATE ON qa_user_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_qa_questions_updated_at BEFORE UPDATE ON qa_questions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_qa_answers_updated_at BEFORE UPDATE ON qa_answers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_qa_wallets_updated_at BEFORE UPDATE ON qa_wallets
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =====================================================
+-- 6. 関数
+-- =====================================================
+
+-- 請求書番号生成
+CREATE OR REPLACE FUNCTION generate_invoice_no()
+RETURNS VARCHAR AS $$
+DECLARE
+    new_no VARCHAR;
+BEGIN
+    SELECT 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYYMM') || '-' ||
+           LPAD((COUNT(*) + 1)::TEXT, 5, '0')
+    INTO new_no
+    FROM qa_invoices
+    WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE);
+
+    RETURN new_no;
+END;
+$$ LANGUAGE plpgsql;
+
+-- アクセス権限チェック
+CREATE OR REPLACE FUNCTION check_question_access(
+    p_user_id UUID,
+    p_question_id UUID
+) RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM qa_access_grants
+        WHERE user_id = p_user_id
+        AND question_id = p_question_id
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ウォレット残高更新
+CREATE OR REPLACE FUNCTION update_wallet_balance(
+    p_wallet_id UUID,
+    p_amount DECIMAL,
+    p_type VARCHAR,
+    p_reference_type VARCHAR,
+    p_reference_id UUID,
+    p_description TEXT
+) RETURNS UUID AS $$
+DECLARE
+    v_current_balance DECIMAL;
+    v_new_balance DECIMAL;
+    v_transaction_id UUID;
+BEGIN
+    -- 排他ロックでウォレット取得
+    SELECT balance_available INTO v_current_balance
+    FROM qa_wallets
+    WHERE id = p_wallet_id
+    FOR UPDATE;
+
+    -- 新残高計算
+    IF p_type = 'DEBIT' THEN
+        v_new_balance := v_current_balance - ABS(p_amount);
+        IF v_new_balance < 0 THEN
+            RAISE EXCEPTION 'Insufficient balance';
+        END IF;
+    ELSE
+        v_new_balance := v_current_balance + ABS(p_amount);
+    END IF;
+
+    -- ウォレット更新
+    UPDATE qa_wallets
+    SET balance_available = v_new_balance,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = p_wallet_id;
+
+    -- 取引記録作成
+    INSERT INTO qa_wallet_transactions (
+        wallet_id, type, amount, balance_after,
+        reference_type, reference_id, description
+    ) VALUES (
+        p_wallet_id, p_type, p_amount, v_new_balance,
+        p_reference_type, p_reference_id, p_description
+    ) RETURNING id INTO v_transaction_id;
+
+    RETURN v_transaction_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- 7. ビュー
+-- =====================================================
+
+-- 質問サマリービュー
+CREATE VIEW qa_questions_summary AS
+SELECT
+    q.*,
+    u.email as asker_email,
+    p.display_name as asker_name,
+    p.reputation_score as asker_reputation,
+    COUNT(DISTINCT a.id) as answer_count,
+    COUNT(DISTINCT ag.id) FILTER (WHERE ag.reason = 'PPV') as ppv_user_count
+FROM qa_questions q
+JOIN auth.users u ON q.asker_id = u.id
+LEFT JOIN qa_user_profiles p ON u.id = p.user_id
+LEFT JOIN qa_answers a ON q.id = a.question_id
+LEFT JOIN qa_access_grants ag ON q.id = ag.question_id
+GROUP BY q.id, u.email, p.display_name, p.reputation_score;
+
+-- ユーザー統計ビュー
+CREATE VIEW qa_user_stats AS
+SELECT
+    u.id,
+    u.email,
+    p.display_name,
+    p.reputation_score,
+    w.balance_available,
+    w.balance_pending,
+    COUNT(DISTINCT q.id) as questions_count,
+    COUNT(DISTINCT a.id) as answers_count,
+    COUNT(DISTINCT a.id) FILTER (WHERE a.is_best) as best_answers_count
+FROM auth.users u
+LEFT JOIN qa_user_profiles p ON u.id = p.user_id
+LEFT JOIN qa_wallets w ON u.id = w.user_id
+LEFT JOIN qa_questions q ON u.id = q.asker_id
+LEFT JOIN qa_answers a ON u.id = a.responder_id
+GROUP BY u.id, u.email, p.display_name, p.reputation_score,
+         w.balance_available, w.balance_pending;
+
+-- =====================================================
+-- 8. RLSポリシー（Row Level Security）
+-- =====================================================
+-- 別ファイル (rls-policies.sql) に記載

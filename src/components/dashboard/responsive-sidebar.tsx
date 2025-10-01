@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { 
-  Sprout, 
+import {
+  Sprout,
   Calendar,
   BarChart3,
   Users,
@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  HelpCircle
 } from 'lucide-react'
 
 const navigation = [
@@ -28,6 +29,13 @@ const navigation = [
     href: '/dashboard/analytics',
     icon: BarChart3,
     shortName: '分析'
+  },
+  {
+    name: '質問を投稿',
+    href: '/questions/new',
+    icon: HelpCircle,
+    shortName: '質問',
+    badge: 'NEW'
   },
   {
     name: 'フォトギャラリー',
@@ -168,15 +176,15 @@ export default function ResponsiveSidebar({ className = '' }: ResponsiveSidebarP
   // ナビゲーション項目
   const NavigationItem = ({ item }: { item: typeof navigation[0] }) => {
     const isActive = pathname === item.href
-    
+
     return (
       <Link
         href={item.href}
         onClick={() => screenSize === 'mobile' && setIsMobileOpen(false)}
         className={cn(
-          'group flex items-center rounded-md transition-all duration-200',
-          isCollapsed && screenSize !== 'mobile' 
-            ? 'px-2 py-3 justify-center' 
+          'group flex items-center rounded-md transition-all duration-200 relative',
+          isCollapsed && screenSize !== 'mobile'
+            ? 'px-2 py-3 justify-center'
             : 'px-3 py-2',
           isActive
             ? 'bg-green-50 text-green-700 border-r-2 border-green-500'
@@ -194,14 +202,28 @@ export default function ResponsiveSidebar({ className = '' }: ResponsiveSidebarP
           )}
         />
         {(!isCollapsed || screenSize === 'mobile') && (
-          <span className="font-medium text-sm whitespace-nowrap">
-            {item.name}
-          </span>
+          <div className="flex items-center flex-1">
+            <span className="font-medium text-sm whitespace-nowrap">
+              {item.name}
+            </span>
+            {item.badge && (
+              <span className="ml-auto bg-green-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+                {item.badge}
+              </span>
+            )}
+          </div>
         )}
         {isCollapsed && screenSize !== 'mobile' && (
-          <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-            {item.name}
-          </span>
+          <>
+            {item.badge && (
+              <span className="absolute -top-1 -right-1 bg-green-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                !
+              </span>
+            )}
+            <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              {item.name}
+            </span>
+          </>
         )}
       </Link>
     )
